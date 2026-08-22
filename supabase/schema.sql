@@ -6,9 +6,10 @@ do $$ begin create type public.order_status as enum ('pending','paid','failed','
 do $$ begin create type public.ticket_status as enum ('open','pending','closed'); exception when duplicate_object then null; end $$;
 
 create table if not exists public.products (
-  id uuid primary key default gen_random_uuid(), slug text unique not null, title text not null, description text, price numeric(12,2) not null check (price >= 0), currency text not null default 'USD', cover_url text, file_path text not null, is_published boolean not null default false, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+  id uuid primary key default gen_random_uuid(), slug text unique not null, title text not null, category text not null default 'General', description text, price numeric(12,2) not null check (price >= 0), currency text not null default 'USD', cover_url text, file_path text not null, is_published boolean not null default false, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 
+alter table public.products add column if not exists category text not null default 'General';
 alter table public.products add column if not exists original_price numeric(12,2) check (original_price is null or original_price >= 0);
 alter table public.products add column if not exists gallery_urls text[];
 

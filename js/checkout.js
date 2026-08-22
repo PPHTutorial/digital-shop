@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { escapeHtml, getAccount, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
+import { escapeHtml, finishPageLoader, getAccount, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 import { convertAmount, formatCurrency, getExchangeRates } from './currency.js';
 
 const params = new URLSearchParams(location.search);
@@ -184,10 +184,11 @@ function setupDescription(text, title) {
 }
 
 async function load() {
-  mountHeader();
+  await mountHeader();
   const { user } = await getAccount();
   if (!user) {
     const nextUrl = `checkout.html?product=${encodeURIComponent(productId || '')}`;
+    finishPageLoader();
     location.replace(`./auth.html?mode=signin&next=${encodeURIComponent(nextUrl)}`);
     return;
   }
@@ -196,13 +197,14 @@ async function load() {
   if (!productId) {
     document.querySelector('#product-title').textContent = 'No product selected';
     document.querySelector('#description-preview').innerHTML = '<p class="text-slate-500">Please choose a book from the <a href="./index.html#store" class="text-orange-600 underline font-bold">catalog</a> first.</p>';
+    finishPageLoader();
     return;
   }
 
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
   let query = supabase
     .from('products')
-    .select('id,title,description,price,original_price,currency,cover_url,is_published');
+    .select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published');
 
   if (isUUID) {
     query = query.eq('id', productId);
@@ -215,6 +217,7 @@ async function load() {
   if (error || !data) {
     document.querySelector('#product-title').textContent = 'Product unavailable';
     document.querySelector('#description-preview').innerHTML = '<p class="text-red-600">This book could not be loaded or is not published yet. <a href="./index.html#store" class="text-orange-600 underline font-bold ml-1">Browse catalog</a></p>';
+    finishPageLoader();
     return;
   }
 
@@ -222,10 +225,38 @@ async function load() {
   productId = data.id;
   sessionStorage.setItem('last_selected_product', data.id);
 
+  // Update address bar with clean shareable URL
+  const canonicalKey = data.slug || data.id;
+  if (!location.search.includes(canonicalKey)) {
+    history.replaceState(null, '', `checkout.html?product=${encodeURIComponent(canonicalKey)}`);
+  }
+
+  // Wire share button
+  const shareBtn = document.querySelector('#share-checkout-btn');
+  if (shareBtn) {
+    shareBtn.onclick = async () => {
+      const canonicalUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(canonicalKey)}`;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: data.title, url: canonicalUrl });
+          return;
+        } catch {}
+      }
+      navigator.clipboard.writeText(canonicalUrl);
+      toast('Shareable product link copied to clipboard!');
+    };
+  }
+
   // Left Column
   document.querySelector('#product-title').textContent = data.title;
   setupImageGallery(data.cover_url);
   setupDescription(data.description, data.title);
+
+  // Category Tag
+  const categoryTag = document.querySelector('#product-category-tag');
+  if (categoryTag) {
+    categoryTag.textContent = data.category || 'Digital Edition';
+  }
 
   // Discount badge
   const discountBadge = document.querySelector('#discount-badge');
@@ -261,6 +292,8 @@ async function load() {
   }
 
   renderTotals();
+  renderIcons();
+  finishPageLoader();
 }
 
 // Payment method UI switching
@@ -291,9 +324,76 @@ providerTabs.forEach((tab) => {
 });
 
 // Real-time conversion on currency or channel change
-document.querySelector('#flw-currency-select')?.addEventListener('change', () => renderTotals());
-document.querySelector('#flw-method-select')?.addEventListener('change', () => updatePayButtonLabel());
-document.querySelector('#crypto-currency-select')?.addEventListener('change', () => updatePayButtonLabel());
+const flwCurrencySelect = document.querySelector('#flw-currency-select');
+const flwMethodSelect = document.querySelector('#flw-method-select');
+const cryptoCurrencySelect = document.querySelector('#crypto-currency-select');
+
+// Currency → Payment Channel mapping:
+// Which payment channels each currency supports on Flutterwave
+const currencyChannelMap = {
+  USD: ['all', 'card'],
+  GBP: ['all', 'card'],
+  EUR: ['all', 'card'],
+  CAD: ['all', 'card'],
+  AUD: ['all', 'card'],
+  NGN: ['all', 'card', 'banktransfer', 'ussd'],
+  GHS: ['all', 'card', 'mobilemoney'],
+  KES: ['all', 'card', 'mobilemoney'],
+  UGX: ['all', 'card', 'mobilemoney'],
+  ZAR: ['all', 'card'],
+};
+
+// Payment Channel → Best default currency
+const channelCurrencyDefault = {
+  mobilemoney: 'GHS',
+  ussd: 'NGN',
+  banktransfer: 'NGN',
+};
+
+function syncCurrencyAndMethod(source) {
+  if (!flwCurrencySelect || !flwMethodSelect) return;
+
+  const currency = flwCurrencySelect.value;
+  const method = flwMethodSelect.value;
+
+  if (source === 'method') {
+    // User changed the payment channel → auto-switch currency if needed
+    const supportedCurrencies = Object.entries(currencyChannelMap)
+      .filter(([, channels]) => channels.includes(method))
+      .map(([cur]) => cur);
+
+    if (method !== 'all' && method !== 'card' && !supportedCurrencies.includes(currency)) {
+      const defaultCur = channelCurrencyDefault[method] || supportedCurrencies[0] || 'USD';
+      flwCurrencySelect.value = defaultCur;
+      toast(`Currency switched to ${defaultCur} for ${method === 'mobilemoney' ? 'Mobile Money' : method === 'ussd' ? 'USSD' : 'Bank Transfer'} compatibility.`);
+    }
+  } else if (source === 'currency') {
+    // User changed currency → auto-switch channel if current channel is incompatible
+    const allowed = currencyChannelMap[currency] || ['all', 'card'];
+    if (!allowed.includes(method)) {
+      flwMethodSelect.value = 'all';
+      toast(`Payment channel reset — ${method} is not available for ${currency}.`);
+    }
+  }
+
+  // Disable incompatible method options for current currency
+  const allowed = currencyChannelMap[currency] || ['all', 'card'];
+  Array.from(flwMethodSelect.options).forEach((opt) => {
+    opt.disabled = !allowed.includes(opt.value);
+  });
+}
+
+flwCurrencySelect?.addEventListener('change', () => {
+  syncCurrencyAndMethod('currency');
+  renderTotals();
+});
+
+flwMethodSelect?.addEventListener('change', () => {
+  syncCurrencyAndMethod('method');
+  renderTotals();
+});
+
+cryptoCurrencySelect?.addEventListener('change', () => updatePayButtonLabel());
 
 // Wire modal close buttons
 [document.querySelector('#close-desc-modal'), document.querySelector('#close-desc-modal-btn')].forEach((btn) => {

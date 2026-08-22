@@ -32,7 +32,6 @@ Deno.serve(async (request) => {
     const product = Array.isArray(order.products) ? order.products[0] : order.products;
     const { data, error } = await db.storage.from('books').createSignedUrl(product.file_path, 600);
     if (error) throw error;
-    if (token) await db.from('orders').update({ download_token_hash: null, download_expires_at: null }).eq('id', order.id);
     return json({ url: data.signedUrl });
   } catch (error) {
     return json({ error: 'Unable to generate download' }, { status: 500 });

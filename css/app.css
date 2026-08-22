@@ -33,7 +33,7 @@ body {
   padding: 0 24px;
   margin: auto;
   align-items: center;
-  gap: 32px;
+  justify-content: space-between;
   background: #fff;
 }
 .brand {
@@ -44,6 +44,7 @@ body {
   font-size: 25px;
   font-weight: 900;
   letter-spacing: -0.04em;
+  flex-shrink: 0;
 }
 .brand small {
   display: block;
@@ -64,49 +65,61 @@ body {
   font-size: 21px;
 }
 .nav-links {
-  display: flex;
-  align-items: center;
-  gap: 27px;
-  margin-left: auto;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 20px !important;
+  margin-inline: auto !important;
   color: #30496f;
   font-size: 14px;
   font-weight: 600;
 }
 .nav-links a,
 .nav-dropdown button {
-  color: inherit;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  color: #30496f !important;
   background: none;
   border: 0;
   font: inherit;
+  font-size: 14px !important;
+  font-weight: 600 !important;
   cursor: pointer;
+  white-space: nowrap !important;
+  text-decoration: none !important;
+  line-height: 1 !important;
+  padding: 6px 12px !important;
+  border-radius: 99px !important;
+  transition: all 0.15s ease !important;
 }
-.nav-dropdown {
-  position: relative;
+.nav-links a:hover,
+.nav-dropdown button:hover {
+  color: #f97316 !important;
+  background: #fff8f5 !important;
 }
-.dropdown-panel {
-  display: none;
-  position: absolute;
-  z-index: 50;
-  min-width: 190px;
-  top: 25px;
-  left: -14px;
-  padding: 9px;
-  border: 1px solid #e5e7eb;
-  background: white;
-  box-shadow: 0 16px 36px #142c5522;
-  border-radius: 14px;
+.nav-links a.active {
+  color: #f97316 !important;
+  font-weight: 700 !important;
+  background: #fff3ed !important;
 }
-.nav-dropdown:hover .dropdown-panel,
-.nav-dropdown:focus-within .dropdown-panel {
-  display: grid;
-  gap: 2px;
+.nav-links a svg,
+.nav-links a i,
+.nav-links a [data-lucide] {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  width: 18px !important;
+  height: 18px !important;
+  margin: 0 !important;
 }
-.dropdown-panel a {
-  padding: 9px 10px;
-  border-radius: 9px;
-}
-.dropdown-panel a:hover {
-  background: #fff3ed;
+.nav-links a span {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  line-height: 1 !important;
 }
 .nav-actions {
   display: flex;
@@ -114,6 +127,7 @@ body {
   gap: 14px;
   font-size: 14px;
   font-weight: 700;
+  flex-shrink: 0;
 }
 .button,
 .text-action {

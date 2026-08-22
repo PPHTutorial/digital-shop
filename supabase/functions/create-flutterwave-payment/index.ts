@@ -60,7 +60,6 @@ Deno.serve(async (request) => {
     // Unique reference per payment attempt
     const reference = `BOOK-${order.id.slice(0, 8)}-${Date.now()}`;
     const customerName = user.user_metadata?.full_name || order.customer_email.split('@')[0] || 'Customer';
-    const chargeCurrency = (chosenCurrency || product.currency || 'USD').toUpperCase();
 
     // Map payment option preference to Flutterwave payment_options string
     let paymentOptionsStr = 'card, banktransfer, ussd, mobilemoneyghana, mobilemoneyuganda, mobilemoneyrwanda, mobilemoneyzambia, mpesa, qr, enaira, credit, account, barter, googlepay, applepay';

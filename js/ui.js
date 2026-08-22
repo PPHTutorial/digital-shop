@@ -1,5 +1,22 @@
 import { supabase } from './client.js';
-export function startPageLoader(){if(document.querySelector('#page-loader'))return;const l=document.createElement('div');l.id='page-loader';l.className='page-loader';l.innerHTML='<div class="loader-card"><div class="shimmer logo"></div><div class="shimmer hero"></div><div class="shimmer short"></div></div>';document.body.append(l)}export function finishPageLoader(){document.querySelector('#page-loader')?.classList.add('is-done')}
+
+export function startPageLoader() {
+  if (document.querySelector('#page-loader')) return;
+  const l = document.createElement('div');
+  l.id = 'page-loader';
+  l.className = 'page-loader';
+  l.innerHTML = '<div class="loader-card"><div class="shimmer logo"></div><div class="shimmer hero"></div><div class="shimmer short"></div></div>';
+  document.body.prepend(l);
+}
+export function finishPageLoader() {
+  const loader = document.querySelector('#page-loader');
+  if (loader) {
+    loader.classList.add('is-done');
+    setTimeout(() => {
+      loader.remove();
+    }, 400);
+  }
+}
 export function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
 export function toast(message,type='success'){let r=document.querySelector('#toast-region');if(!r){r=document.createElement('div');r.id='toast-region';r.className='toast-region';document.body.append(r)}const e=document.createElement('div');e.className=`toast toast-${type}`;e.innerHTML=`<span>${type==='error'?'!':'✓'}</span><p>${escapeHtml(message)}</p><button>×</button>`;e.querySelector('button').onclick=()=>e.remove();r.append(e);setTimeout(()=>e.remove(),6000)}
 export function setButtonLoading(b,loading,label='Please wait…'){if(!b)return;if(loading){b.dataset.label=b.textContent;b.disabled=true;b.innerHTML=`<span class="spinner"></span>${label}`}else{b.disabled=false;b.textContent=b.dataset.label||b.textContent}}
@@ -22,13 +39,24 @@ export async function mountHeader() {
   const render = async () => {
     const { user, profile } = await getAccount();
     const name = profile?.full_name || 'My account';
+
+    const path = window.location.pathname.toLowerCase().split('/').pop() || 'index.html';
+    const hash = window.location.hash.toLowerCase();
+
+    const isCatalog = hash === '#store';
+    const isHome = (path === 'index.html' || path === '' || path === '/') && !isCatalog;
+    const isBlog = path.includes('blog');
+    const isAbout = path.includes('about');
+    const isContact = path.includes('contact');
+    const isSupport = path.includes('support');
+
     const links = `
-      <a href="./index.html">${icon('house')}<span>Home</span></a>
-      <a href="./index.html#store">${icon('shopping-bag')}<span>Catalog</span></a>
-      <a href="./blog.html">${icon('newspaper')}<span>Blog</span></a>
-      <a href="./about.html">${icon('info')}<span>About</span></a>
-      <a href="./contact.html">${icon('mail')}<span>Contact</span></a>
-      <a href="./support.html">${icon('circle-help')}<span>Support</span></a>
+      <a href="./index.html" class="${isHome ? 'active' : ''}">${icon('house')}<span>Home</span></a>
+      <a href="./index.html#store" class="${isCatalog ? 'active' : ''}">${icon('shopping-bag')}<span>Catalog</span></a>
+      <a href="./blog.html" class="${isBlog ? 'active' : ''}">${icon('newspaper')}<span>Blog</span></a>
+      <a href="./about.html" class="${isAbout ? 'active' : ''}">${icon('info')}<span>About</span></a>
+      <a href="./contact.html" class="${isContact ? 'active' : ''}">${icon('mail')}<span>Contact</span></a>
+      <a href="./support.html" class="${isSupport ? 'active' : ''}">${icon('circle-help')}<span>Support</span></a>
     `;
     target.innerHTML = `
       <div class="utility-bar">
@@ -86,6 +114,7 @@ export async function mountHeader() {
       </aside>
     `;
     renderIcons();
+    finishPageLoader();
     const drawer = target.querySelector('#mobile-drawer');
     target.querySelector('#mobile-menu-button').onclick = () => {
       drawer.classList.add('open');

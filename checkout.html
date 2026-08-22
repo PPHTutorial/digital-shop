@@ -8,6 +8,15 @@
   <link rel="stylesheet" href="./css/app.css">
 </head>
 <body class="bg-slate-50 text-slate-900">
+  <!-- Instant Page Loader -->
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
+    </div>
+  </div>
+
   <header id="site-header" class="sticky top-0 z-40"></header>
 
   <main class="shell py-10 lg:py-14">
@@ -38,11 +47,17 @@
         <!-- Product Title & Details -->
         <div class="border-t border-slate-100 pt-5">
           <div class="flex flex-wrap items-center gap-2 mb-2">
-            <span class="tag">Digital Edition</span>
+            <span id="product-category-tag" class="tag">Digital Edition</span>
             <span id="discount-badge" class="discount-pill hidden">Sale</span>
             <span class="text-xs text-slate-400 font-semibold">⚡ Instant PDF/EPUB Download</span>
           </div>
-          <h2 id="product-title" class="text-2xl font-black text-[#142c55]">Loading title…</h2>
+          <div class="flex items-center justify-between gap-3">
+            <h2 id="product-title" class="text-2xl font-black text-[#142c55]">Loading title…</h2>
+            <button id="share-checkout-btn" type="button" class="button !min-h-9 !px-3 !text-xs flex-shrink-0" title="Share product checkout link">
+              <i data-lucide="share-2" width="15" height="15"></i>
+              <span>Share link</span>
+            </button>
+          </div>
         </div>
 
         <!-- Description (5-10 lines max with Read More) -->

@@ -1,38 +1,212 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin | DigiStore</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="./css/app.css"></head><body class="bg-slate-50 text-slate-900"><div class="min-h-screen lg:flex"><aside class="bg-[#142c55] p-5 text-white lg:sticky lg:top-0 lg:h-screen lg:w-64"><a class="brand !text-white" href="./index.html"><span class="brand-mark">D</span><span>DigiStore<small class="!text-slate-400">Control centre</small></span></a><nav class="mt-7 flex gap-2 overflow-x-auto text-sm font-bold lg:grid"><a class="admin-link active" href="#overview">Overview</a><a class="admin-link" href="#customers">Customers</a><a class="admin-link" href="#transactions">Transactions</a><a class="admin-link" href="#products">Catalog</a><a class="admin-link" href="#content">Content</a><a class="admin-link" href="#tickets">Support</a></nav><div class="mt-8 text-xs text-slate-400"><a class="font-bold text-white" href="./account.html">Back to account</a></div></aside><main class="min-w-0 flex-1"><header class="border-b bg-white"><div class="shell flex items-center justify-between py-5"><div><span class="eyebrow">DIGISTORE OPERATIONS</span><h1 class="mt-1 text-2xl font-black text-[#142c55]">Command centre</h1></div><div class="flex gap-3"><span id="admin-user" class="hidden text-sm font-bold text-slate-500 sm:block"></span><button id="admin-signout" class="button">Log out</button></div></div></header><div class="shell space-y-7 py-7"><p id="admin-status" class="status-line"></p><section id="overview" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><div class="metric"><span>Total revenue</span><strong id="m-revenue">—</strong></div><div class="metric"><span>Paid orders</span><strong id="m-orders">—</strong></div><div class="metric"><span>Customers</span><strong id="m-customers">—</strong></div><div class="metric"><span>Open support</span><strong id="m-tickets">—</strong></div></section><section class="grid gap-7 xl:grid-cols-[1.25fr_.75fr]"><div class="soft-panel p-6"><span class="eyebrow">REVENUE ANALYTICS</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Seven-day revenue</h2><div id="revenue-chart" class="mt-7 h-52"></div></div><div class="soft-panel p-6"><span class="eyebrow">STORE HEALTH</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Operations</h2><div id="operations-list" class="mt-5 grid gap-3"></div></div></section><section id="customers" class="soft-panel p-6"><span class="eyebrow">CUSTOMERS</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Users and sign-in activity</h2><div id="users-table" class="mt-5"></div></section><section id="transactions" class="soft-panel p-6"><span class="eyebrow">TRANSACTIONS</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Orders and payments</h2><div id="orders-table" class="mt-5"></div></section><section id="products" class="soft-panel p-6"><div class="flex justify-between gap-3"><div><span class="eyebrow">CATALOG</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Products and promotions</h2></div><button id="new-product" class="button button-primary">Add product</button></div><div id="products-table" class="mt-5"></div><div class="mt-7 flex justify-between"><h3 class="font-black text-[#142c55]">Promotion codes</h3><button id="new-promo" class="button">Add promotion</button></div><div id="promos-table" class="mt-4"></div></section><section id="content" class="soft-panel p-6"><span class="eyebrow">CMS &amp; JOURNAL</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Store content</h2><div id="posts-table" class="mt-5"></div><form id="cms-form" class="mt-7 grid gap-4 sm:grid-cols-2"><label><span class="label">Store title</span><input name="site_title" class="field"></label><label><span class="label">Support email</span><input name="support_email" class="field"></label><label class="sm:col-span-2"><span class="label">Announcement</span><textarea name="announcement" class="field"></textarea></label><button class="button button-primary">Save content</button></form></section><section id="tickets" class="soft-panel p-6"><span class="eyebrow">CUSTOMER CARE</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Support queue</h2><div id="tickets-table" class="mt-5"></div></section></div></main></div>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin Centre | DigiStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="min-h-screen lg:flex">
+    <aside class="bg-[#142c55] p-5 text-white lg:sticky lg:top-0 lg:h-screen lg:w-64">
+      <a class="brand !text-white" href="./index.html">
+        <span class="brand-mark">D</span>
+        <span>DigiStore<small class="!text-slate-400">Control centre</small></span>
+      </a>
+      <nav class="mt-7 flex gap-2 overflow-x-auto text-sm font-bold lg:grid">
+        <a class="admin-link active" href="#overview">Overview</a>
+        <a class="admin-link" href="#customers">Customers</a>
+        <a class="admin-link" href="#transactions">Transactions</a>
+        <a class="admin-link" href="#products">Catalog</a>
+        <a class="admin-link" href="#content">Content</a>
+        <a class="admin-link" href="#tickets">Support</a>
+      </nav>
+      <div class="mt-8 text-xs text-slate-400">
+        <a class="font-bold text-white hover:underline" href="./account.html">← Back to account</a>
+      </div>
+    </aside>
 
-<!-- Product / Promo editor modal -->
-<dialog id="editor-modal" class="w-[min(94vw,620px)] rounded-2xl border-0 p-0"><form id="editor-form" class="p-6"><div class="flex justify-between"><div><span id="editor-eyebrow" class="eyebrow"></span><h2 id="editor-title" class="mt-1 text-xl font-black"></h2></div><button id="close-modal" type="button" class="text-2xl text-slate-400">×</button></div><div id="editor-fields" class="mt-5 grid gap-4"></div><p id="editor-feedback" class="status-line mt-4"></p><button class="button button-primary mt-4 w-full" type="submit">Save</button></form></dialog>
+    <main class="min-w-0 flex-1">
+      <header class="border-b bg-white">
+        <div class="shell flex items-center justify-between py-5">
+          <div>
+            <span class="eyebrow">DIGISTORE OPERATIONS</span>
+            <h1 class="mt-1 text-2xl font-black text-[#142c55]">Command centre</h1>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="admin-user" class="hidden text-sm font-bold text-slate-500 sm:block"></span>
+            <button id="admin-signout" class="button">Log out</button>
+          </div>
+        </div>
+      </header>
 
-<!-- Image editor modal -->
-<dialog id="image-editor-modal" class="image-editor-modal">
-  <div class="p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-black text-[#142c55]">Edit Image</h2>
-      <button id="cancel-crop-btn" type="button" class="text-2xl leading-none text-slate-400 border-0 bg-transparent cursor-pointer">×</button>
-    </div>
-    <div class="overflow-auto rounded-xl bg-slate-100 flex justify-center items-center min-h-[200px]" style="max-height:360px">
-      <canvas id="crop-canvas" class="max-w-full block"></canvas>
-    </div>
-    <div class="mt-4 flex flex-wrap gap-2 items-center">
-      <span class="label mr-1">Crop:</span>
-      <button type="button" class="button text-xs crop-preset active" data-aspect="free">Free</button>
-      <button type="button" class="button text-xs crop-preset" data-aspect="1">Square 1:1</button>
-      <button type="button" class="button text-xs crop-preset" data-aspect="1.3333">Portrait 4:3</button>
-      <button type="button" class="button text-xs crop-preset" data-aspect="1.7778">Landscape 16:9</button>
-    </div>
-    <div class="mt-3 flex flex-wrap gap-4 items-center">
-      <span class="label mr-1">Quality:</span>
-      <label class="text-sm flex gap-1.5 items-center cursor-pointer"><input type="radio" name="img-quality" value="lossless"> Lossless (PNG)</label>
-      <label class="text-sm flex gap-1.5 items-center cursor-pointer"><input type="radio" name="img-quality" value="0.92" checked> High JPEG 92%</label>
-      <label class="text-sm flex gap-1.5 items-center cursor-pointer"><input type="radio" name="img-quality" value="0.75"> Compressed 75%</label>
-    </div>
-    <div class="mt-5 flex gap-3 justify-end">
-      <button id="cancel-crop-btn-2" type="button" class="button">Cancel</button>
-      <button id="apply-crop-btn" type="button" class="button button-primary">Apply &amp; Upload</button>
-    </div>
+      <div class="shell space-y-7 py-7">
+        <p id="admin-status" class="status-line"></p>
+
+        <!-- Overview Section -->
+        <section id="overview" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="metric"><span>Total revenue</span><strong id="m-revenue">—</strong></div>
+          <div class="metric"><span>Paid orders</span><strong id="m-orders">—</strong></div>
+          <div class="metric"><span>Total customers</span><strong id="m-customers">—</strong></div>
+          <div class="metric"><span>Open tickets</span><strong id="m-tickets">—</strong></div>
+        </section>
+
+        <section class="grid gap-7 xl:grid-cols-[1.25fr_.75fr]">
+          <div class="soft-panel p-6">
+            <span class="eyebrow">REVENUE ANALYTICS</span>
+            <h2 class="mt-1 text-xl font-black text-[#142c55]">Seven-day revenue</h2>
+            <div id="revenue-chart" class="mt-7 h-52"></div>
+          </div>
+          <div class="soft-panel p-6">
+            <span class="eyebrow">STORE HEALTH</span>
+            <h2 class="mt-1 text-xl font-black text-[#142c55]">Operations snapshot</h2>
+            <div id="operations-list" class="mt-5 grid gap-3"></div>
+          </div>
+        </section>
+
+        <!-- Customers Section -->
+        <section id="customers" class="soft-panel p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="eyebrow">CUSTOMERS &amp; USERS</span>
+              <h2 class="mt-1 text-xl font-black text-[#142c55]">Customer management</h2>
+            </div>
+          </div>
+          <div id="users-table" class="mt-5"></div>
+        </section>
+
+        <!-- Transactions Section -->
+        <section id="transactions" class="soft-panel p-6">
+          <span class="eyebrow">TRANSACTIONS</span>
+          <h2 class="mt-1 text-xl font-black text-[#142c55]">Orders and payments</h2>
+          <div id="orders-status-summary" class="mt-3 flex flex-wrap gap-2 text-xs"></div>
+          <div id="orders-filter-tabs" class="mt-3 flex flex-wrap gap-1.5"></div>
+          <div id="orders-table" class="mt-4"></div>
+        </section>
+
+        <!-- Catalog & Products Section -->
+        <section id="products" class="soft-panel p-6">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <span class="eyebrow">CATALOG</span>
+              <h2 class="mt-1 text-xl font-black text-[#142c55]">Products and digital editions</h2>
+            </div>
+            <button id="new-product" class="button button-primary">+ Add product</button>
+          </div>
+          <div id="products-table" class="mt-5"></div>
+
+          <div class="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
+            <div>
+              <span class="eyebrow">DISCOUNTS</span>
+              <h3 class="mt-1 text-xl font-black text-[#142c55]">Promotion codes</h3>
+            </div>
+            <button id="new-promo" class="button">+ Add promotion</button>
+          </div>
+          <div id="promos-table" class="mt-4"></div>
+        </section>
+
+        <!-- CMS Section -->
+        <section id="content" class="soft-panel p-6">
+          <span class="eyebrow">CMS &amp; JOURNAL</span>
+          <h2 class="mt-1 text-xl font-black text-[#142c55]">Store content &amp; blog</h2>
+          <div id="posts-table" class="mt-5"></div>
+          
+          <form id="cms-form" class="mt-7 grid gap-4 sm:grid-cols-2 border-t border-slate-100 pt-6">
+            <label>
+              <span class="label">Store title</span>
+              <input name="site_title" class="field">
+            </label>
+            <label>
+              <span class="label">Support email</span>
+              <input name="support_email" class="field">
+            </label>
+            <label class="sm:col-span-2">
+              <span class="label">Store announcement banner</span>
+              <textarea name="announcement" class="field" rows="2"></textarea>
+            </label>
+            <div>
+              <button class="button button-primary">Save store settings</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Support Queue Section -->
+        <section id="tickets" class="soft-panel p-6">
+          <span class="eyebrow">CUSTOMER CARE</span>
+          <h2 class="mt-1 text-xl font-black text-[#142c55]">Support queue</h2>
+          <div id="tickets-table" class="mt-5"></div>
+        </section>
+      </div>
+    </main>
   </div>
-</dialog>
 
-<script type="module" src="./js/admin.js"></script>
+  <!-- General Editor Modal -->
+  <dialog id="editor-modal" class="w-[min(94vw,640px)] rounded-2xl border-0 p-0 shadow-2xl">
+    <form id="editor-form" class="p-6">
+      <div class="flex items-start justify-between pb-3 border-b border-slate-100">
+        <div>
+          <span id="editor-eyebrow" class="eyebrow"></span>
+          <h2 id="editor-title" class="mt-1 text-xl font-black text-[#142c55]"></h2>
+        </div>
+        <button id="close-modal" type="button" class="text-2xl text-slate-400 hover:text-slate-700 bg-transparent border-0 cursor-pointer">×</button>
+      </div>
+      <div id="editor-fields" class="mt-5 grid gap-4"></div>
+      <p id="editor-feedback" class="status-line mt-4"></p>
+      <div class="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
+        <button id="cancel-modal-btn" type="button" class="button">Cancel</button>
+        <button id="editor-submit-btn" class="button button-primary" type="submit">Save changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Details / Activity View Modal -->
+  <dialog id="details-modal" class="w-[min(94vw,640px)] rounded-2xl border-0 p-0 shadow-2xl">
+    <div class="p-6">
+      <div class="flex items-start justify-between pb-3 border-b border-slate-100">
+        <div>
+          <span id="details-eyebrow" class="eyebrow">CUSTOMER DETAILS</span>
+          <h2 id="details-title" class="mt-1 text-xl font-black text-[#142c55]">Customer activity</h2>
+        </div>
+        <button id="close-details-modal" type="button" class="text-2xl text-slate-400 hover:text-slate-700 bg-transparent border-0 cursor-pointer">×</button>
+      </div>
+      <div id="details-content" class="mt-5 space-y-4 max-h-[60vh] overflow-y-auto pr-1"></div>
+      <div class="mt-6 flex justify-end border-t border-slate-100 pt-4">
+        <button id="close-details-btn" type="button" class="button">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Image Editor Modal -->
+  <dialog id="image-editor-modal" class="image-editor-modal">
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-black text-[#142c55]">Edit Image</h2>
+        <button id="cancel-crop-btn" type="button" class="text-2xl leading-none text-slate-400 border-0 bg-transparent cursor-pointer">×</button>
+      </div>
+      <div class="overflow-auto rounded-xl bg-slate-100 flex justify-center items-center min-h-[200px]" style="max-height:360px">
+        <canvas id="crop-canvas" class="max-w-full block"></canvas>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2 items-center">
+        <span class="label mr-1">Crop:</span>
+        <button type="button" class="button text-xs crop-preset active" data-aspect="free">Free</button>
+        <button type="button" class="button text-xs crop-preset" data-aspect="1">Square 1:1</button>
+        <button type="button" class="button text-xs crop-preset" data-aspect="1.3333">Portrait 4:3</button>
+        <button type="button" class="button text-xs crop-preset" data-aspect="1.7778">Landscape 16:9</button>
+      </div>
+      <div class="mt-3 flex flex-wrap gap-4 items-center">
+        <span class="label mr-1">Quality:</span>
+        <label class="text-sm flex gap-1.5 items-center cursor-pointer"><input type="radio" name="img-quality" value="lossless"> Lossless (PNG)</label>
+        <label class="text-sm flex gap-1.5 items-center cursor-pointer"><input type="radio" name="img-quality" value="0.92" checked> High JPEG 92%</label>
+        <label class="text-sm flex gap-1.5 items-center cursor-pointer"><input type="radio" name="img-quality" value="0.75"> Compressed 75%</label>
+      </div>
+      <div class="mt-5 flex gap-3 justify-end">
+        <button id="cancel-crop-btn-2" type="button" class="button">Cancel</button>
+        <button id="apply-crop-btn" type="button" class="button button-primary">Apply &amp; Upload</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="./js/admin.js"></script>
 </body>
 </html>
