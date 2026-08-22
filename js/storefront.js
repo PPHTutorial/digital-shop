@@ -1,5 +1,5 @@
 import { supabase } from "./client.js";
-import { escapeHtml, mountHeader, setButtonLoading, toast } from './ui.js';
+import { escapeHtml, finishPageLoader, initMotion, mountHeader, setButtonLoading, startPageLoader, toast } from './ui.js';
 document.querySelector("#year").textContent = new Date().getFullYear();
 const grid = document.querySelector("#product-grid");
 async function load() {
@@ -12,7 +12,7 @@ async function load() {
   if (error) {
     grid.innerHTML = '<div class="soft-panel p-8 text-slate-600">The catalog is unavailable right now. Please try again shortly.</div>';
     document.querySelector('#product-loading').classList.add('hidden');
-    return;
+    finishPageLoader(); return;
   }
   document.querySelector("#product-count").textContent =
     `${data.length} published title${data.length === 1 ? "" : "s"}`;
@@ -20,7 +20,7 @@ async function load() {
     grid.innerHTML =
       '<div class="soft-panel p-8 text-slate-600">No books are published yet.</div>';
     document.querySelector('#product-loading').classList.add('hidden');
-    return;
+    finishPageLoader(); return;
   }
   grid.innerHTML = data
     .map(
@@ -29,6 +29,7 @@ async function load() {
     )
     .join("");
   document.querySelector('#product-loading').classList.add('hidden');
+  finishPageLoader();
 }
 document
   .querySelector("#subscribe-form")
@@ -51,5 +52,6 @@ document
     e.currentTarget.reset();
     toast('Subscription confirmed.');
   });
-mountHeader();
+startPageLoader(); mountHeader();
+initMotion();
 load();

@@ -10,10 +10,7 @@
 </head>
 
 <body class="bg-stone-50 text-slate-900">
-    <header class="bg-stone-50">
-        <div class="mx-auto max-w-7xl px-5 py-6 lg:px-8"><a href="./index.html" class="font-black">NORTHSTAR<span
-                    class="text-slate-500">BOOKS</span></a></div>
-    </header>
+    <header id="site-header"></header>
     <main class="mx-auto max-w-5xl px-5 py-12 lg:px-8">
         <div class="mb-8"><span class="eyebrow">SUPPORT DESK</span>
             <h1 class="mt-3 text-4xl font-black">How can we help?</h1>
@@ -38,7 +35,7 @@
             </form>
         </section>
     </main>
-    <script type="module" src="./js/support.js"></script>
+    <script type="module" src="./js/support.js"></script><script type="module">import {mountHeader} from './js/ui.js';mountHeader();</script>
 </body>
 
 </html>

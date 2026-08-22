@@ -90,6 +90,44 @@ create table if not exists public.site_settings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.blog_posts (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  title text not null,
+  excerpt text,
+  content text not null,
+  cover_url text,
+  source_url text,
+  status text not null default 'draft' check (status in ('draft', 'published')),
+  published_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.search_index_queue (
+  id uuid primary key default gen_random_uuid(),
+  entity_type text not null check (entity_type in ('product', 'blog_post')),
+  entity_id uuid not null,
+  operation text not null default 'upsert' check (operation in ('upsert', 'delete')),
+  created_at timestamptz not null default now(),
+  processed_at timestamptz
+);
+
+create or replace function public.queue_search_index()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'DELETE' then
+    insert into public.search_index_queue(entity_type, entity_id, operation) values (tg_argv[0], old.id, 'delete');
+    return old;
+  end if;
+  insert into public.search_index_queue(entity_type, entity_id, operation) values (tg_argv[0], new.id, 'upsert');
+  return new;
+end; $$;
+drop trigger if exists products_search_index on public.products;
+create trigger products_search_index after insert or update or delete on public.products for each row execute procedure public.queue_search_index('product');
+drop trigger if exists blog_posts_search_index on public.blog_posts;
+create trigger blog_posts_search_index after insert or update or delete on public.blog_posts for each row execute procedure public.queue_search_index('blog_post');
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -118,6 +156,8 @@ alter table public.subscribers enable row level security;
 alter table public.tickets enable row level security;
 alter table public.site_settings enable row level security;
 alter table public.promo_codes enable row level security;
+alter table public.blog_posts enable row level security;
+alter table public.search_index_queue enable row level security;
 
 drop policy if exists "published products are public" on public.products;
 drop policy if exists "users read own profile" on public.profiles;
@@ -133,6 +173,9 @@ drop policy if exists "owners/admins read tickets" on public.tickets;
 drop policy if exists "admins update tickets" on public.tickets;
 drop policy if exists "admins manage cms" on public.site_settings;
 drop policy if exists "admins manage promotion codes" on public.promo_codes;
+drop policy if exists "public read published blogs" on public.blog_posts;
+drop policy if exists "admins manage blogs" on public.blog_posts;
+drop policy if exists "admins manage search queue" on public.search_index_queue;
 
 create policy "published products are public" on public.products for select using (is_published = true or auth.uid() in (select id from public.profiles where role='admin'));
 create policy "users read own profile" on public.profiles for select using (auth.uid()=id or auth.uid() in (select id from public.profiles where role='admin'));
@@ -148,6 +191,9 @@ create policy "owners/admins read tickets" on public.tickets for select using (a
 create policy "admins update tickets" on public.tickets for update using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
 create policy "admins manage cms" on public.site_settings for all using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
 create policy "admins manage promotion codes" on public.promo_codes for all using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
+create policy "public read published blogs" on public.blog_posts for select using (status = 'published' or auth.uid() in (select id from public.profiles where role='admin'));
+create policy "admins manage blogs" on public.blog_posts for all using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
+create policy "admins manage search queue" on public.search_index_queue for all using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
 
 insert into storage.buckets (id, name, public)
 values ('books', 'books', false)

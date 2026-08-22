@@ -1,30 +1,4 @@
-import { supabase } from './client.js';
-import { escapeHtml, getAccount, mountHeader, setButtonLoading, toast } from './ui.js';
-
-let account;
-async function load() {
-  mountHeader();
-  account = await getAccount();
-  if (!account.user) { location.replace('./auth.html?mode=signin'); return; }
-  const { user, profile } = account;
-  document.querySelector('#account-subtitle').textContent = `${user.email} · ${profile?.role === 'admin' ? 'Administrator' : 'Customer account'}`;
-  const form = document.querySelector('#profile-form');
-  ['full_name', 'phone', 'country', 'address', 'occupation', 'age'].forEach((field) => form.elements[field].value = profile?.[field] ?? '');
-  document.querySelector('#admin-card').classList.toggle('hidden', profile?.role !== 'admin');
-  const { data: orders, error } = await supabase.from('orders').select('id,status,amount,currency,created_at,products(title)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(12);
-  const list = document.querySelector('#orders-list');
-  if (error) { list.innerHTML = '<p class="text-sm text-red-700">Orders are unavailable right now.</p>'; return; }
-  list.innerHTML = orders?.length ? orders.map((order) => `<div class="border-t border-slate-100 py-4"><div class="flex justify-between gap-4"><div><strong class="text-sm text-[#142c55]">${escapeHtml(order.products?.title || 'Digital product')}</strong><p class="mt-1 text-xs text-slate-500">${new Date(order.created_at).toLocaleDateString()}</p></div><div class="text-right"><strong class="text-sm">${order.currency} ${Number(order.amount).toFixed(2)}</strong><p class="mt-1 text-xs font-bold ${order.status === 'paid' ? 'text-green-700' : 'text-slate-500'}">${escapeHtml(order.status)}</p></div></div></div>`).join('') : '<p class="py-4 text-sm text-slate-500">No purchases yet.</p>';
-}
-document.querySelector('#profile-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const button = event.currentTarget.querySelector('button');
-  const values = Object.fromEntries(new FormData(event.currentTarget).entries());
-  setButtonLoading(button, true, 'Saving…');
-  const { error } = await supabase.from('profiles').update({ ...values, age: values.age ? Number(values.age) : null, updated_at: new Date().toISOString() }).eq('id', account.user.id);
-  setButtonLoading(button, false);
-  const feedback = document.querySelector('#profile-feedback');
-  if (error) { feedback.textContent = error.message; feedback.className = 'status-line error sm:col-span-2'; return; }
-  feedback.textContent = 'Your account details have been saved.'; feedback.className = 'status-line success sm:col-span-2'; toast('Account details saved.');
-});
-load();
+import { supabase } from './client.js'; import { escapeHtml, getAccount, mountHeader, setButtonLoading, toast } from './ui.js'; let account;
+const chart=orders=>{const paid=orders.filter(o=>o.status==='paid');const max=Math.max(1,...paid.map(o=>Number(o.amount)));return paid.length?`<div class="flex h-full items-end gap-3">${paid.slice(0,7).reverse().map(o=>`<div class="flex flex-1 flex-col items-center gap-2"><span class="text-xs">$${Number(o.amount).toFixed(0)}</span><div class="w-full rounded-t bg-orange-500" style="height:${Math.max(8,Number(o.amount)/max*125)}px"></div><small class="text-[10px] text-slate-400">${new Date(o.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</small></div>`).join('')}</div>`:'<p class="pt-16 text-center text-sm text-slate-500">Your purchase activity will appear here.</p>'};
+async function load(){mountHeader();account=await getAccount();if(!account.user){location.replace('./auth.html?mode=signin');return}const{user,profile}=account;document.querySelector('#account-title').textContent=`Welcome, ${profile?.full_name||'there'}`;document.querySelector('#account-subtitle').textContent='A private overview of your DigiStore activity.';document.querySelector('#account-admin').classList.toggle('hidden',profile?.role!=='admin');const{data:orders,error}=await supabase.from('orders').select('id,status,amount,currency,created_at,products(title)').eq('user_id',user.id).order('created_at',{ascending:false});const all=orders||[];const paid=all.filter(o=>o.status==='paid');document.querySelector('#a-orders').textContent=all.length;document.querySelector('#a-spend').textContent=`$${paid.reduce((s,o)=>s+Number(o.amount),0).toFixed(2)}`;document.querySelector('#a-ready').textContent=paid.length;document.querySelector('#a-member').textContent=profile?.created_at?new Date(profile.created_at).toLocaleDateString(undefined,{month:'short',year:'numeric'}):'—';document.querySelector('#activity-chart').innerHTML=chart(all);document.querySelector('#orders-list').innerHTML=error?'<p class="text-red-700">Orders are unavailable.</p>':all.length?all.map(o=>`<div class="flex justify-between gap-4 border-t border-slate-100 py-4"><div><strong class="text-sm text-[#142c55]">${escapeHtml(o.products?.title||'Digital product')}</strong><p class="mt-1 text-xs text-slate-500">${new Date(o.created_at).toLocaleDateString()}</p></div><div class="text-right"><strong>${o.currency} ${Number(o.amount).toFixed(2)}</strong><p class="mt-1 text-xs font-bold ${o.status==='paid'?'text-green-700':'text-slate-500'}">${escapeHtml(o.status)}</p></div></div>`).join(''):'<p class="py-4 text-sm text-slate-500">No purchases yet.</p>';const form=document.querySelector('#profile-form');['full_name','phone','country','address','occupation','age'].forEach(k=>form.elements[k].value=profile?.[k]??'')}
+document.querySelector('#edit-profile').onclick=()=>document.querySelector('#profile-panel').classList.toggle('hidden');document.querySelector('#profile-form').onsubmit=async e=>{e.preventDefault();const b=e.currentTarget.querySelector('button');const v=Object.fromEntries(new FormData(e.currentTarget).entries());setButtonLoading(b,true,'Saving…');const{error}=await supabase.from('profiles').update({...v,age:v.age?Number(v.age):null,updated_at:new Date().toISOString()}).eq('id',account.user.id);setButtonLoading(b,false);document.querySelector('#profile-feedback').textContent=error?error.message:'Profile saved.';document.querySelector('#profile-feedback').className=`status-line sm:col-span-2 ${error?'error':'success'}`;if(!error)toast('Profile updated.')};load();

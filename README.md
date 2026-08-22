@@ -72,6 +72,16 @@ values ('WELCOME10', 'percent', 10, '2027-01-01T00:00:00Z');
 
 In Supabase Dashboard, open **Authentication → Emails → SMTP Settings** and enable Custom SMTP. Use a verified sender such as `no-reply@codeinktechnologies.com`, set the sender name to `DigiStore`, and enter the SMTP host, port, username, and password supplied by your email provider. Configure SPF, DKIM, and DMARC records for the sending domain. Then use **Authentication → Emails → Email Templates** to set the confirmation and recovery subjects/content to DigiStore, keeping `{{ .ConfirmationURL }}` in the confirmation template. Set **Authentication → URL Configuration** Site URL to `https://digistore.codeinktechnologies.com`, and add `https://digistore.codeinktechnologies.com/auth.html` to Redirect URLs.
 
+## One-command deployment
+
+Use PowerShell from the repository root:
+
+```powershell
+.\scripts\deploy.ps1 -ProjectRef synnepvvxpluoydkmphb
+```
+
+The script logs into and links Supabase, securely prompts for the required server secrets, creates the first tracked migration from `supabase/schema.sql` when required, previews then applies database migrations, deploys every Edge Function, and commits/pushes the static site to GitHub. It never stores prompted secrets in the repository. Configure GitHub Pages once to deploy from the root of `main`; thereafter each script run pushes the frontend update.
+
 ## Data minimization
 
 The requested form includes age, gender, occupation, and address. Those fields are included in the prototype, but they should be retained only when they serve a real business/compliance purpose. Do not send them to payment gateways unless actually needed.
