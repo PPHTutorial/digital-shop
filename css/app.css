@@ -692,18 +692,24 @@ a:hover {
   transform: scale(1.05);
 }
 
-/* Admin Modal Content Overflow Control */
+/* Dialog Open / Close Display Controls */
+dialog:not([open]) {
+  display: none !important;
+}
+dialog[open].admin-modal-container {
+  display: flex !important;
+  flex-direction: column;
+}
 .admin-modal-container {
   width: min(96vw, 860px);
   max-height: 92vh;
-  display: flex;
-  flex-direction: column;
   border-radius: 20px;
   border: 0;
   padding: 0;
   box-shadow: 0 25px 60px rgba(15, 23, 42, 0.25);
   background: #ffffff;
   overflow: hidden;
+  margin: auto;
 }
 .admin-modal-body {
   flex: 1;

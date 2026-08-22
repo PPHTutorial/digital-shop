@@ -512,30 +512,30 @@ async function load() {
     ['Product Details', 'Category', 'Pricing', 'Slug / URL', 'Status', 'Actions'],
     (p) => {
       const priceCell = p.original_price
-        ? `<span class="price-original">${p.currency} ${Number(p.original_price).toFixed(2)}</span>
-           <strong class="ml-1 text-slate-900">${p.currency} ${Number(p.price).toFixed(2)}</strong>`
-        : `<strong>${p.currency} ${Number(p.price).toFixed(2)}</strong>`;
+        ? `<span class="price-original text-xs">${p.currency} ${Number(p.original_price).toFixed(2)}</span>
+           <strong class="ml-1 text-slate-900 text-xs font-bold">${p.currency} ${Number(p.price).toFixed(2)}</strong>`
+        : `<strong class="text-xs font-bold text-slate-900">${p.currency} ${Number(p.price).toFixed(2)}</strong>`;
       const canonicalSlug = p.slug || p.id;
       return `
         <td class="px-3 py-3">
-          <div class="flex items-center gap-3">
-            ${p.cover_url ? `<img src="${escapeHtml(p.cover_url)}" class="h-10 w-10 object-cover rounded bg-slate-100">` : ''}
-            <div>
-              <strong class="block text-[#142c55]">${escapeHtml(p.title)}</strong>
-              <span class="text-xs text-slate-400 line-clamp-1">${escapeHtml(p.description || '')}</span>
+          <div class="flex items-center gap-2.5">
+            ${p.cover_url ? `<img src="${escapeHtml(p.cover_url)}" class="h-9 w-9 object-cover rounded-lg bg-slate-100 shrink-0">` : ''}
+            <div class="min-w-0 max-w-[180px] sm:max-w-[220px]">
+              <strong class="block text-xs font-bold text-[#142c55] truncate" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</strong>
+              <span class="text-[10px] text-slate-400 truncate block">${escapeHtml(p.description || 'No description')}</span>
             </div>
           </div>
         </td>
         <td class="px-3 py-3">
-          <span class="tag text-xs font-semibold">${escapeHtml(p.category || 'General')}</span>
+          <span class="tag text-[10px] font-semibold">${escapeHtml(p.category || 'General')}</span>
         </td>
         <td class="px-3 py-3">${priceCell}</td>
-        <td class="px-3 py-3 text-xs font-mono text-slate-500">${escapeHtml(p.slug || '—')}</td>
+        <td class="px-3 py-3 text-[11px] font-mono text-slate-500 truncate max-w-[120px]">${escapeHtml(p.slug || '—')}</td>
         <td class="px-3 py-3">
-          <span class="tag ${p.is_published ? '!bg-green-100 !text-green-800' : '!bg-slate-100 !text-slate-600'}">${p.is_published ? 'Published' : 'Draft'}</span>
+          <span class="tag text-[10px] ${p.is_published ? '!bg-green-100 !text-green-800' : '!bg-slate-100 !text-slate-600'}">${p.is_published ? 'Published' : 'Draft'}</span>
         </td>
         <td class="px-3 py-3">
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-1.5 whitespace-nowrap">
             <button class="button !min-h-8 !py-1 text-xs" data-copy-ad-link="${escapeHtml(canonicalSlug)}" title="Copy advertising link">🔗 Ad Link</button>
             <button class="button !min-h-8 !py-1 text-xs" data-edit-product="${escapeHtml(p.id)}">Edit</button>
             <button class="button !min-h-8 !py-1 text-xs text-red-600 hover:bg-red-50" data-delete-product="${escapeHtml(p.id)}">Delete</button>
@@ -571,16 +571,19 @@ async function load() {
     promos,
     ['Promo Code', 'Discount', 'Redemptions', 'Status', 'Actions'],
     (p) => `
-      <td class="px-3 py-3 font-bold text-[#142c55] font-mono">${escapeHtml(p.code)}</td>
-      <td class="px-3 py-3">${p.discount_type === 'percent' ? `${p.discount_value}%` : `$${p.discount_value}`}</td>
-      <td class="px-3 py-3">${p.redemption_count} ${p.max_redemptions ? `/ ${p.max_redemptions}` : ''}</td>
+      <td class="px-3 py-3 font-bold text-[#142c55] font-mono text-xs">${escapeHtml(p.code)}</td>
+      <td class="px-3 py-3 text-xs">${p.discount_type === 'percent' ? `${p.discount_value}%` : `$${p.discount_value}`}</td>
+      <td class="px-3 py-3 text-xs">${p.redemption_count} ${p.max_redemptions ? `/ ${p.max_redemptions}` : ''}</td>
       <td class="px-3 py-3">
-        <span class="tag ${p.is_active ? '!bg-green-100 !text-green-800' : '!bg-slate-100 !text-slate-600'}">${p.is_active ? 'Active' : 'Paused'}</span>
+        <span class="tag text-[10px] ${p.is_active ? '!bg-green-100 !text-green-800' : '!bg-slate-100 !text-slate-600'}">${p.is_active ? 'Active' : 'Paused'}</span>
       </td>
       <td class="px-3 py-3">
-        <button class="button !min-h-8 !py-1 text-xs" data-toggle-promo="${escapeHtml(p.id)}" data-active="${p.is_active}">
-          ${p.is_active ? 'Pause' : 'Activate'}
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button class="button !min-h-8 !py-1 text-xs" data-toggle-promo="${escapeHtml(p.id)}" data-active="${p.is_active}">
+            ${p.is_active ? 'Pause' : 'Activate'}
+          </button>
+          <button class="button !min-h-8 !py-1 text-xs text-red-600 hover:bg-red-50" data-delete-promo="${escapeHtml(p.id)}">Delete</button>
+        </div>
       </td>`,
     8,
     (container) => {
@@ -588,9 +591,26 @@ async function load() {
         btn.addEventListener('click', async () => {
           const id = btn.dataset.togglePromo;
           const current = btn.dataset.active === 'true';
-          await supabase.from('promo_codes').update({ is_active: !current }).eq('id', id);
-          toast('Promotion updated.');
-          load();
+          setButtonLoading(btn, true, 'Updating…');
+          const { error } = await supabase.from('promo_codes').update({ is_active: !current }).eq('id', id);
+          setButtonLoading(btn, false);
+          if (error) toast(error.message, 'error');
+          else {
+            toast(`Promo code ${current ? 'paused' : 'activated'}.`);
+            load();
+          }
+        });
+      });
+      container.querySelectorAll('[data-delete-promo]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this promotion code?')) return;
+          const id = btn.dataset.deletePromo;
+          const { error } = await supabase.from('promo_codes').delete().eq('id', id);
+          if (error) toast(error.message, 'error');
+          else {
+            toast('Promo code deleted.');
+            load();
+          }
         });
       });
     }
@@ -600,41 +620,94 @@ async function load() {
   renderPaginatedTable(
     '#posts-table',
     posts,
-    ['Title', 'Slug', 'Status', 'Published'],
+    ['Article Title', 'Status', 'Date', 'Actions'],
     (p) => `
-      <td class="px-3 py-3 font-medium text-[#142c55]">${escapeHtml(p.title)}</td>
-      <td class="px-3 py-3 text-xs font-mono text-slate-500">${escapeHtml(p.slug)}</td>
-      <td class="px-3 py-3"><span class="tag">${escapeHtml(p.status)}</span></td>
-      <td class="px-3 py-3 text-xs text-slate-500">${p.published_at ? new Date(p.published_at).toLocaleDateString() : '—'}</td>`,
-    8
+      <td class="px-3 py-3">
+        <strong class="block text-xs font-bold text-[#142c55] truncate max-w-xs">${escapeHtml(p.title)}</strong>
+        <span class="text-[10px] font-mono text-slate-400">/${escapeHtml(p.slug || '')}</span>
+      </td>
+      <td class="px-3 py-3">
+        <span class="tag text-[10px] ${p.status === 'published' ? '!bg-green-100 !text-green-800' : '!bg-amber-100 !text-amber-800'}">${escapeHtml(p.status)}</span>
+      </td>
+      <td class="px-3 py-3 text-xs text-slate-500">${new Date(p.created_at).toLocaleDateString()}</td>
+      <td class="px-3 py-3">
+        <div class="flex items-center gap-1.5">
+          <button class="button !min-h-8 !py-1 text-xs" data-toggle-post="${escapeHtml(p.id)}" data-status="${p.status}">
+            ${p.status === 'published' ? 'Unpublish' : 'Publish'}
+          </button>
+          <button class="button !min-h-8 !py-1 text-xs text-red-600 hover:bg-red-50" data-delete-post="${escapeHtml(p.id)}">Delete</button>
+        </div>
+      </td>`,
+    8,
+    (container) => {
+      container.querySelectorAll('[data-toggle-post]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.togglePost;
+          const isPub = btn.dataset.status === 'published';
+          setButtonLoading(btn, true, 'Updating…');
+          const { error } = await supabase.from('blog_posts').update({ status: isPub ? 'draft' : 'published' }).eq('id', id);
+          setButtonLoading(btn, false);
+          if (error) toast(error.message, 'error');
+          else {
+            toast(`Post ${isPub ? 'unpublished' : 'published'}.`);
+            load();
+          }
+        });
+      });
+      container.querySelectorAll('[data-delete-post]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this article?')) return;
+          const id = btn.dataset.deletePost;
+          const { error } = await supabase.from('blog_posts').delete().eq('id', id);
+          if (error) toast(error.message, 'error');
+          else {
+            toast('Article deleted.');
+            load();
+          }
+        });
+      });
+    }
   );
 
   // 6. Tickets Table (Paginated)
   renderPaginatedTable(
     '#tickets-table',
     tickets,
-    ['Customer', 'Category', 'Subject', 'Status', 'Actions'],
+    ['Sender / Email', 'Subject', 'Status', 'Date', 'Actions'],
     (t) => `
-      <td class="px-3 py-3">${escapeHtml(t.email)}</td>
-      <td class="px-3 py-3"><span class="tag">${escapeHtml(t.category || 'General')}</span></td>
-      <td class="px-3 py-3">${escapeHtml(t.subject)}</td>
       <td class="px-3 py-3">
-        <span class="tag ${t.status === 'closed' ? '!bg-slate-100 !text-slate-600' : '!bg-orange-100 !text-orange-800'}">${escapeHtml(t.status)}</span>
+        <strong class="block text-xs font-bold text-[#142c55]">${escapeHtml(t.name || 'User')}</strong>
+        <span class="text-[10px] text-slate-400">${escapeHtml(t.email)}</span>
       </td>
       <td class="px-3 py-3">
-        <button class="button !min-h-8 !py-1 text-xs" data-toggle-ticket="${escapeHtml(t.id)}" data-status="${t.status}">
-          ${t.status === 'closed' ? 'Reopen' : 'Close'}
-        </button>
+        <span class="text-xs font-medium text-slate-700 block truncate max-w-xs">${escapeHtml(t.subject)}</span>
+        <span class="text-[10px] text-slate-400 line-clamp-1">${escapeHtml(t.message || '')}</span>
+      </td>
+      <td class="px-3 py-3">
+        <span class="tag text-[10px] ${t.status === 'closed' ? '!bg-slate-100 !text-slate-600' : '!bg-orange-100 !text-orange-800'}">${escapeHtml(t.status)}</span>
+      </td>
+      <td class="px-3 py-3 text-xs text-slate-500">${new Date(t.created_at).toLocaleDateString()}</td>
+      <td class="px-3 py-3">
+        <div class="flex items-center gap-1.5">
+          <button class="button !min-h-8 !py-1 text-xs" data-toggle-ticket="${escapeHtml(t.id)}" data-status="${t.status}">
+            ${t.status === 'closed' ? 'Reopen' : 'Resolve'}
+          </button>
+        </div>
       </td>`,
     8,
     (container) => {
       container.querySelectorAll('[data-toggle-ticket]').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const id = btn.dataset.toggleTicket;
-          const nextStatus = btn.dataset.status === 'closed' ? 'open' : 'closed';
-          await supabase.from('tickets').update({ status: nextStatus }).eq('id', id);
-          toast(`Ticket marked as ${nextStatus}.`);
-          load();
+          const isClosed = btn.dataset.status === 'closed';
+          setButtonLoading(btn, true, 'Updating…');
+          const { error } = await supabase.from('tickets').update({ status: isClosed ? 'open' : 'closed' }).eq('id', id);
+          setButtonLoading(btn, false);
+          if (error) toast(error.message, 'error');
+          else {
+            toast(`Ticket marked as ${isClosed ? 'open' : 'resolved'}.`);
+            load();
+          }
         });
       });
     }
@@ -657,38 +730,38 @@ function openCustomerEditor(user) {
 
   document.querySelector('#editor-fields').innerHTML = `
     <div>
-      <label class="label">Full Name</label>
-      <input class="field" name="full_name" value="${escapeHtml(user.full_name || '')}" placeholder="Customer full name">
+      <label class="label text-xs font-bold">Full Name</label>
+      <input class="field !mt-1" name="full_name" value="${escapeHtml(user.full_name || '')}" placeholder="Customer full name">
     </div>
 
     <div class="grid grid-cols-2 gap-3">
       <div>
-        <label class="label">System Role</label>
-        <select class="field" name="role">
+        <label class="label text-xs font-bold">System Role</label>
+        <select class="field !mt-1" name="role">
           <option value="customer" ${user.role === 'customer' ? 'selected' : ''}>Customer (Standard)</option>
           <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Administrator (Full Access)</option>
         </select>
       </div>
       <div>
-        <label class="label">Phone Number</label>
-        <input class="field" name="phone" value="${escapeHtml(user.phone || '')}" placeholder="+123456789">
+        <label class="label text-xs font-bold">Phone Number</label>
+        <input class="field !mt-1" name="phone" value="${escapeHtml(user.phone || '')}" placeholder="+123456789">
       </div>
     </div>
 
     <div class="grid grid-cols-2 gap-3">
       <div>
-        <label class="label">Country</label>
-        <input class="field" name="country" value="${escapeHtml(user.country || '')}" placeholder="e.g. United States, Nigeria">
+        <label class="label text-xs font-bold">Country</label>
+        <input class="field !mt-1" name="country" value="${escapeHtml(user.country || '')}" placeholder="e.g. United States, Ghana">
       </div>
       <div>
-        <label class="label">Occupation</label>
-        <input class="field" name="occupation" value="${escapeHtml(user.occupation || '')}" placeholder="Occupation">
+        <label class="label text-xs font-bold">Occupation</label>
+        <input class="field !mt-1" name="occupation" value="${escapeHtml(user.occupation || '')}" placeholder="Occupation">
       </div>
     </div>
 
     <div>
-      <label class="label">Address</label>
-      <textarea class="field" name="address" rows="2" placeholder="Customer address">${escapeHtml(user.address || '')}</textarea>
+      <label class="label text-xs font-bold">Address</label>
+      <textarea class="field !mt-1" name="address" rows="2" placeholder="Customer address">${escapeHtml(user.address || '')}</textarea>
     </div>`;
 
   modal.showModal();
@@ -761,7 +834,7 @@ async function openEditor(type, existing = null) {
 
     if (!isEdit) {
       // ============================================================
-      // CREATE PRODUCT MODAL LAYOUT (Streamlined & Clean)
+      // CREATE PRODUCT MODAL (Slug below description)
       // ============================================================
       document.querySelector('#editor-fields').innerHTML = `
         <div class="space-y-4">
@@ -770,29 +843,17 @@ async function openEditor(type, existing = null) {
             <input class="field !mt-1" id="product-title-input" name="title" placeholder="e.g. Next.js SaaS Architecture Blueprint" value="" required>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label class="label text-xs font-bold text-slate-700" for="product-category-input">Category *</label>
-              <select class="field !mt-1" id="product-category-input" name="category">
-                <option value="Ebooks & Guides">Ebooks &amp; Guides</option>
-                <option value="Software & Tools">Software &amp; Tools</option>
-                <option value="Templates & Themes">Templates &amp; Themes</option>
-                <option value="Online Courses">Online Courses</option>
-                <option value="Audio & Media">Audio &amp; Media</option>
-                <option value="Design & Graphics">Design &amp; Graphics</option>
-                <option value="General">General</option>
-              </select>
-            </div>
-            <div>
-              <div class="flex items-center justify-between">
-                <label class="label text-xs font-bold text-slate-700" for="product-slug-input">SEO URL Slug *</label>
-                <button type="button" id="auto-slug-btn" class="text-xs text-orange-600 font-bold hover:underline flex items-center gap-1">
-                  <i data-lucide="zap" width="12" height="12"></i>
-                  <span>Auto</span>
-                </button>
-              </div>
-              <input class="field font-mono text-xs !mt-1" id="product-slug-input" name="slug" placeholder="e.g. nextjs-saas-blueprint" value="" required>
-            </div>
+          <div>
+            <label class="label text-xs font-bold text-slate-700" for="product-category-input">Category *</label>
+            <select class="field !mt-1" id="product-category-input" name="category">
+              <option value="Ebooks & Guides">Ebooks &amp; Guides</option>
+              <option value="Software & Tools">Software &amp; Tools</option>
+              <option value="Templates & Themes">Templates &amp; Themes</option>
+              <option value="Online Courses">Online Courses</option>
+              <option value="Audio & Media">Audio &amp; Media</option>
+              <option value="Design & Graphics">Design &amp; Graphics</option>
+              <option value="General">General</option>
+            </select>
           </div>
 
           <div class="grid grid-cols-3 gap-3">
@@ -843,37 +904,43 @@ async function openEditor(type, existing = null) {
             <textarea class="field !mt-1" name="description" placeholder="Comprehensive product overview, highlights, features, and bundle contents…" rows="3"></textarea>
           </div>
 
-          <label class="flex items-center gap-2 text-sm font-semibold cursor-pointer pt-2">
+          <div class="form-section-card space-y-3">
+            <div class="flex items-center justify-between">
+              <label class="label text-xs font-bold text-slate-700" for="product-slug-input">SEO URL Slug *</label>
+              <button type="button" id="auto-slug-btn" class="text-xs text-orange-600 font-bold hover:underline flex items-center gap-1">
+                <i data-lucide="zap" width="12" height="12"></i>
+                <span>Auto Generate</span>
+              </button>
+            </div>
+            <input class="field font-mono text-xs !mt-1" id="product-slug-input" name="slug" placeholder="e.g. nextjs-saas-blueprint" value="" required>
+
+            <div class="p-2.5 bg-white rounded-lg border border-slate-200 text-xs space-y-1">
+              <div class="flex items-center justify-between font-bold text-slate-600">
+                <span>Checkout Link Preview</span>
+                <button type="button" id="copy-modal-ad-link" class="text-orange-600 font-bold hover:underline flex items-center gap-1">
+                  <i data-lucide="copy" width="12" height="12"></i>
+                  <span>Copy</span>
+                </button>
+              </div>
+              <div id="modal-ad-link-preview" class="font-mono text-[11px] text-slate-500 truncate">
+                ${liveAdUrl}
+              </div>
+            </div>
+          </div>
+
+          <label class="flex items-center gap-2 text-sm font-semibold cursor-pointer pt-1">
             <input type="checkbox" name="is_published" checked class="rounded text-orange-600">
             <span>Publish immediately in store catalog</span>
           </label>
         </div>`;
     } else {
       // ============================================================
-      // UPDATE PRODUCT MODAL LAYOUT (Advanced, Modular & Collapsible)
+      // UPDATE PRODUCT MODAL (Slug placed below description)
       // ============================================================
       const galleryVal = Array.isArray(full.gallery_urls) ? full.gallery_urls.join(', ') : (full.gallery_urls || '');
 
       document.querySelector('#editor-fields').innerHTML = `
         <div class="space-y-4">
-          <!-- Top Shareable Ad Link Card -->
-          <div class="form-section-card space-y-1.5">
-            <div class="flex items-center justify-between text-xs font-bold text-slate-700">
-              <span class="flex items-center gap-1.5">
-                <i data-lucide="link" width="13" height="13" class="text-orange-500"></i>
-                <span>Direct Advertising &amp; Checkout Link</span>
-              </span>
-              <button type="button" id="copy-modal-ad-link" class="text-orange-600 font-bold hover:underline flex items-center gap-1">
-                <i data-lucide="copy" width="12" height="12"></i>
-                <span>Copy Link</span>
-              </button>
-            </div>
-            <div id="modal-ad-link-preview" class="font-mono text-[11px] text-slate-600 truncate bg-white p-2 rounded-lg border border-slate-200 shadow-inner">
-              ${liveAdUrl}
-            </div>
-          </div>
-
-          <!-- Section 1: Essentials & Category -->
           <div class="form-section-card space-y-3">
             <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Product Information</h3>
             <div>
@@ -881,33 +948,20 @@ async function openEditor(type, existing = null) {
               <input class="field !mt-1" id="product-title-input" name="title" value="${escapeHtml(full.title ?? '')}" required>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label class="label text-xs" for="product-category-input">Category *</label>
-                <select class="field !mt-1" id="product-category-input" name="category">
-                  <option value="Ebooks & Guides" ${currentCat === 'Ebooks & Guides' ? 'selected' : ''}>Ebooks &amp; Guides</option>
-                  <option value="Software & Tools" ${currentCat === 'Software & Tools' ? 'selected' : ''}>Software &amp; Tools</option>
-                  <option value="Templates & Themes" ${currentCat === 'Templates & Themes' ? 'selected' : ''}>Templates &amp; Themes</option>
-                  <option value="Online Courses" ${currentCat === 'Online Courses' ? 'selected' : ''}>Online Courses</option>
-                  <option value="Audio & Media" ${currentCat === 'Audio & Media' ? 'selected' : ''}>Audio &amp; Media</option>
-                  <option value="Design & Graphics" ${currentCat === 'Design & Graphics' ? 'selected' : ''}>Design &amp; Graphics</option>
-                  <option value="General" ${currentCat === 'General' ? 'selected' : ''}>General</option>
-                </select>
-              </div>
-              <div>
-                <div class="flex items-center justify-between">
-                  <label class="label text-xs" for="product-slug-input">SEO Slug *</label>
-                  <button type="button" id="auto-slug-btn" class="text-xs text-orange-600 font-bold hover:underline flex items-center gap-1">
-                    <i data-lucide="zap" width="12" height="12"></i>
-                    <span>Auto</span>
-                  </button>
-                </div>
-                <input class="field font-mono text-xs !mt-1" id="product-slug-input" name="slug" value="${escapeHtml(initialSlug)}" required>
-              </div>
+            <div>
+              <label class="label text-xs" for="product-category-input">Category *</label>
+              <select class="field !mt-1" id="product-category-input" name="category">
+                <option value="Ebooks & Guides" ${currentCat === 'Ebooks & Guides' ? 'selected' : ''}>Ebooks &amp; Guides</option>
+                <option value="Software & Tools" ${currentCat === 'Software & Tools' ? 'selected' : ''}>Software &amp; Tools</option>
+                <option value="Templates & Themes" ${currentCat === 'Templates & Themes' ? 'selected' : ''}>Templates &amp; Themes</option>
+                <option value="Online Courses" ${currentCat === 'Online Courses' ? 'selected' : ''}>Online Courses</option>
+                <option value="Audio & Media" ${currentCat === 'Audio & Media' ? 'selected' : ''}>Audio &amp; Media</option>
+                <option value="Design & Graphics" ${currentCat === 'Design & Graphics' ? 'selected' : ''}>Design &amp; Graphics</option>
+                <option value="General" ${currentCat === 'General' ? 'selected' : ''}>General</option>
+              </select>
             </div>
           </div>
 
-          <!-- Section 2: Dual Pricing Dynamics -->
           <div class="form-section-card space-y-3">
             <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Pricing &amp; Discounts</h3>
             <div class="grid grid-cols-3 gap-3">
@@ -926,7 +980,6 @@ async function openEditor(type, existing = null) {
             </div>
           </div>
 
-          <!-- Section 3: Media & Visual Assets -->
           <div class="form-section-card space-y-3">
             <div class="flex items-center justify-between">
               <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Cover Image &amp; Gallery</h3>
@@ -936,10 +989,10 @@ async function openEditor(type, existing = null) {
             <div class="flex flex-wrap sm:flex-nowrap items-center gap-4">
               ${
                 full.cover_url
-                  ? `<div class="relative group shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-100">
+                  ? `<div class="relative group shrink-0 w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-100">
                       <img id="cover-preview" src="${escapeHtml(full.cover_url)}" class="w-full h-full object-cover" alt="Cover">
                      </div>`
-                  : `<img id="cover-preview" class="hidden w-24 h-24 rounded-xl object-cover border border-slate-200" alt="">`
+                  : `<img id="cover-preview" class="hidden w-20 h-20 rounded-xl object-cover border border-slate-200" alt="">`
               }
               <div class="upload-zone flex-1 !p-3" id="cover-upload-zone">
                 <input type="file" id="cover-file-input" accept="image/*" class="hidden">
@@ -958,7 +1011,6 @@ async function openEditor(type, existing = null) {
             </div>
           </div>
 
-          <!-- Section 4: Secure Downloadable File Asset -->
           <div class="form-section-card space-y-3">
             <div class="flex items-center justify-between">
               <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Downloadable Asset</h3>
@@ -987,13 +1039,39 @@ async function openEditor(type, existing = null) {
             <p id="file-upload-status" class="text-xs text-slate-500 font-medium"></p>
           </div>
 
-          <!-- Section 5: Description with Compact View -->
           <div class="form-section-card space-y-2">
             <div class="flex items-center justify-between">
               <label class="text-xs font-black text-[#142c55] uppercase tracking-wider">Product Description</label>
               <button type="button" id="toggle-desc-size-btn" class="text-xs text-orange-600 font-bold hover:underline">Expand Editor</button>
             </div>
             <textarea class="field !mt-1" id="product-desc-textarea" name="description" placeholder="Comprehensive product description, chapters, instructions…" rows="3">${escapeHtml(full.description ?? '')}</textarea>
+          </div>
+
+          <div class="form-section-card space-y-3">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-black text-[#142c55] uppercase tracking-wider" for="product-slug-input">SEO URL Slug *</label>
+              <button type="button" id="auto-slug-btn" class="text-xs text-orange-600 font-bold hover:underline flex items-center gap-1">
+                <i data-lucide="zap" width="12" height="12"></i>
+                <span>Auto Generate</span>
+              </button>
+            </div>
+            <input class="field font-mono text-xs !mt-1" id="product-slug-input" name="slug" value="${escapeHtml(initialSlug)}" required>
+
+            <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5 shadow-inner">
+              <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+                <span class="flex items-center gap-1.5">
+                  <i data-lucide="link" width="13" height="13" class="text-orange-500"></i>
+                  <span>Live Advertising &amp; Checkout Link</span>
+                </span>
+                <button type="button" id="copy-modal-ad-link" class="text-orange-600 font-bold hover:underline flex items-center gap-1">
+                  <i data-lucide="copy" width="12" height="12"></i>
+                  <span>Copy Link</span>
+                </button>
+              </div>
+              <div id="modal-ad-link-preview" class="font-mono text-[11px] text-slate-600 truncate">
+                ${liveAdUrl}
+              </div>
+            </div>
           </div>
 
           <label class="flex items-center gap-2 text-sm font-semibold cursor-pointer pt-1">
@@ -1029,7 +1107,13 @@ async function openEditor(type, existing = null) {
 
     slugInput?.addEventListener('input', updateAdLink);
     document.querySelector('#product-title-input')?.addEventListener('input', () => setTimeout(updateAdLink, 10));
-    document.querySelector('#auto-slug-btn')?.addEventListener('click', () => setTimeout(updateAdLink, 10));
+    document.querySelector('#auto-slug-btn')?.addEventListener('click', () => {
+      const titleVal = document.querySelector('#product-title-input')?.value || '';
+      if (slugInput && titleVal) {
+        slugInput.value = slugify(titleVal);
+        updateAdLink();
+      }
+    });
 
     copyAdBtn?.addEventListener('click', () => {
       const s = slugInput?.value.trim() || 'product-slug';
@@ -1178,6 +1262,13 @@ document.querySelector('#close-modal').onclick = () => modal.close();
 document.querySelector('#cancel-modal-btn').onclick = () => modal.close();
 document.querySelector('#close-details-modal').onclick = () => detailsModal.close();
 document.querySelector('#close-details-btn').onclick = () => detailsModal.close();
+
+// Close dialogs on outside backdrop click
+[modal, detailsModal, imgModal].forEach((d) => {
+  d?.addEventListener('click', (e) => {
+    if (e.target === d) d.close();
+  });
+});
 
 // Sign out + CMS settings
 document.querySelector('#admin-signout').onclick = async () => {
