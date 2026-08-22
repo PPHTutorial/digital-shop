@@ -71,7 +71,7 @@ Deno.serve(async (request) => {
       paymentOptionsStr = 'mobilemoneyghana, mobilemoneyuganda, mobilemoneyrwanda, mobilemoneyzambia, mpesa';
     } else if (paymentOption === 'ussd') {
       paymentOptionsStr = 'ussd';
-    } else if (typeof paymentOption === 'string' && paymentOption !== 'all') {
+    } else if (typeof paymentOption === 'string' && paymentOption !== 'all') { 
       paymentOptionsStr = paymentOption;
     }
 
