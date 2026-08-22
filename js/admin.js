@@ -541,6 +541,11 @@ async function load() {
               ${icon('link', 11)}
               <span>Ad Link</span>
             </button>
+            ${p.file_path ? `
+              <a href="${escapeHtml(p.file_path)}" target="_blank" download class="button !min-h-8 !py-1 text-xs text-blue-600 hover:bg-blue-50 inline-flex items-center gap-1" title="Direct test download for this product asset">
+                ${icon('download', 11)}
+                <span>Test File</span>
+              </a>` : ''}
             <button class="button !min-h-8 !py-1 text-xs inline-flex items-center gap-1" data-edit-product="${escapeHtml(p.id)}">
               ${icon('edit-2', 11)}
               <span>Edit</span>
@@ -1037,12 +1042,22 @@ async function openEditor(type, existing = null) {
                   <span class="block text-[10px] text-slate-400">Stored in encrypted bucket</span>
                 </div>
               </div>
-              <div class="upload-zone !p-1.5 !px-3 shrink-0 cursor-pointer text-xs font-bold text-orange-600 hover:bg-orange-50 border-orange-200" id="file-upload-zone">
-                <input type="file" id="product-file-input" class="hidden">
-                <span id="file-upload-prompt" class="flex items-center gap-1 text-xs">
-                  <i data-lucide="upload" width="12" height="12"></i>
-                  <span>${full.file_path ? 'Replace File' : 'Upload File'}</span>
-                </span>
+              <div class="flex items-center gap-2 shrink-0">
+                ${
+                  full.file_path
+                    ? `<a href="${escapeHtml(full.file_path)}" target="_blank" download class="button !min-h-7 !py-1 !px-2.5 text-[11px] font-bold text-blue-600 hover:bg-blue-50 inline-flex items-center gap-1">
+                        <i data-lucide="download" width="11" height="11"></i>
+                        <span>Test File</span>
+                       </a>`
+                    : ''
+                }
+                <div class="upload-zone !p-1.5 !px-3 cursor-pointer text-xs font-bold text-orange-600 hover:bg-orange-50 border-orange-200" id="file-upload-zone">
+                  <input type="file" id="product-file-input" class="hidden">
+                  <span id="file-upload-prompt" class="flex items-center gap-1 text-xs">
+                    <i data-lucide="upload" width="12" height="12"></i>
+                    <span>${full.file_path ? 'Replace File' : 'Upload File'}</span>
+                  </span>
+                </div>
               </div>
             </div>
             <input type="hidden" name="file_path" id="file-path-input" value="${escapeHtml(full.file_path ?? '')}">
