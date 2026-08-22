@@ -753,101 +753,270 @@ async function openEditor(type, existing = null) {
   }
 
   if (type === 'product') {
+    const isEdit = Boolean(editingId);
+    const op = full.original_price ?? '';
     const currentCat = full.category || 'General';
     const initialSlug = full.slug || (full.title ? slugify(full.title) : '');
     const liveAdUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(initialSlug || 'product-slug')}`;
 
-    document.querySelector('#editor-fields').innerHTML = `
-      <div>
-        <label class="label" for="product-title-input">Product Title *</label>
-        <input class="field" id="product-title-input" name="title" placeholder="e.g. Mastery in Software Architecture" value="${escapeHtml(full.title ?? '')}" required>
-      </div>
-
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="label" for="product-category-input">Category *</label>
-          <select class="field" id="product-category-input" name="category">
-            <option value="Ebooks & Guides" ${currentCat === 'Ebooks & Guides' ? 'selected' : ''}>Ebooks &amp; Guides</option>
-            <option value="Software & Tools" ${currentCat === 'Software & Tools' ? 'selected' : ''}>Software &amp; Tools</option>
-            <option value="Templates & Themes" ${currentCat === 'Templates & Themes' ? 'selected' : ''}>Templates &amp; Themes</option>
-            <option value="Online Courses" ${currentCat === 'Online Courses' ? 'selected' : ''}>Online Courses</option>
-            <option value="Audio & Media" ${currentCat === 'Audio & Media' ? 'selected' : ''}>Audio &amp; Media</option>
-            <option value="Design & Graphics" ${currentCat === 'Design & Graphics' ? 'selected' : ''}>Design &amp; Graphics</option>
-            <option value="General" ${currentCat === 'General' ? 'selected' : ''}>General</option>
-          </select>
-        </div>
-        <div>
-          <div class="flex items-center justify-between">
-            <label class="label" for="product-slug-input">Product Slug (SEO Key) *</label>
-            <button type="button" id="auto-slug-btn" class="text-xs text-orange-600 font-bold hover:underline">⚡ Auto</button>
+    if (!isEdit) {
+      // ============================================================
+      // CREATE PRODUCT MODAL LAYOUT (Streamlined & Clean)
+      // ============================================================
+      document.querySelector('#editor-fields').innerHTML = `
+        <div class="space-y-4">
+          <div>
+            <label class="label text-xs font-bold text-slate-700" for="product-title-input">Product Title *</label>
+            <input class="field !mt-1" id="product-title-input" name="title" placeholder="e.g. Next.js SaaS Architecture Blueprint" value="" required>
           </div>
-          <input class="field font-mono text-xs" id="product-slug-input" name="slug" placeholder="e.g. mastery-in-architecture" value="${escapeHtml(initialSlug)}" required>
-        </div>
-      </div>
 
-      <!-- Live Advertising Link Box -->
-      <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
-        <div class="flex items-center justify-between font-bold text-slate-700">
-          <span>🔗 Shareable Advertising / Checkout Link</span>
-          <button type="button" id="copy-modal-ad-link" class="text-orange-600 font-bold hover:underline">Copy Link</button>
-        </div>
-        <div id="modal-ad-link-preview" class="font-mono text-[11px] text-slate-500 truncate bg-white p-2 rounded border border-slate-200">
-          ${liveAdUrl}
-        </div>
-      </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="label text-xs font-bold text-slate-700" for="product-category-input">Category *</label>
+              <select class="field !mt-1" id="product-category-input" name="category">
+                <option value="Ebooks & Guides">Ebooks &amp; Guides</option>
+                <option value="Software & Tools">Software &amp; Tools</option>
+                <option value="Templates & Themes">Templates &amp; Themes</option>
+                <option value="Online Courses">Online Courses</option>
+                <option value="Audio & Media">Audio &amp; Media</option>
+                <option value="Design & Graphics">Design &amp; Graphics</option>
+                <option value="General">General</option>
+              </select>
+            </div>
+            <div>
+              <div class="flex items-center justify-between">
+                <label class="label text-xs font-bold text-slate-700" for="product-slug-input">SEO URL Slug *</label>
+                <button type="button" id="auto-slug-btn" class="text-xs text-orange-600 font-bold hover:underline flex items-center gap-1">
+                  <i data-lucide="zap" width="12" height="12"></i>
+                  <span>Auto</span>
+                </button>
+              </div>
+              <input class="field font-mono text-xs !mt-1" id="product-slug-input" name="slug" placeholder="e.g. nextjs-saas-blueprint" value="" required>
+            </div>
+          </div>
 
-      <div>
-        <label class="label">Description (Full Overview)</label>
-        <textarea class="field" name="description" placeholder="Full product description, highlights, chapters..." rows="4">${escapeHtml(full.description ?? '')}</textarea>
-      </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="label text-xs font-bold text-slate-700">Original price (Was)</label>
+              <input class="field !mt-1" id="orig-price-input" name="original_price" type="number" step=".01" min="0" placeholder="0.00">
+            </div>
+            <div>
+              <label class="label text-xs font-bold text-slate-700">Sale price (Now) *</label>
+              <input class="field font-bold !mt-1" id="sale-price-input" name="price" type="number" step=".01" min="0" placeholder="0.00" required>
+            </div>
+            <div>
+              <label class="label text-xs font-bold text-slate-700">Discount %</label>
+              <input class="field !mt-1" id="discount-pct-input" type="number" step="0.1" min="0" max="100" placeholder="Auto">
+            </div>
+          </div>
 
-      <div>
-        <span class="label">Cover image</span>
-        <div class="upload-zone mt-2" id="cover-upload-zone">
-          <input type="file" id="cover-file-input" accept="image/*" class="hidden">
-          ${full.cover_url
-            ? `<img id="cover-preview" src="${escapeHtml(full.cover_url)}" class="h-28 mx-auto rounded-lg object-cover mb-2" alt="">`
-            : `<img id="cover-preview" class="hidden h-28 mx-auto rounded-lg object-cover mb-2" alt="">`}
-          <p id="cover-upload-prompt" class="text-sm text-slate-400 ${full.cover_url ? 'hidden' : ''}">📸 Click or drag to upload cover image</p>
-          <p class="text-xs text-slate-400 mt-1">Opens crop &amp; compress tool automatically</p>
-        </div>
-        <input type="hidden" name="cover_url" id="cover-url-input" value="${escapeHtml(full.cover_url ?? '')}">
-      </div>
+          <div>
+            <label class="label text-xs font-bold text-slate-700">Cover Image</label>
+            <div class="upload-zone mt-1" id="cover-upload-zone">
+              <input type="file" id="cover-file-input" accept="image/*" class="hidden">
+              <img id="cover-preview" class="hidden h-28 mx-auto rounded-lg object-cover mb-2" alt="">
+              <div id="cover-upload-prompt" class="flex flex-col items-center justify-center gap-1 text-slate-500 py-2">
+                <i data-lucide="upload-cloud" width="24" height="24" class="text-slate-400"></i>
+                <span class="text-xs font-bold text-slate-700">Click or drag image to upload</span>
+                <span class="text-[11px] text-slate-400">Image crop &amp; compress tool opens automatically</span>
+              </div>
+            </div>
+            <input type="hidden" name="cover_url" id="cover-url-input" value="">
+          </div>
 
-      <div class="grid grid-cols-3 gap-3">
-        <div>
-          <label class="label">Original price (Was)</label>
-          <input class="field" id="orig-price-input" name="original_price" type="number" step=".01" min="0" placeholder="0.00" value="${op}">
-        </div>
-        <div>
-          <label class="label">Sale price (Now) *</label>
-          <input class="field font-bold" id="sale-price-input" name="price" type="number" step=".01" min="0" placeholder="0.00" value="${full.price ?? ''}" required>
-        </div>
-        <div>
-          <label class="label">Discount %</label>
-          <input class="field" id="discount-pct-input" type="number" step="0.1" min="0" max="100" placeholder="Auto">
-        </div>
-      </div>
+          <div>
+            <label class="label text-xs font-bold text-slate-700">Product Downloadable File Asset *</label>
+            <div class="upload-zone mt-1" id="file-upload-zone">
+              <input type="file" id="product-file-input" class="hidden">
+              <div id="file-upload-prompt" class="flex flex-col items-center justify-center gap-1 text-slate-500 py-2">
+                <i data-lucide="package" width="24" height="24" class="text-slate-400"></i>
+                <span class="text-xs font-bold text-slate-700">Click or drag file (ZIP, PDF, EPUB, DMG…)</span>
+                <span class="text-[11px] text-slate-400">Encrypted in private storage</span>
+              </div>
+            </div>
+            <input type="hidden" name="file_path" id="file-path-input" value="">
+            <p id="file-upload-status" class="text-xs mt-1 text-slate-500 font-medium"></p>
+          </div>
 
-      <div>
-        <span class="label">Product Downloadable Asset</span>
-        <div class="upload-zone mt-2" id="file-upload-zone">
-          <input type="file" id="product-file-input" class="hidden">
-          <p id="file-upload-prompt" class="text-sm text-slate-400">
-            ${full.file_path ? `📁 ${full.file_path}` : '📁 Click or drag product file (PDF, ZIP, EPUB…)'}
-          </p>
-          <p class="text-xs text-slate-400 mt-1">Uploaded securely to private storage</p>
-        </div>
-        <input type="hidden" name="file_path" id="file-path-input" value="${escapeHtml(full.file_path ?? '')}">
-        <p id="file-upload-status" class="text-xs mt-1 text-slate-400"></p>
-      </div>
+          <div>
+            <label class="label text-xs font-bold text-slate-700">Product Description</label>
+            <textarea class="field !mt-1" name="description" placeholder="Comprehensive product overview, highlights, features, and bundle contents…" rows="3"></textarea>
+          </div>
 
-      <label class="flex items-center gap-2 text-sm font-medium cursor-pointer">
-        <input type="checkbox" name="is_published" ${full.is_published ? 'checked' : ''} class="rounded text-orange-600">
-        <span>Publish immediately in store catalog</span>
-      </label>`;
+          <label class="flex items-center gap-2 text-sm font-semibold cursor-pointer pt-2">
+            <input type="checkbox" name="is_published" checked class="rounded text-orange-600">
+            <span>Publish immediately in store catalog</span>
+          </label>
+        </div>`;
+    } else {
+      // ============================================================
+      // UPDATE PRODUCT MODAL LAYOUT (Advanced, Modular & Collapsible)
+      // ============================================================
+      const galleryVal = Array.isArray(full.gallery_urls) ? full.gallery_urls.join(', ') : (full.gallery_urls || '');
 
-    // Update live ad link on slug change
+      document.querySelector('#editor-fields').innerHTML = `
+        <div class="space-y-4">
+          <!-- Top Shareable Ad Link Card -->
+          <div class="form-section-card space-y-1.5">
+            <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+              <span class="flex items-center gap-1.5">
+                <i data-lucide="link" width="13" height="13" class="text-orange-500"></i>
+                <span>Direct Advertising &amp; Checkout Link</span>
+              </span>
+              <button type="button" id="copy-modal-ad-link" class="text-orange-600 font-bold hover:underline flex items-center gap-1">
+                <i data-lucide="copy" width="12" height="12"></i>
+                <span>Copy Link</span>
+              </button>
+            </div>
+            <div id="modal-ad-link-preview" class="font-mono text-[11px] text-slate-600 truncate bg-white p-2 rounded-lg border border-slate-200 shadow-inner">
+              ${liveAdUrl}
+            </div>
+          </div>
+
+          <!-- Section 1: Essentials & Category -->
+          <div class="form-section-card space-y-3">
+            <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Product Information</h3>
+            <div>
+              <label class="label text-xs" for="product-title-input">Product Title *</label>
+              <input class="field !mt-1" id="product-title-input" name="title" value="${escapeHtml(full.title ?? '')}" required>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="label text-xs" for="product-category-input">Category *</label>
+                <select class="field !mt-1" id="product-category-input" name="category">
+                  <option value="Ebooks & Guides" ${currentCat === 'Ebooks & Guides' ? 'selected' : ''}>Ebooks &amp; Guides</option>
+                  <option value="Software & Tools" ${currentCat === 'Software & Tools' ? 'selected' : ''}>Software &amp; Tools</option>
+                  <option value="Templates & Themes" ${currentCat === 'Templates & Themes' ? 'selected' : ''}>Templates &amp; Themes</option>
+                  <option value="Online Courses" ${currentCat === 'Online Courses' ? 'selected' : ''}>Online Courses</option>
+                  <option value="Audio & Media" ${currentCat === 'Audio & Media' ? 'selected' : ''}>Audio &amp; Media</option>
+                  <option value="Design & Graphics" ${currentCat === 'Design & Graphics' ? 'selected' : ''}>Design &amp; Graphics</option>
+                  <option value="General" ${currentCat === 'General' ? 'selected' : ''}>General</option>
+                </select>
+              </div>
+              <div>
+                <div class="flex items-center justify-between">
+                  <label class="label text-xs" for="product-slug-input">SEO Slug *</label>
+                  <button type="button" id="auto-slug-btn" class="text-xs text-orange-600 font-bold hover:underline flex items-center gap-1">
+                    <i data-lucide="zap" width="12" height="12"></i>
+                    <span>Auto</span>
+                  </button>
+                </div>
+                <input class="field font-mono text-xs !mt-1" id="product-slug-input" name="slug" value="${escapeHtml(initialSlug)}" required>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Dual Pricing Dynamics -->
+          <div class="form-section-card space-y-3">
+            <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Pricing &amp; Discounts</h3>
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="label text-xs">Original price (Was)</label>
+                <input class="field !mt-1" id="orig-price-input" name="original_price" type="number" step=".01" min="0" placeholder="0.00" value="${op}">
+              </div>
+              <div>
+                <label class="label text-xs font-bold">Sale price (Now) *</label>
+                <input class="field font-bold !mt-1" id="sale-price-input" name="price" type="number" step=".01" min="0" placeholder="0.00" value="${full.price ?? ''}" required>
+              </div>
+              <div>
+                <label class="label text-xs">Discount %</label>
+                <input class="field !mt-1" id="discount-pct-input" type="number" step="0.1" min="0" max="100" placeholder="Auto">
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Media & Visual Assets -->
+          <div class="form-section-card space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Cover Image &amp; Gallery</h3>
+              ${full.cover_url ? `<span class="tag !text-[10px] !bg-green-100 !text-green-800">Cover Active</span>` : ''}
+            </div>
+
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-4">
+              ${
+                full.cover_url
+                  ? `<div class="relative group shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-100">
+                      <img id="cover-preview" src="${escapeHtml(full.cover_url)}" class="w-full h-full object-cover" alt="Cover">
+                     </div>`
+                  : `<img id="cover-preview" class="hidden w-24 h-24 rounded-xl object-cover border border-slate-200" alt="">`
+              }
+              <div class="upload-zone flex-1 !p-3" id="cover-upload-zone">
+                <input type="file" id="cover-file-input" accept="image/*" class="hidden">
+                <p id="cover-upload-prompt" class="text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5">
+                  <i data-lucide="image" width="14" height="14"></i>
+                  <span>${full.cover_url ? 'Replace cover image' : 'Upload cover image'}</span>
+                </p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Click or drag to crop &amp; compress</p>
+              </div>
+            </div>
+            <input type="hidden" name="cover_url" id="cover-url-input" value="${escapeHtml(full.cover_url ?? '')}">
+
+            <div>
+              <label class="label text-xs">Additional Gallery Images (Comma-separated URLs)</label>
+              <input class="field text-xs !mt-1" name="gallery_urls" value="${escapeHtml(galleryVal)}" placeholder="https://…/image2.jpg, https://…/image3.jpg">
+            </div>
+          </div>
+
+          <!-- Section 4: Secure Downloadable File Asset -->
+          <div class="form-section-card space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Downloadable Asset</h3>
+              ${full.file_path ? `<span class="tag !text-[10px] !bg-green-100 !text-green-800">File Linked</span>` : '<span class="tag !text-[10px] !bg-amber-100 !text-amber-800">Pending Upload</span>'}
+            </div>
+
+            <div class="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                  <i data-lucide="file-check" width="16" height="16"></i>
+                </div>
+                <div class="min-w-0">
+                  <span class="block text-xs font-bold text-slate-800 truncate">${full.file_path ? escapeHtml(full.file_path) : 'No file uploaded yet'}</span>
+                  <span class="block text-[10px] text-slate-400">Stored in encrypted bucket</span>
+                </div>
+              </div>
+              <div class="upload-zone !p-1.5 !px-3 shrink-0 cursor-pointer text-xs font-bold text-orange-600 hover:bg-orange-50 border-orange-200" id="file-upload-zone">
+                <input type="file" id="product-file-input" class="hidden">
+                <span id="file-upload-prompt" class="flex items-center gap-1 text-xs">
+                  <i data-lucide="upload" width="12" height="12"></i>
+                  <span>${full.file_path ? 'Replace File' : 'Upload File'}</span>
+                </span>
+              </div>
+            </div>
+            <input type="hidden" name="file_path" id="file-path-input" value="${escapeHtml(full.file_path ?? '')}">
+            <p id="file-upload-status" class="text-xs text-slate-500 font-medium"></p>
+          </div>
+
+          <!-- Section 5: Description with Compact View -->
+          <div class="form-section-card space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-black text-[#142c55] uppercase tracking-wider">Product Description</label>
+              <button type="button" id="toggle-desc-size-btn" class="text-xs text-orange-600 font-bold hover:underline">Expand Editor</button>
+            </div>
+            <textarea class="field !mt-1" id="product-desc-textarea" name="description" placeholder="Comprehensive product description, chapters, instructions…" rows="3">${escapeHtml(full.description ?? '')}</textarea>
+          </div>
+
+          <label class="flex items-center gap-2 text-sm font-semibold cursor-pointer pt-1">
+            <input type="checkbox" name="is_published" ${full.is_published ? 'checked' : ''} class="rounded text-orange-600">
+            <span>Publish in store catalog</span>
+          </label>
+        </div>`;
+
+      // Wire description toggle
+      const descArea = document.querySelector('#product-desc-textarea');
+      const toggleDescBtn = document.querySelector('#toggle-desc-size-btn');
+      toggleDescBtn?.addEventListener('click', () => {
+        if (descArea.rows === 3) {
+          descArea.rows = 8;
+          toggleDescBtn.textContent = 'Collapse';
+        } else {
+          descArea.rows = 3;
+          toggleDescBtn.textContent = 'Expand Editor';
+        }
+      });
+    }
+
+    // Live shareable ad link updates
     const slugInput = document.querySelector('#product-slug-input');
     const adPreview = document.querySelector('#modal-ad-link-preview');
     const copyAdBtn = document.querySelector('#copy-modal-ad-link');
@@ -869,6 +1038,7 @@ async function openEditor(type, existing = null) {
       toast('Advertising link copied to clipboard!');
     });
 
+    renderIcons();
     setTimeout(wireUploadZones, 0);
   } else if (type === 'promo') {
     document.querySelector('#editor-fields').innerHTML = `
@@ -953,6 +1123,12 @@ document.querySelector('#editor-form').onsubmit = async (e) => {
     v.original_price = v.original_price ? Number(v.original_price) : null;
     v.category = v.category || 'General';
     v.slug = slugify(v.slug || v.title);
+
+    if (v.gallery_urls) {
+      v.gallery_urls = v.gallery_urls.split(',').map((s) => s.trim()).filter(Boolean);
+    } else {
+      v.gallery_urls = null;
+    }
 
     if (!v.slug) {
       toast('Please enter a title or slug for the product.', 'error');

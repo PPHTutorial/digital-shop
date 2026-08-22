@@ -2,123 +2,402 @@
 <html lang="en" class="scroll-smooth">
 
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="description" content="DigiStore by Codeink Technologies — digital products delivered securely.">
-    <title>DigiStore | Codeink Technologies</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="./css/app.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="DigiStore by Codeink Technologies — Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
+  <title>DigiStore | Premium Digital Catalog</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./css/app.css">
 </head>
 
-<body class="bg-slate-50 text-slate-900">
-    <!-- Initial Instant Page Loader -->
-    <div id="page-loader" class="page-loader">
-        <div class="loader-card">
-            <div class="shimmer logo"></div>
-            <div class="shimmer hero"></div>
-            <div class="shimmer short"></div>
-        </div>
+<body class="bg-slate-50 text-slate-900 selection:bg-orange-500 selection:text-white">
+  <!-- Initial Instant Page Loader -->
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
     </div>
+  </div>
 
-    <header id="site-header" class="sticky top-0 z-40"></header>
-    <main>
-        <section class="border-b border-slate-200 bg-white">
-            <div class="shell grid gap-10 py-16 lg:grid-cols-[1.15fr_.85fr] lg:py-24">
-                <div class="self-center"><span class="eyebrow">CURATED DIGITAL GOODS</span>
-                    <h1
-                        class="mt-4 max-w-3xl text-5xl font-black leading-[.98] tracking-[-.05em] text-[#142c55] sm:text-6xl">
-                        Everything digital, ready when you are.</h1>
-                    <p class="mt-6 max-w-2xl text-lg leading-8 text-slate-600">Discover books, templates, software, and
-                        practical resources from creators you can trust.</p>
-                    <div class="mt-8 flex flex-wrap gap-3"><a href="#store" class="button button-primary">Explore
-                            catalog</a><a href="./auth.html?mode=signup" class="button">Create your account</a></div>
-                </div>
-                <div class="hero-card p-7 sm:p-9">
-                    <div class="flex items-center justify-between"><span class="tag">Why DigiStore</span><span
-                            class="text-sm font-bold text-slate-400">Secure checkout</span></div>
-                    <div class="mt-8 space-y-6">
-                        <div class="feature-row">
-                            <div class="icon-dot">01</div>
-                            <div>
-                                <h2 class="font-black text-[#142c55]">Buy with confidence</h2>
-                                <p class="mt-1 text-sm leading-6 text-slate-600">Payments are verified before protected
-                                    downloads are released.</p>
-                            </div>
-                        </div>
-                        <div class="feature-row">
-                            <div class="icon-dot">02</div>
-                            <div>
-                                <h2 class="font-black text-[#142c55]">Your account, your access</h2>
-                                <p class="mt-1 text-sm leading-6 text-slate-600">Manage your profile, orders, and
-                                    downloads from one secure place.</p>
-                            </div>
-                        </div>
-                        <div class="feature-row">
-                            <div class="icon-dot">03</div>
-                            <div>
-                                <h2 class="font-black text-[#142c55]">Fresh collections</h2>
-                                <p class="mt-1 text-sm leading-6 text-slate-600">Find helpful new releases across our
-                                    growing digital catalog.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        <section id="store" class="shell py-14">
-            <div class="flex flex-wrap items-end justify-between gap-5">
-                <div><span class="eyebrow">CATALOG</span>
-                    <h2 class="mt-2 text-3xl font-black tracking-tight text-[#142c55]">Explore products</h2>
-                </div>
-                <p id="product-count" class="text-sm font-semibold text-slate-500"></p>
-            </div>
-            <div class="mt-7 grid gap-5 lg:grid-cols-[240px_1fr]">
-                <aside class="soft-panel h-fit p-5">
-                    <h3 class="font-black text-[#142c55]">Categories</h3>
-                    <div id="category-sidebar-list" class="mt-4 grid gap-1 text-sm font-semibold text-slate-600">
-                        <button type="button" class="category-filter-btn text-left rounded-lg bg-orange-50 px-3 py-2 text-orange-700 font-bold active" data-category="all">All products</button>
-                    </div>
-                    <p class="mt-6 border-t pt-5 text-xs leading-5 text-slate-500">Instant digital downloads delivered securely to your account upon payment.</p>
-                </aside>
-                    <div id="product-grid" class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"></div>
-                    <div id="load-more-container" class="mt-8 text-center hidden">
-                        <button id="load-more-btn" type="button" class="button !py-3 !px-8 text-sm font-bold shadow-sm hover:shadow">
-                            Load more products
-                        </button>
-                    </div>
-                    <div id="product-loading" class="mt-6 hidden">
-                        <div class="progress-track"></div>
-                        <p class="mt-3 text-center text-sm font-semibold text-slate-500">Loading catalog…</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-        <section id="collections" class="shell pb-14">
-            <div class="soft-panel grid gap-7 p-7 sm:grid-cols-[1fr_auto] sm:items-center">
-                <div><span class="eyebrow">STAY INFORMED</span>
-                    <h2 class="mt-2 text-2xl font-black text-[#142c55]">New releases, without the noise.</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-600">Product launches, useful resources, and occasional
-                        offers.</p>
-                </div>
-                <form id="subscribe-form" class="flex w-full max-w-md gap-2"><input name="email" required type="email"
-                        placeholder="you@example.com" class="field !mt-0"><button class="button button-primary"
-                        type="submit">Subscribe</button></form>
-                <p id="subscribe-status" class="status-line sm:col-span-2" aria-live="polite"></p>
-            </div>
-        </section>
-    </main>
-    <footer class="bg-[#142c55] py-10 text-slate-300">
-        <div class="shell flex flex-wrap items-center justify-between gap-5">
-            <div>
-                <div class="text-xl font-black text-white">DigiStore</div>
-                <p class="mt-1 text-xs">powered by codeinktechnologies</p>
-            </div>
-            <div class="flex gap-5 text-sm font-semibold"><a href="./support.html">Support</a><a
-                    href="./auth.html">Account</a><a href="./admin.html">Admin</a></div>
-            <p class="text-xs">© <span id="year"></span> Codeink Technologies.</p>
+  <header id="site-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur shadow-sm"></header>
+
+  <!-- Quick Category Bar -->
+  <nav class="border-b border-slate-200 bg-white py-3 overflow-x-auto">
+    <div class="shell flex items-center gap-2 text-xs font-semibold whitespace-nowrap" id="quick-category-nav">
+      <button type="button" class="quick-nav-pill rounded-full bg-[#142c55] text-white px-3.5 py-1.5 transition" data-target-category="all">All Products</button>
+      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Ebooks & Guides">Ebooks &amp; Guides</button>
+      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Software & Tools">Software &amp; Tools</button>
+      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Templates & Themes">Templates &amp; Themes</button>
+      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Online Courses">Online Courses</button>
+      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Audio & Media">Audio &amp; Media</button>
+      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Design & Graphics">Design &amp; Graphics</button>
+      <a href="#store" class="ml-auto text-orange-600 font-bold hover:underline flex items-center gap-1">
+        <span>Explore Full Catalog</span>
+        <span>↓</span>
+      </a>
+    </div>
+  </nav>
+
+  <main class="py-8 space-y-12">
+
+    <!-- 1. FEATURED RELEASES SECTION -->
+    <section id="section-featured" class="shell">
+      <div class="section-nav-header">
+        <div>
+          <span class="eyebrow !text-orange-600">HANDPICKED SPOTLIGHT</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Featured Releases</h2>
         </div>
-    </footer>
-    <script type="module" src="./js/storefront.js"></script>
+        <div class="flex items-center gap-3">
+          <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-featured" aria-label="Scroll left">‹</button>
+          <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-featured" aria-label="Scroll right">›</button>
+          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="featured">
+            See all (<span class="count-featured">0</span>) →
+          </button>
+        </div>
+      </div>
+      <div id="scroll-featured" class="horizontal-scroll-container"></div>
+    </section>
+
+    <!-- 2. NEW ARRIVALS SECTION -->
+    <section id="section-new" class="shell">
+      <div class="section-nav-header">
+        <div>
+          <span class="eyebrow !text-blue-600">FRESH IN STORE</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">New Arrivals</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-new" aria-label="Scroll left">‹</button>
+          <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-new" aria-label="Scroll right">›</button>
+          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="new">
+            See all (<span class="count-new">0</span>) →
+          </button>
+        </div>
+      </div>
+      <div id="scroll-new" class="horizontal-scroll-container"></div>
+    </section>
+
+    <!-- 3. BEST SELLERS / MOST PURCHASED -->
+    <section id="section-bestsellers" class="shell">
+      <div class="section-nav-header">
+        <div>
+          <span class="eyebrow !text-amber-600">COMMUNITY FAVORITES</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Most Purchased &amp; Best Sellers</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-bestsellers" aria-label="Scroll left">‹</button>
+          <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-bestsellers" aria-label="Scroll right">›</button>
+          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="bestsellers">
+            See all (<span class="count-bestsellers">0</span>) →
+          </button>
+        </div>
+      </div>
+      <div id="scroll-bestsellers" class="horizontal-scroll-container"></div>
+    </section>
+
+    <!-- 4. TRENDING NOW -->
+    <section id="section-trending" class="shell">
+      <div class="section-nav-header">
+        <div>
+          <span class="eyebrow !text-purple-600">HIGH DEMAND</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Trending Now</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-trending" aria-label="Scroll left">‹</button>
+          <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-trending" aria-label="Scroll right">›</button>
+          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="trending">
+            See all (<span class="count-trending">0</span>) →
+          </button>
+        </div>
+      </div>
+      <div id="scroll-trending" class="horizontal-scroll-container"></div>
+    </section>
+
+    <!-- 5. SPECIAL DEALS & DISCOUNTS -->
+    <section id="section-deals" class="shell">
+      <div class="section-nav-header">
+        <div>
+          <span class="eyebrow !text-red-600">LIMITED-TIME SAVINGS</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Special Deals &amp; Discounts</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-deals" aria-label="Scroll left">‹</button>
+          <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-deals" aria-label="Scroll right">›</button>
+          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="deals">
+            See all (<span class="count-deals">0</span>) →
+          </button>
+        </div>
+      </div>
+      <div id="scroll-deals" class="horizontal-scroll-container"></div>
+    </section>
+
+    <!-- 6. EBOOKS & GUIDES -->
+    <section id="section-ebooks" class="shell">
+      <div class="section-nav-header">
+        <div>
+          <span class="eyebrow">DIGITAL PUBLICATIONS</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Ebooks &amp; Comprehensive Guides</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-ebooks" aria-label="Scroll left">‹</button>
+          <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-ebooks" aria-label="Scroll right">›</button>
+          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="Ebooks & Guides">
+            See all (<span class="count-ebooks">0</span>) →
+          </button>
+        </div>
+      </div>
+      <div id="scroll-ebooks" class="horizontal-scroll-container"></div>
+    </section>
+
+    <!-- 7. SOFTWARE, TOOLS & SCRIPTS -->
+    <section id="section-software" class="shell">
+      <div class="section-nav-header">
+        <div>
+          <span class="eyebrow">ENGINEERING &amp; TOOLS</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Software, Tools &amp; Scripts</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-software" aria-label="Scroll left">‹</button>
+          <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-software" aria-label="Scroll right">›</button>
+          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="Software & Tools">
+            See all (<span class="count-software">0</span>) →
+          </button>
+        </div>
+      </div>
+      <div id="scroll-software" class="horizontal-scroll-container"></div>
+    </section>
+
+    <!-- 8. TEMPLATES, THEMES & UI KITS -->
+    <section id="section-templates" class="shell">
+      <div class="section-nav-header">
+        <div>
+          <span class="eyebrow">DESIGN &amp; THEMES</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Templates, Themes &amp; UI Kits</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-templates" aria-label="Scroll left">‹</button>
+          <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-templates" aria-label="Scroll right">›</button>
+          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="Templates & Themes">
+            See all (<span class="count-templates">0</span>) →
+          </button>
+        </div>
+      </div>
+      <div id="scroll-templates" class="horizontal-scroll-container"></div>
+    </section>
+
+    <!-- 9. ONLINE COURSES & MASTERCLASSES -->
+    <section id="section-courses" class="shell">
+      <div class="section-nav-header">
+        <div>
+          <span class="eyebrow">LEARNING &amp; MASTERY</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Online Courses &amp; Masterclasses</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-courses" aria-label="Scroll left">‹</button>
+          <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-courses" aria-label="Scroll right">›</button>
+          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="Online Courses">
+            See all (<span class="count-courses">0</span>) →
+          </button>
+        </div>
+      </div>
+      <div id="scroll-courses" class="horizontal-scroll-container"></div>
+    </section>
+
+    <!-- 10. AUDIO & MEDIA ASSETS -->
+    <section id="section-audio" class="shell">
+      <div class="section-nav-header">
+        <div>
+          <span class="eyebrow">CREATIVE MEDIA</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Audio &amp; Media Assets</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-audio" aria-label="Scroll left">‹</button>
+          <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-audio" aria-label="Scroll right">›</button>
+          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="Audio & Media">
+            See all (<span class="count-audio">0</span>) →
+          </button>
+        </div>
+      </div>
+      <div id="scroll-audio" class="horizontal-scroll-container"></div>
+    </section>
+
+    <!-- HIGH-CONVERTING CTA BANNER -->
+    <section class="shell my-12">
+      <div class="rounded-3xl bg-gradient-to-br from-[#142c55] via-[#1a386b] to-[#0f2344] p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="relative z-10 max-w-2xl space-y-4">
+          <span class="tag !bg-orange-500 !text-white !border-0 text-xs font-bold tracking-wider">INSTANT DELIVERY SYSTEM</span>
+          <h2 class="text-3xl sm:text-4xl font-black tracking-tight leading-tight">Instant Digital Downloads Delivered Securely to Your Vault</h2>
+          <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
+            Gain immediate lifetime access to software licenses, high-resolution media, development kits, and professional ebooks with multi-currency payment support.
+          </p>
+          <div class="pt-3 flex flex-wrap gap-3 items-center">
+            <a href="#store" class="inline-flex rounded-full bg-orange-500 px-7 py-3 font-bold text-white hover:bg-orange-400 shadow-lg shadow-orange-500/30 transition-all hover:scale-105">Browse Complete Catalog</a>
+            <a href="./support.html" class="inline-flex rounded-full bg-white/10 hover:bg-white/20 px-6 py-3 font-bold text-white transition-colors">Customer Support</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPLETE STOREFRONT CATALOG EXPLORER (No side category panel) -->
+    <section id="store" class="shell pt-6 pb-16">
+      <div class="border-t border-slate-200 pt-10">
+        <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+          <div>
+            <span class="eyebrow">EXPLORE STOREFRONT</span>
+            <h2 id="catalog-heading" class="text-3xl font-black tracking-tight text-[#142c55]">All Products</h2>
+            <p id="catalog-subtitle" class="text-xs text-slate-500 mt-1">Showing verified digital products available for immediate download</p>
+          </div>
+          <p id="product-count" class="text-sm font-bold text-slate-500"></p>
+        </div>
+
+        <!-- Unified Top Filter Bar -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-4 mb-8">
+          <!-- Top Category Filter Pills -->
+          <div id="catalog-category-pills" class="flex flex-wrap gap-2"></div>
+
+          <!-- Search & Sorting Row -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+            <div class="relative flex-1 min-w-[240px]">
+              <input id="store-search-input" type="text" placeholder="Search by title, description, or keyword…" class="field !mt-0 !py-2 !pl-3 text-xs w-full">
+            </div>
+            <div class="flex items-center gap-2">
+              <label for="store-sort-select" class="text-xs font-bold text-slate-500 whitespace-nowrap">Sort by:</label>
+              <select id="store-sort-select" class="field !mt-0 !py-2 text-xs bg-slate-50 border-slate-200">
+                <option value="newest">Newest First</option>
+                <option value="price-low">Price: Low to High</option>
+                <option value="price-high">Price: High to Low</option>
+                <option value="title">Alphabetical (A-Z)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Product Grid (Full Width) -->
+        <div id="product-grid" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"></div>
+
+        <!-- Load More Button Container -->
+        <div id="load-more-container" class="mt-10 text-center hidden">
+          <button id="load-more-btn" type="button" class="button !py-3 !px-8 text-sm font-bold shadow-md hover:shadow-lg transition">
+            Load more products
+          </button>
+        </div>
+
+        <!-- Product Loading State -->
+        <div id="product-loading" class="mt-8 hidden">
+          <div class="progress-track max-w-xs mx-auto"></div>
+          <p class="mt-3 text-center text-sm font-semibold text-slate-500">Loading catalog items…</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- NEWSLETTER SUBSCRIPTION -->
+    <section id="collections" class="shell pb-10">
+      <div class="soft-panel grid gap-7 p-8 sm:p-10 sm:grid-cols-[1fr_auto] sm:items-center rounded-3xl">
+        <div>
+          <span class="eyebrow !text-orange-600">STAY INFORMED</span>
+          <h2 class="mt-2 text-2xl sm:text-3xl font-black text-[#142c55]">New releases, tools, and digital insights.</h2>
+          <p class="mt-2 text-sm leading-relaxed text-slate-600 max-w-xl">
+            Subscribe to receive occasional product launch discounts, newly curated digital assets, and developer resources directly to your inbox.
+          </p>
+        </div>
+        <form id="subscribe-form" class="flex w-full max-w-md gap-2">
+          <input name="email" required type="email" placeholder="Enter your email address…" class="field !mt-0">
+          <button class="button button-primary shrink-0" type="submit">Subscribe</button>
+        </form>
+        <p id="subscribe-status" class="status-line sm:col-span-2" aria-live="polite"></p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ULTRA-PREMIUM MODERN FOOTER -->
+  <footer class="bg-[#0e1e38] text-slate-300 pt-16 pb-12 border-t border-slate-800">
+    <div class="shell space-y-12">
+      <!-- 5-Column Grid -->
+      <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-5 text-sm">
+        <!-- Col 1: Brand & Info -->
+        <div class="lg:col-span-2 space-y-4 pr-4">
+          <div class="flex items-center gap-3">
+            <span class="brand-mark !bg-orange-500 !text-white font-black text-lg w-10 h-10 rounded-xl flex items-center justify-center">D</span>
+            <div>
+              <span class="text-xl font-black text-white tracking-tight">DigiStore</span>
+              <span class="block text-[11px] text-slate-400 font-medium uppercase tracking-wider">by Codeink Technologies</span>
+            </div>
+          </div>
+          <p class="text-xs leading-relaxed text-slate-400 max-w-sm">
+            Empowering professionals, creators, and developers worldwide with verified, high-value digital products, comprehensive ebooks, tools, and software templates.
+          </p>
+          <div class="pt-2 flex flex-wrap gap-2 items-center text-[11px] text-slate-400">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
+              <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              <span>All Systems Operational</span>
+            </span>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
+              <span>🔒 256-Bit SSL Encrypted</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Col 2: Categories -->
+        <div class="space-y-3">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Digital Catalog</h3>
+          <ul class="space-y-2 text-xs text-slate-400">
+            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Ebooks & Guides">Ebooks &amp; Guides</a></li>
+            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Software & Tools">Software &amp; Tools</a></li>
+            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Templates & Themes">Templates &amp; Themes</a></li>
+            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Online Courses">Online Courses</a></li>
+            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Audio & Media">Audio &amp; Media</a></li>
+            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Design & Graphics">Design &amp; Graphics</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 3: Customer Hub -->
+        <div class="space-y-3">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Customer Hub</h3>
+          <ul class="space-y-2 text-xs text-slate-400">
+            <li><a href="./account.html" class="hover:text-orange-400 transition">My Account &amp; Vault</a></li>
+            <li><a href="./account.html" class="hover:text-orange-400 transition">Order History</a></li>
+            <li><a href="./support.html" class="hover:text-orange-400 transition">Customer Helpdesk</a></li>
+            <li><a href="./support.html" class="hover:text-orange-400 transition">Submit Support Ticket</a></li>
+            <li><a href="./blog.html" class="hover:text-orange-400 transition">Articles &amp; Updates</a></li>
+            <li><a href="./about.html" class="hover:text-orange-400 transition">About Codeink</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 4: Legal & Trust -->
+        <div class="space-y-3">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Trust &amp; Legal</h3>
+          <ul class="space-y-2 text-xs text-slate-400">
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Terms of Service</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Privacy Policy</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Refund &amp; Return Policy</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Digital License Agreement</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Security &amp; Compliance</a></li>
+            <li><a href="./contact.html" class="hover:text-orange-400 transition">Contact Legal Team</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Bottom Bar with Payment Chips & Copyright -->
+      <div class="border-t border-slate-800/80 pt-8 flex flex-wrap items-center justify-between gap-6 text-xs text-slate-500">
+        <div>
+          <p>© <span id="year"></span> <strong class="text-slate-400">Codeink Technologies</strong>. All rights reserved.</p>
+          <p class="text-[11px] text-slate-500 mt-0.5">DigiStore is a registered digital merchandise platform by Codeink Technologies.</p>
+        </div>
+
+        <!-- Verified Payment Badges -->
+        <div class="flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
+          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">Flutterwave Verified</span>
+          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">NOWPayments Crypto</span>
+          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">Mobile Money (GHS/KES/UGX)</span>
+          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">Visa / Mastercard / Verve</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="./js/storefront.js"></script>
 </body>
 
 </html>

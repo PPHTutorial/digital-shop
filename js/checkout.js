@@ -150,10 +150,29 @@ function setupImageGallery(coverUrl, galleryUrls = []) {
     } else {
       strip.classList.add('hidden');
     }
+
+    // Lightbox modal setup
+    const lightbox = document.querySelector('#image-lightbox-modal');
+    const lightboxImg = document.querySelector('#lightbox-img');
+    const lightboxTitle = document.querySelector('#lightbox-title');
+    const closeLightbox = document.querySelector('#close-lightbox-btn');
+
+    document.querySelector('#main-image-wrapper').onclick = () => {
+      if (mainImg.src && !mainImg.classList.contains('hidden') && lightbox && lightboxImg) {
+        lightboxImg.src = mainImg.src;
+        if (lightboxTitle) lightboxTitle.textContent = product?.title || 'Product Image Preview';
+        lightbox.showModal();
+      }
+    };
+
+    closeLightbox?.addEventListener('click', () => lightbox?.close());
+    lightbox?.addEventListener('click', (e) => {
+      if (e.target === lightbox) lightbox.close();
+    });
   } else {
     mainImg.classList.add('hidden');
     placeholder.classList.remove('hidden');
-    placeholder.innerHTML = '<span>Digital Book</span>';
+    placeholder.innerHTML = '<span>Digital Product</span>';
     strip.classList.add('hidden');
   }
 }

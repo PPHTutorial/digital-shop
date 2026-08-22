@@ -141,21 +141,23 @@
     </main>
   </div>
 
-  <!-- General Editor Modal -->
-  <dialog id="editor-modal" class="w-[min(94vw,640px)] rounded-2xl border-0 p-0 shadow-2xl">
-    <form id="editor-form" class="p-6">
-      <div class="flex items-start justify-between pb-3 border-b border-slate-100">
+  <!-- General Editor Modal (Contained & Non-bleeding) -->
+  <dialog id="editor-modal" class="admin-modal-container">
+    <form id="editor-form" class="flex flex-col h-full max-h-[92vh]">
+      <div class="flex items-start justify-between p-5 sm:p-6 pb-4 border-b border-slate-100 bg-white shrink-0">
         <div>
           <span id="editor-eyebrow" class="eyebrow"></span>
-          <h2 id="editor-title" class="mt-1 text-xl font-black text-[#142c55]"></h2>
+          <h2 id="editor-title" class="mt-0.5 text-xl font-black text-[#142c55]"></h2>
         </div>
-        <button id="close-modal" type="button" class="text-2xl text-slate-400 hover:text-slate-700 bg-transparent border-0 cursor-pointer">×</button>
+        <button id="close-modal" type="button" class="text-2xl leading-none text-slate-400 hover:text-slate-700 bg-transparent border-0 cursor-pointer">×</button>
       </div>
-      <div id="editor-fields" class="mt-5 grid gap-4"></div>
-      <p id="editor-feedback" class="status-line mt-4"></p>
-      <div class="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
-        <button id="cancel-modal-btn" type="button" class="button">Cancel</button>
-        <button id="editor-submit-btn" class="button button-primary" type="submit">Save changes</button>
+      <div id="editor-fields" class="admin-modal-body space-y-5"></div>
+      <div class="admin-modal-footer flex items-center justify-between gap-3">
+        <p id="editor-feedback" class="status-line mr-auto my-0 text-xs"></p>
+        <div class="flex items-center gap-3 shrink-0">
+          <button id="cancel-modal-btn" type="button" class="button">Cancel</button>
+          <button id="editor-submit-btn" class="button button-primary" type="submit">Save changes</button>
+        </div>
       </div>
     </form>
   </dialog>

@@ -32,9 +32,13 @@
       <!-- LEFT COLUMN: Book Cover, Thumbnails Gallery, Description -->
       <section class="soft-panel p-6 sm:p-8 space-y-6">
         <div id="product-media-container" class="space-y-4">
-          <!-- Main Hero Image -->
-          <div id="main-image-wrapper" class="overflow-hidden rounded-2xl bg-slate-100 flex items-center justify-center">
-            <img id="main-book-img" src="" alt="Book Cover" class="checkout-main-img hidden">
+          <!-- Main Hero Image with Zoom Click -->
+          <div id="main-image-wrapper" class="overflow-hidden rounded-2xl bg-slate-100 flex items-center justify-center relative group cursor-pointer" title="Click to view full image">
+            <img id="main-book-img" src="" alt="Book Cover" class="checkout-main-img hidden transition-transform duration-300 group-hover:scale-[1.02]">
+            <div class="absolute bottom-3 right-3 bg-slate-900/70 hover:bg-slate-900 text-white text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <i data-lucide="maximize-2" width="12" height="12"></i>
+              <span>Click to zoom</span>
+            </div>
             <div id="main-book-placeholder" class="h-64 w-full flex items-center justify-center text-slate-400">
               <span>Loading product preview…</span>
             </div>
@@ -44,18 +48,18 @@
           <div id="thumbnail-strip" class="thumb-gallery hidden"></div>
         </div>
 
-        <!-- Product Title & Details -->
+        <!-- Product Title & Details (Flex-row on sm/md/lg) -->
         <div class="border-t border-slate-100 pt-5">
           <div class="flex flex-wrap items-center gap-2 mb-2">
             <span id="product-category-tag" class="tag">Digital Edition</span>
             <span id="discount-badge" class="discount-pill hidden">Sale</span>
-            <span class="text-xs text-slate-400 font-semibold">⚡ Instant PDF/EPUB Download</span>
+            <span class="text-xs text-slate-400 font-semibold">⚡ Instant Verified Download</span>
           </div>
-          <div class="flex items-center justify-between gap-3">
-            <h2 id="product-title" class="text-2xl font-black text-[#142c55]">Loading title…</h2>
-            <button id="share-checkout-btn" type="button" class="button !min-h-9 !px-3 !text-xs flex-shrink-0" title="Share product checkout link">
-              <i data-lucide="share-2" width="15" height="15"></i>
-              <span>Share link</span>
+          <div class="flex flex-row items-center justify-between gap-3 pt-1">
+            <h2 id="product-title" class="text-xl sm:text-2xl font-black text-[#142c55] leading-tight">Loading title…</h2>
+            <button id="share-checkout-btn" type="button" class="button !min-h-9 !px-3.5 !text-xs shrink-0 flex items-center gap-1.5 whitespace-nowrap" title="Share product checkout link">
+              <i data-lucide="share-2" width="14" height="14"></i>
+              <span>Share</span>
             </button>
           </div>
         </div>
@@ -267,6 +271,19 @@
       <div id="modal-desc-content" class="mt-5 max-h-[60vh] overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line space-y-3"></div>
       <div class="mt-6 pt-4 border-t border-slate-100 flex justify-end">
         <button id="close-desc-modal-btn" type="button" class="button button-primary !px-6 text-sm">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Fullscreen Image Lightbox Modal -->
+  <dialog id="image-lightbox-modal" class="rounded-2xl border-0 p-0 shadow-2xl bg-slate-950/90 backdrop:bg-slate-950/80 text-white max-w-4xl w-[min(96vw,840px)]">
+    <div class="p-4 sm:p-6">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <span id="lightbox-title" class="text-sm font-bold text-slate-300 truncate">Product Image Preview</span>
+        <button id="close-lightbox-btn" type="button" class="text-2xl leading-none text-slate-400 hover:text-white cursor-pointer border-0 bg-transparent">×</button>
+      </div>
+      <div class="py-4 flex items-center justify-center min-h-[250px] max-h-[72vh]">
+        <img id="lightbox-img" src="" alt="Full Product Image" class="max-h-[68vh] max-w-full rounded-xl object-contain shadow-2xl">
       </div>
     </div>
   </dialog>

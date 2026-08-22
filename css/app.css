@@ -622,4 +622,109 @@ a:hover {
   gap: 4px;
 }
 
+/* Horizontal Scroll Showcase & Section Carousel */
+.horizontal-scroll-container {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 4px 18px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.horizontal-scroll-container::-webkit-scrollbar {
+  height: 6px;
+}
+.horizontal-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.horizontal-scroll-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+.horizontal-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.scroll-card-item {
+  flex: 0 0 280px;
+  width: 280px;
+}
+@media (min-width: 640px) {
+  .scroll-card-item {
+    flex: 0 0 300px;
+    width: 300px;
+  }
+}
+@media (min-width: 1024px) {
+  .scroll-card-item {
+    flex: 0 0 320px;
+    width: 320px;
+  }
+}
+
+/* Section Header Bar with Navigation */
+.section-nav-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.scroll-arrow-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+.scroll-arrow-btn:hover {
+  background: #f8fafc;
+  border-color: #f97316;
+  color: #ea580c;
+  transform: scale(1.05);
+}
+
+/* Admin Modal Content Overflow Control */
+.admin-modal-container {
+  width: min(96vw, 860px);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  border: 0;
+  padding: 0;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.25);
+  background: #ffffff;
+  overflow: hidden;
+}
+.admin-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  max-height: calc(92vh - 140px);
+}
+.admin-modal-footer {
+  flex-shrink: 0;
+  padding: 16px 24px;
+  border-top: 1px solid #f1f5f9;
+  background: #f8fafc;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.form-section-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+}
+
 
