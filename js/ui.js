@@ -157,13 +157,13 @@ export function mountFooter() {
           <p class="text-xs leading-relaxed text-slate-400 max-w-sm">
             Empowering professionals, creators, and developers worldwide with verified, high-value digital products, comprehensive ebooks, tools, and software templates.
           </p>
-          <div class="pt-2 flex flex-wrap gap-2 items-center text-[11px] text-slate-400">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-slate-300 font-medium">
-              ${icon('shield-check', 13)}
+          <div class="pt-2 flex flex-wrap gap-4 items-center text-xs text-slate-400">
+            <span class="inline-flex items-center gap-1.5 text-slate-300 font-medium">
+              ${icon('shield-check', 14)}
               <span>Verified Merchant Platform</span>
             </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-slate-300 font-medium">
-              ${icon('lock', 13)}
+            <span class="inline-flex items-center gap-1.5 text-slate-300 font-medium">
+              ${icon('lock', 14)}
               <span>256-Bit SSL Encrypted</span>
             </span>
           </div>
@@ -211,8 +211,11 @@ export function mountFooter() {
           <p>© ${year} <strong class="text-slate-400">Codeink Technologies</strong>. All rights reserved.</p>
           <p class="text-[11px] text-slate-500 mt-0.5">DigiStore is a registered digital merchandise platform by Codeink Technologies.</p>
         </div>
-        <div class="flex flex-wrap items-center gap-5 sm:gap-6">
-          <div class="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition cursor-default" title="Flutterwave Verified Partner">
+
+        <!-- Clean, Unbordered Official Payment Gateway SVG Logos -->
+        <div class="flex flex-wrap items-center gap-6">
+          <!-- Flutterwave -->
+          <div class="flex items-center gap-1.5 opacity-85 hover:opacity-100 transition cursor-default" title="Flutterwave Verified Partner">
             <svg class="h-4 w-auto" viewBox="0 0 120 28" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12.5 0C5.6 0 0 5.6 0 12.5C0 19.4 5.6 25 12.5 25C13.8 25 15.1 24.8 16.3 24.4C13.2 21.6 11.2 17.5 11.2 13C11.2 8.5 13.2 4.4 16.3 1.6C15.1 1.2 13.8 0 12.5 0Z" fill="#FB9129"/>
               <path d="M17.5 3.2C15.1 5.7 13.7 9.2 13.7 13C13.7 16.8 15.1 20.3 17.5 22.8C20 20.3 21.4 16.8 21.4 13C21.4 9.2 20 5.7 17.5 3.2Z" fill="#F5A623"/>
@@ -220,29 +223,44 @@ export function mountFooter() {
               <text x="44" y="17" fill="#FFFFFF" font-family="system-ui, sans-serif" font-weight="800" font-size="12" letter-spacing="-0.2">Flutterwave</text>
             </svg>
           </div>
-          <div class="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition cursor-default" title="NOWPayments Crypto Gateway">
+
+          <!-- NOWPayments -->
+          <div class="flex items-center gap-1.5 opacity-85 hover:opacity-100 transition cursor-default" title="NOWPayments Crypto Gateway">
             <svg class="h-4 w-auto" viewBox="0 0 125 28" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="12" cy="13" r="10" fill="#00E5FF" fill-opacity="0.15"/>
               <path d="M8 8L16 13L8 18V8Z" fill="#00E5FF"/>
               <text x="26" y="17" fill="#00E5FF" font-family="system-ui, sans-serif" font-weight="800" font-size="11.5" letter-spacing="0.2">NOWPayments</text>
             </svg>
           </div>
-          <div class="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition cursor-default" title="Mobile Money (GHS / KES / UGX / RWF)">
+
+          <!-- Mobile Money -->
+          <div class="flex items-center gap-1.5 opacity-85 hover:opacity-100 transition cursor-default" title="Mobile Money (GHS / KES / UGX / RWF)">
             <svg class="h-4 w-auto" viewBox="0 0 105 28" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="10" cy="13" r="8" fill="#FFCC00"/>
               <path d="M7 10H13V16H7V10Z" fill="#000000"/>
               <text x="22" y="17" fill="#FFCC00" font-family="system-ui, sans-serif" font-weight="800" font-size="11.5">MoMo &amp; M-Pesa</text>
             </svg>
           </div>
-          <div class="flex items-center opacity-80 hover:opacity-100 transition cursor-default" title="Visa">
+
+          <!-- Visa -->
+          <div class="flex items-center opacity-85 hover:opacity-100 transition cursor-default" title="Visa">
             <svg class="h-4 w-auto" viewBox="0 0 45 16" fill="none" xmlns="http://www.w3.org/2000/svg">
               <text x="2" y="14" fill="#60A5FA" font-family="system-ui, sans-serif" font-weight="900" font-style="italic" font-size="16" letter-spacing="1">VISA</text>
             </svg>
           </div>
-          <div class="flex items-center opacity-80 hover:opacity-100 transition cursor-default" title="Mastercard">
+
+          <!-- Mastercard -->
+          <div class="flex items-center opacity-85 hover:opacity-100 transition cursor-default" title="Mastercard">
             <svg class="h-4 w-auto" viewBox="0 0 34 20" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="10" cy="10" r="9" fill="#EB001B"/>
               <circle cx="24" cy="10" r="9" fill="#F79E1B" fill-opacity="0.85"/>
+            </svg>
+          </div>
+
+          <!-- Apple Pay -->
+          <div class="flex items-center opacity-85 hover:opacity-100 transition cursor-default" title="Apple Pay">
+            <svg class="h-4 w-auto" viewBox="0 0 40 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <text x="2" y="14" fill="#FFFFFF" font-family="system-ui, sans-serif" font-weight="700" font-size="12"> Pay</text>
             </svg>
           </div>
         </div>
