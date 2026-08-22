@@ -1156,10 +1156,11 @@ async function openEditor(type, existing = null) {
       <div>
         <label class="label">Max Redemptions (Optional)</label>
         <input class="field" name="max_redemptions" type="number" min="1" placeholder="Unlimited if empty" value="${full.max_redemptions ?? ''}">
-      </div>`;
   }
 
-  modal.showModal();
+  if (modal && !modal.open) {
+    modal.showModal();
+  }
 }
 
 async function deleteProduct(id) {
@@ -1266,19 +1267,38 @@ document.querySelector('#editor-form').onsubmit = async (e) => {
 };
 
 // Wiring dialog close & modal buttons
-document.querySelector('#new-product').onclick = () => openEditor('product');
-document.querySelector('#new-promo').onclick = () => openEditor('promo');
-document.querySelector('#close-modal').onclick = () => modal.close();
-document.querySelector('#cancel-modal-btn').onclick = () => modal.close();
-document.querySelector('#close-details-modal').onclick = () => detailsModal.close();
-document.querySelector('#close-details-btn').onclick = () => detailsModal.close();
-
-// Close dialogs on outside backdrop click
-[modal, detailsModal, imgModal].forEach((d) => {
-  d?.addEventListener('click', (e) => {
-    if (e.target === d) d.close();
-  });
+document.querySelector('#new-product')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  openEditor('product');
 });
+
+document.querySelector('#new-promo')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  openEditor('promo');
+});
+
+document.querySelector('#close-modal')?.addEventListener('click', () => modal?.close());
+document.querySelector('#cancel-modal-btn')?.addEventListener('click', () => modal?.close());
+document.querySelector('#close-details-modal')?.addEventListener('click', () => detailsModal?.close());
+document.querySelector('#close-details-btn')?.addEventListener('click', () => detailsModal?.close());
+
+// Close dialogs ONLY when strictly clicking on the outer backdrop outside modal rect
+function setupBackdropClose(dialog) {
+  if (!dialog) return;
+  dialog.addEventListener('click', (e) => {
+    const rect = dialog.getBoundingClientRect();
+    const isOutside =
+      e.clientX < rect.left ||
+      e.clientX > rect.right ||
+      e.clientY < rect.top ||
+      e.clientY > rect.bottom;
+    if (isOutside && dialog.open) {
+      dialog.close();
+    }
+  });
+}
+
+[modal, detailsModal, imgModal].forEach(setupBackdropClose);
 
 // Sign out + CMS settings
 document.querySelector('#admin-signout').onclick = async () => {
