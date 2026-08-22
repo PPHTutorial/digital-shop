@@ -1,2 +1,29 @@
-import { supabase } from './client.js';
-const q=new URLSearchParams(location.search);const token=q.get('token');const title=document.querySelector('#status-title');const copy=document.querySelector('#status-copy');const area=document.querySelector('#download-area');async function run(){if(!token){title.textContent='Payment received';copy.textContent='Your payment callback is being processed. Refresh this page after a few seconds if your download is not ready.';return;}const {data,error}=await supabase.functions.invoke('download-book',{body:{token}});if(error||!data?.url){title.textContent='Payment is still being confirmed';copy.textContent='Your payment may still be processing. Refresh this page in a moment, or open a support ticket if the problem persists.';return;}title.textContent='Payment confirmed';copy.textContent='Your book is ready. The download link is temporary and single-use.';area.innerHTML=`<a href="${data.url}" class="inline-flex rounded-full bg-slate-950 px-7 py-3 font-bold text-white">Download your book</a>`;}run();
+import { supabase } from "./client.js";
+const q = new URLSearchParams(location.search);
+const token = q.get("token");
+const orderId = q.get("order_id");
+const title = document.querySelector("#status-title");
+const copy = document.querySelector("#status-copy");
+const area = document.querySelector("#download-area");
+async function run() {
+  if (!token && !orderId) {
+    title.textContent = "Payment received";
+    copy.textContent =
+      "Your payment callback is being processed. Refresh this page after a few seconds if your download is not ready.";
+    return;
+  }
+  const { data, error } = await supabase.functions.invoke("download-book", {
+    body: { token, order_id: orderId },
+  });
+  if (error || !data?.url) {
+    title.textContent = "Payment is still being confirmed";
+    copy.textContent =
+      "Your payment may still be processing. Refresh this page in a moment, or open a support ticket if the problem persists.";
+    return;
+  }
+  title.textContent = "Payment confirmed";
+  copy.textContent =
+    "Your book is ready. The download link is temporary and single-use.";
+  area.innerHTML = `<a href="${data.url}" class="inline-flex rounded-full bg-slate-950 px-7 py-3 font-bold text-white">Download your book</a>`;
+}
+run();

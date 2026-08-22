@@ -58,12 +58,47 @@ create table if not exists public.site_settings (
   updated_at timestamptz not null default now()
 );
 
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id, full_name)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1), 'Customer')
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
 alter table public.products enable row level security;
 alter table public.profiles enable row level security;
 alter table public.orders enable row level security;
 alter table public.subscribers enable row level security;
 alter table public.tickets enable row level security;
 alter table public.site_settings enable row level security;
+
+drop policy if exists "published products are public" on public.products;
+drop policy if exists "users read own profile" on public.profiles;
+drop policy if exists "users insert own profile" on public.profiles;
+drop policy if exists "users update own profile" on public.profiles;
+drop policy if exists "users read own orders" on public.orders;
+drop policy if exists "users create own pending orders" on public.orders;
+drop policy if exists "admins manage products" on public.products;
+drop policy if exists "public can subscribe" on public.subscribers;
+drop policy if exists "admins read subscribers" on public.subscribers;
+drop policy if exists "public can create tickets" on public.tickets;
+drop policy if exists "owners/admins read tickets" on public.tickets;
+drop policy if exists "admins update tickets" on public.tickets;
+drop policy if exists "admins manage cms" on public.site_settings;
 
 create policy "published products are public" on public.products for select using (is_published = true or auth.uid() in (select id from public.profiles where role='admin'));
 create policy "users read own profile" on public.profiles for select using (auth.uid()=id or auth.uid() in (select id from public.profiles where role='admin'));

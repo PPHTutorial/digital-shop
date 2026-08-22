@@ -26,9 +26,10 @@ GitHub Pages can host the static frontend, but it cannot safely hold payment-pro
 2. Run `supabase/schema.sql` in the SQL editor.
 3. Create a private Storage bucket named `books` and upload your PDFs/EPUBs.
 4. Put the exact file path into each product's `file_path`.
-5. Set `js/config.js` with the Supabase URL, anon key, and Functions base URL.
+5. Set `js/config.js` with the Supabase URL, anon key, and Functions base URL. The browser must only receive the publishable/anon key.
 6. Deploy the Edge Functions and set secrets:
    - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `PUBLIC_SITE_URL`
    - `STORE_NAME`
@@ -40,6 +41,13 @@ GitHub Pages can host the static frontend, but it cannot safely hold payment-pro
 8. In NOWPayments, set the IPN callback URL to the deployed `nowpayments-ipn` function.
 9. Create one admin user, then update its `profiles.role` to `admin` in SQL.
 10. Add products through the admin CMS/catalog workflow.
+
+## Authentication and deployment checklist
+
+1. In Supabase Auth URL Configuration, set the Site URL to the deployed storefront URL and add `https://YOUR-DOMAIN/auth.html` to Redirect URLs. This enables email-confirmation links to return to the store.
+2. Run the updated `supabase/schema.sql`. It is safe to rerun and creates a profile automatically for every new Auth user.
+3. Deploy all five Edge Functions again. Checkout now invokes the payment functions with the customer's access token, and those functions verify that the requested order belongs to that customer.
+4. Rotate the Supabase service-role key, Flutterwave secret key, NOWPayments API key, and NOWPayments IPN secret. They were previously committed in the frontend configuration and must be considered exposed. Set the replacements only with `supabase secrets set`; never put them in `js/config.js`.
 
 ## Data minimization
 
@@ -54,3 +62,10 @@ NOWPayments currently exposes `POST /v1/payment`, takes an API key header, and s
 ## Preview
 
 Open `index.html` locally or serve this directory with any static server. Replace the Supabase placeholders before expecting catalog, auth, payments, and admin features to work.
+
+
+supabase functions deploy create-flutterwave-payment --project-ref synnepvvxpluoydkmphb --use-api --debug
+supabase functions deploy flutterwave-callback --project-ref synnepvvxpluoydkmphb --use-api --debug
+supabase functions deploy create-nowpayments-payment --project-ref synnepvvxpluoydkmphb --use-api --debug
+supabase functions deploy nowpayments-ipn --project-ref synnepvvxpluoydkmphb --use-api --debug
+supabase functions deploy download-book --project-ref synnepvvxpluoydkmphb --use-api --debug

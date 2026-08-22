@@ -1,2 +1,43 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-Deno.serve(async (req) => { try { const url = new URL(req.url); const orderId = url.searchParams.get('order_id'); if (!orderId) return new Response('Missing order_id', { status: 400 }); const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!); const { data: o, error } = await supabase.from('orders').select('id,customer_email,products(title,price,currency)').eq('id', orderId).single(); if (error) throw error; const ref = `BOOK-${o.id}`; const r = await fetch('https://api.flutterwave.com/v3/payments', { method: 'POST', headers: { Authorization: `Bearer ${Deno.env.get('FLW_SECRET_KEY')!}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: o.products.price, currency: o.products.currency, tx_ref: ref, redirect_url: `${Deno.env.get('SUPABASE_FUNCTIONS_URL')}/flutterwave-callback`, customer: { email: o.customer_email }, meta: { order_id: o.id, product_id: o.products.id }, customizations: { title: Deno.env.get('STORE_NAME') || 'Northstar Books' } }) }); const j = await r.json(); if (!r.ok || !j.data?.link) throw new Error(j.message || 'Unable to create payment'); await supabase.from('orders').update({ amount: o.products.price, currency: o.products.currency, provider: 'flutterwave', provider_reference: ref }).eq('id', o.id); return Response.redirect(j.data.link, 302) } catch (e) { return new Response(String(e?.message || e), { status: 500 }) } });
+import { corsHeaders, json } from '../_shared/cors.ts';
+
+Deno.serve(async (request) => {
+  if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  try {
+    const token = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
+    if (!token) return json({ error: 'Authentication required.' }, { status: 401 });
+    const url = Deno.env.get('SUPABASE_URL')!;
+    const auth = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: `Bearer ${token}` } } });
+    const { data: { user }, error: authError } = await auth.auth.getUser();
+    if (authError || !user) return json({ error: 'Invalid session.' }, { status: 401 });
+
+    const { order_id } = await request.json();
+    const db = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: order, error } = await db.from('orders')
+      .select('id,user_id,customer_email,products(title,price,currency)')
+      .eq('id', order_id).single();
+    if (error || !order || order.user_id !== user.id) return json({ error: 'Order not found.' }, { status: 404 });
+
+    const product = Array.isArray(order.products) ? order.products[0] : order.products;
+    const reference = `BOOK-${order.id}`;
+    const payment = await fetch('https://api.flutterwave.com/v3/payments', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${Deno.env.get('FLW_SECRET_KEY')!}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: product.price,
+        currency: product.currency,
+        tx_ref: reference,
+        redirect_url: `${Deno.env.get('SUPABASE_FUNCTIONS_URL')}/flutterwave-callback`,
+        customer: { email: order.customer_email },
+        meta: { order_id: order.id },
+        customizations: { title: Deno.env.get('STORE_NAME') || 'Northstar Books' },
+      }),
+    });
+    const result = await payment.json();
+    if (!payment.ok || !result.data?.link) throw new Error(result.message || 'Unable to create payment');
+    await db.from('orders').update({ amount: product.price, currency: product.currency, provider: 'flutterwave', provider_reference: reference }).eq('id', order.id);
+    return json({ payment_url: result.data.link });
+  } catch (error) {
+    return json({ error: String(error?.message || error) }, { status: 500 });
+  }
+});

@@ -1,6 +1,55 @@
-import { supabase } from './client.js';
-document.querySelector('#year').textContent=new Date().getFullYear();
-const grid=document.querySelector('#product-grid');
-async function load(){const {data,error}=await supabase.from('products').select('id,title,slug,description,price,currency,cover_url,is_published').eq('is_published',true).order('created_at',{ascending:false});if(error){grid.innerHTML='<div class="soft-panel p-8 text-slate-600">Connect Supabase in js/config.js to load the catalog.</div>';return;}document.querySelector('#product-count').textContent=`${data.length} published title${data.length===1?'':'s'}`; if(!data.length){grid.innerHTML='<div class="soft-panel p-8 text-slate-600">No books are published yet.</div>';return;}grid.innerHTML=data.map(p=>`<article class="soft-panel overflow-hidden"><div class="aspect-[4/5] bg-white">${p.cover_url?`<img src="${p.cover_url}" alt="" class="h-full w-full object-cover">`:''}</div><div class="p-6"><div class="text-xs font-black uppercase tracking-wider text-slate-400">Digital book</div><h3 class="mt-2 text-xl font-black">${escapeHtml(p.title)}</h3><p class="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">${escapeHtml(p.description||'')}</p><div class="mt-5 flex items-center justify-between gap-3"><strong class="text-lg">${p.currency} ${Number(p.price).toFixed(2)}</strong><a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white" href="./checkout.html?product=${encodeURIComponent(p.id)}">Buy</a></div></div></article>`).join('');}
-function escapeHtml(v){return String(v??'').replace(/[&<>\"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[m]));}
-document.querySelector('#subscribe-form').addEventListener('submit',async e=>{e.preventDefault();const email=new FormData(e.currentTarget).get('email');const {error}=await supabase.from('subscribers').upsert({email},{onConflict:'email'});alert(error?'Unable to subscribe right now.':'You’re subscribed for store updates.');if(!error)e.currentTarget.reset();});load();
+import { supabase } from "./client.js";
+document.querySelector("#year").textContent = new Date().getFullYear();
+const grid = document.querySelector("#product-grid");
+async function load() {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id,title,slug,description,price,currency,cover_url,is_published")
+    .eq("is_published", true)
+    .order("created_at", { ascending: false });
+  if (error) {
+    grid.innerHTML =
+      '<div class="soft-panel p-8 text-slate-600">Connect Supabase in js/config.js to load the catalog.</div>';
+    return;
+  }
+  document.querySelector("#product-count").textContent =
+    `${data.length} published title${data.length === 1 ? "" : "s"}`;
+  if (!data.length) {
+    grid.innerHTML =
+      '<div class="soft-panel p-8 text-slate-600">No books are published yet.</div>';
+    return;
+  }
+  grid.innerHTML = data
+    .map(
+      (p) =>
+        `<article class="soft-panel overflow-hidden"><div class="aspect-[4/5] bg-white">${p.cover_url ? `<img src="${p.cover_url}" alt="" class="h-full w-full object-cover">` : ""}</div><div class="p-6"><div class="text-xs font-black uppercase tracking-wider text-slate-400">Digital book</div><h3 class="mt-2 text-xl font-black">${escapeHtml(p.title)}</h3><p class="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">${escapeHtml(p.description || "")}</p><div class="mt-5 flex items-center justify-between gap-3"><strong class="text-lg">${p.currency} ${Number(p.price).toFixed(2)}</strong><a class="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white" href="./checkout.html?product=${encodeURIComponent(p.id)}">Buy</a></div></div></article>`,
+    )
+    .join("");
+}
+function escapeHtml(v) {
+  return String(v ?? "").replace(
+    /[&<>\"']/g,
+    (m) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '\"': "&quot;",
+        "'": "&#039;",
+      })[m],
+  );
+}
+document
+  .querySelector("#subscribe-form")
+  .addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = new FormData(e.currentTarget).get("email");
+    const { error } = await supabase.from("subscribers").insert({ email });
+    alert(
+      error && error.code !== '23505'
+        ? "Unable to subscribe right now."
+        : "You’re subscribed for store updates.",
+    );
+    if (!error || error.code === '23505') e.currentTarget.reset();
+  });
+load();
