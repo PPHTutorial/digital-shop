@@ -6,3 +6,14 @@ export const CONFIG = {
   PAYMENT_FUNCTIONS_BASE: 'https://synnepvvxpluoydkmphb.functions.supabase.co',
   SITE_URL: window.location.origin
 };
+
+
+// supabase functions deploy admin-dashboard --project-ref synnepvvxpluoydkmphb --use-api --debug
+// supabase functions deploy create-flutterwave-payment --project-ref synnepvvxpluoydkmphb --use-api --debug
+// supabase functions deploy create-nowpayments-payment --project-ref synnepvvxpluoydkmphb --use-api --debug
+// supabase functions deploy daily-content --project-ref synnepvvxpluoydkmphb --use-api --debug
+// supabase functions deploy download-book --project-ref synnepvvxpluoydkmphb --use-api --debug
+// supabase functions deploy flutterwave-callback --project-ref synnepvvxpluoydkmphb --use-api --debug
+// supabase functions deploy nowpayments-ipn --project-ref synnepvvxpluoydkmphb --use-api --debug
+// supabase functions deploy search-index --project-ref synnepvvxpluoydkmphb --use-api --debug
+// supabase functions deploy sitemap --project-ref synnepvvxpluoydkmphb --use-api --debug

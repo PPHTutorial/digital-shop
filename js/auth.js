@@ -21,7 +21,14 @@ function setMode(nextMode) {
 
 async function redirectIfSignedIn() {
   const { data: { session } } = await supabase.auth.getSession();
-  if (session) location.replace('./account.html');
+  if (session) {
+    const next = new URLSearchParams(location.search).get('next');
+    if (next) {
+      location.replace(next.startsWith('./') || next.startsWith('/') ? next : `./${next}`);
+    } else {
+      location.replace('./account.html');
+    }
+  }
 }
 
 toggle.addEventListener('click', () => setMode(mode === 'signup' ? 'signin' : 'signup'));

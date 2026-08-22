@@ -55,9 +55,15 @@ $answer = Read-Host 'Apply the migration to the linked project? Type DEPLOY to c
 if ($answer -ne 'DEPLOY') { throw 'Deployment cancelled before database changes.' }
 supabase db push
 
+$publicNoJwtFunctions = @('flutterwave-callback', 'nowpayments-ipn', 'sitemap', 'search-index', 'daily-content', 'download-book')
+
 @('create-flutterwave-payment','flutterwave-callback','create-nowpayments-payment','nowpayments-ipn','download-book','sitemap','search-index','daily-content','admin-dashboard') | ForEach-Object {
   Write-Host "Deploying Edge Function: $_" -ForegroundColor Cyan
-  supabase functions deploy $_ --project-ref $ProjectRef
+  if ($publicNoJwtFunctions -contains $_) {
+    supabase functions deploy $_ --no-verify-jwt --project-ref $ProjectRef
+  } else {
+    supabase functions deploy $_ --project-ref $ProjectRef
+  }
 }
 
 if (-not $SkipGitHub) {

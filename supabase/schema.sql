@@ -9,6 +9,9 @@ create table if not exists public.products (
   id uuid primary key default gen_random_uuid(), slug text unique not null, title text not null, description text, price numeric(12,2) not null check (price >= 0), currency text not null default 'USD', cover_url text, file_path text not null, is_published boolean not null default false, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 
+alter table public.products add column if not exists original_price numeric(12,2) check (original_price is null or original_price >= 0);
+alter table public.products add column if not exists gallery_urls text[];
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade, full_name text not null, phone text, address text, gender text, country text, occupation text, age integer check(age is null or age between 13 and 120), role public.app_role not null default 'customer', created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
@@ -159,42 +162,206 @@ alter table public.promo_codes enable row level security;
 alter table public.blog_posts enable row level security;
 alter table public.search_index_queue enable row level security;
 
-drop policy if exists "published products are public" on public.products;
-drop policy if exists "users read own profile" on public.profiles;
-drop policy if exists "users insert own profile" on public.profiles;
-drop policy if exists "users update own profile" on public.profiles;
-drop policy if exists "users read own orders" on public.orders;
-drop policy if exists "users create own pending orders" on public.orders;
-drop policy if exists "admins manage products" on public.products;
-drop policy if exists "public can subscribe" on public.subscribers;
-drop policy if exists "admins read subscribers" on public.subscribers;
-drop policy if exists "public can create tickets" on public.tickets;
-drop policy if exists "owners/admins read tickets" on public.tickets;
-drop policy if exists "admins update tickets" on public.tickets;
-drop policy if exists "admins manage cms" on public.site_settings;
-drop policy if exists "admins manage promotion codes" on public.promo_codes;
-drop policy if exists "public read published blogs" on public.blog_posts;
-drop policy if exists "admins manage blogs" on public.blog_posts;
-drop policy if exists "admins manage search queue" on public.search_index_queue;
+-- -----------------------------------------------------------------------------
+-- RLS helper
+-- IMPORTANT: admin checks must NOT query profiles from a profiles policy.
+-- The function runs as its owner (SECURITY DEFINER), avoiding recursive RLS.
+-- -----------------------------------------------------------------------------
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role = 'admin'::public.app_role
+  );
+$$;
 
-create policy "published products are public" on public.products for select using (is_published = true or auth.uid() in (select id from public.profiles where role='admin'));
-create policy "users read own profile" on public.profiles for select using (auth.uid()=id or auth.uid() in (select id from public.profiles where role='admin'));
-create policy "users insert own profile" on public.profiles for insert with check (auth.uid()=id);
-create policy "users update own profile" on public.profiles for update using (auth.uid()=id or auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid()=id or auth.uid() in (select id from public.profiles where role='admin'));
-create policy "users read own orders" on public.orders for select using (auth.uid()=user_id or auth.uid() in (select id from public.profiles where role='admin'));
-create policy "users create own pending orders" on public.orders for insert with check (auth.uid()=user_id and status='pending');
-create policy "admins manage products" on public.products for all using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
-create policy "public can subscribe" on public.subscribers for insert with check (true);
-create policy "admins read subscribers" on public.subscribers for select using (auth.uid() in (select id from public.profiles where role='admin'));
-create policy "public can create tickets" on public.tickets for insert with check (true);
-create policy "owners/admins read tickets" on public.tickets for select using (auth.uid()=user_id or auth.uid() in (select id from public.profiles where role='admin'));
-create policy "admins update tickets" on public.tickets for update using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
-create policy "admins manage cms" on public.site_settings for all using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
-create policy "admins manage promotion codes" on public.promo_codes for all using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
-create policy "public read published blogs" on public.blog_posts for select using (status = 'published' or auth.uid() in (select id from public.profiles where role='admin'));
-create policy "admins manage blogs" on public.blog_posts for all using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
-create policy "admins manage search queue" on public.search_index_queue for all using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
+revoke all on function public.is_admin() from public;
+grant execute on function public.is_admin() to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- Cleanly remove every existing policy on the tables managed by this schema.
+-- This makes the script safe to rerun after earlier policy experiments.
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  r record;
+begin
+  for r in
+    select schemaname, tablename, policyname
+    from pg_policies
+    where schemaname = 'public'
+      and tablename in (
+        'products', 'profiles', 'orders', 'subscribers', 'tickets',
+        'site_settings', 'promo_codes', 'blog_posts', 'search_index_queue'
+      )
+  loop
+    execute format('drop policy if exists %I on %I.%I', r.policyname, r.schemaname, r.tablename);
+  end loop;
+end
+$$;
+
+-- -----------------------------------------------------------------------------
+-- Products
+-- -----------------------------------------------------------------------------
+create policy "published products are public"
+on public.products
+for select
+to anon, authenticated
+using (
+  is_published = true
+  or public.is_admin()
+);
+
+create policy "admins manage products"
+on public.products
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+-- -----------------------------------------------------------------------------
+-- Profiles
+-- NEVER query public.profiles directly from these policies.
+-- -----------------------------------------------------------------------------
+create policy "users read own profile"
+on public.profiles
+for select
+to authenticated
+using (
+  auth.uid() = id
+  or public.is_admin()
+);
+
+create policy "users insert own profile"
+on public.profiles
+for insert
+to authenticated
+with check (auth.uid() = id);
+
+create policy "users update own profile"
+on public.profiles
+for update
+to authenticated
+using (
+  auth.uid() = id
+  or public.is_admin()
+)
+with check (
+  auth.uid() = id
+  or public.is_admin()
+);
+
+-- -----------------------------------------------------------------------------
+-- Orders
+-- -----------------------------------------------------------------------------
+create policy "users read own orders"
+on public.orders
+for select
+to authenticated
+using (
+  auth.uid() = user_id
+  or public.is_admin()
+);
+
+create policy "users create own pending orders"
+on public.orders
+for insert
+to authenticated
+with check (
+  auth.uid() = user_id
+  and status = 'pending'::public.order_status
+);
+
+-- -----------------------------------------------------------------------------
+-- Subscribers
+-- -----------------------------------------------------------------------------
+create policy "public can subscribe"
+on public.subscribers
+for insert
+to anon, authenticated
+with check (true);
+
+create policy "admins read subscribers"
+on public.subscribers
+for select
+to authenticated
+using (public.is_admin());
+
+-- -----------------------------------------------------------------------------
+-- Tickets
+-- -----------------------------------------------------------------------------
+create policy "public can create tickets"
+on public.tickets
+for insert
+to anon, authenticated
+with check (true);
+
+create policy "owners/admins read tickets"
+on public.tickets
+for select
+to authenticated
+using (
+  auth.uid() = user_id
+  or public.is_admin()
+);
+
+create policy "admins update tickets"
+on public.tickets
+for update
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+-- -----------------------------------------------------------------------------
+-- CMS
+-- -----------------------------------------------------------------------------
+create policy "admins manage cms"
+on public.site_settings
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "admins manage promotion codes"
+on public.promo_codes
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "public read published blogs"
+on public.blog_posts
+for select
+to anon, authenticated
+using (
+  status = 'published'
+  or public.is_admin()
+);
+
+create policy "admins manage blogs"
+on public.blog_posts
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "admins manage search queue"
+on public.search_index_queue
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
 
 insert into storage.buckets (id, name, public)
 values ('books', 'books', false)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('product-images', 'product-images', true)
 on conflict (id) do nothing;
