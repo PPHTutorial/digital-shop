@@ -34,10 +34,15 @@ Deno.serve(async (request) => {
 
     if (product.file_path && !product.file_path.startsWith('http://') && !product.file_path.startsWith('https://')) {
       const cleanPath = product.file_path.replace(/^books\//, '');
-      const { data, error } = await db.storage.from('books').createSignedUrl(cleanPath, 3600);
+      const { data, error } = await db.storage.from('books').createSignedUrl(cleanPath, 3600, {
+        download: true,
+      });
       if (!error && data?.signedUrl) {
         downloadUrl = data.signedUrl;
       }
+    } else if (downloadUrl && !downloadUrl.includes('download=')) {
+      const sep = downloadUrl.includes('?') ? '&' : '?';
+      downloadUrl = `${downloadUrl}${sep}download=`;
     }
 
     return json({ url: downloadUrl });

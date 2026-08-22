@@ -91,9 +91,10 @@ function showState(type, data = {}) {
     if (title) title.textContent = "Payment Confirmed!";
     if (copy) copy.textContent = "Thank you for your purchase! Your digital product is ready for instant download. Your access token is valid for immediate access.";
     if (area) {
+      const directUrl = data.url.includes('download=') ? data.url : (data.url.includes('?') ? `${data.url}&download=` : `${data.url}?download=`);
       area.innerHTML = `
         <div class="space-y-4">
-          <a href="${data.url}" class="inline-flex items-center gap-2 rounded-full bg-orange-600 px-8 py-3.5 font-bold text-white hover:bg-orange-500 shadow-lg shadow-orange-600/30 transition-all hover:scale-105">
+          <a href="${directUrl}" download class="inline-flex items-center gap-2 rounded-full bg-orange-600 px-8 py-3.5 font-bold text-white hover:bg-orange-500 shadow-lg shadow-orange-600/30 transition-all hover:scale-105">
             <i data-lucide="download" width="18" height="18"></i>
             <span>Download Your Product</span>
           </a>

@@ -542,7 +542,7 @@ async function load() {
               <span>Ad Link</span>
             </button>
             ${p.file_path ? `
-              <a href="${escapeHtml(p.file_path)}" target="_blank" download class="button !min-h-8 !py-1 text-xs text-blue-600 hover:bg-blue-50 inline-flex items-center gap-1" title="Direct test download for this product asset">
+              <a href="${escapeHtml(p.file_path.includes('?') ? p.file_path + '&download=' : p.file_path + '?download=')}" target="_blank" download class="button !min-h-8 !py-1 text-xs text-blue-600 hover:bg-blue-50 inline-flex items-center gap-1" title="Direct test download for this product asset">
                 ${icon('download', 11)}
                 <span>Test File</span>
               </a>` : ''}
@@ -1045,7 +1045,7 @@ async function openEditor(type, existing = null) {
               <div class="flex items-center gap-2 shrink-0">
                 ${
                   full.file_path
-                    ? `<a href="${escapeHtml(full.file_path)}" target="_blank" download class="button !min-h-7 !py-1 !px-2.5 text-[11px] font-bold text-blue-600 hover:bg-blue-50 inline-flex items-center gap-1">
+                    ? `<a href="${escapeHtml(full.file_path.includes('?') ? full.file_path + '&download=' : full.file_path + '?download=')}" target="_blank" download class="button !min-h-7 !py-1 !px-2.5 text-[11px] font-bold text-blue-600 hover:bg-blue-50 inline-flex items-center gap-1">
                         <i data-lucide="download" width="11" height="11"></i>
                         <span>Test File</span>
                        </a>`
