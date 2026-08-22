@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Support — Northstar Books</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./css/app.css">
+</head>
+
+<body class="bg-stone-50 text-slate-900">
+    <header class="bg-stone-50">
+        <div class="mx-auto max-w-7xl px-5 py-6 lg:px-8"><a href="./index.html" class="font-black">NORTHSTAR<span
+                    class="text-slate-500">BOOKS</span></a></div>
+    </header>
+    <main class="mx-auto max-w-5xl px-5 py-12 lg:px-8">
+        <div class="mb-8"><span class="eyebrow">SUPPORT DESK</span>
+            <h1 class="mt-3 text-4xl font-black">How can we help?</h1>
+            <p class="mt-3 text-slate-600">Open a ticket for payment, download, account, or general store issues.</p>
+        </div>
+        <section class="soft-panel p-7 sm:p-9">
+            <form id="support-form" class="grid gap-4 sm:grid-cols-2"><label><span class="label">Name</span><input
+                        name="name" class="field" required></label><label><span class="label">Email</span><input
+                        name="email" type="email" class="field" required></label><label><span class="label">Order
+                        reference</span><input name="order_ref" class="field"></label><label><span class="label">Issue
+                        type</span><select name="category" class="field">
+                        <option>Payment</option>
+                        <option>Download</option>
+                        <option>Account</option>
+                        <option>Other</option>
+                    </select></label><label class="sm:col-span-2"><span class="label">Subject</span><input
+                        name="subject" class="field" required></label><label class="sm:col-span-2"><span
+                        class="label">Message</span><textarea name="message" class="field min-h-40"
+                        required></textarea></label>
+                <div class="sm:col-span-2"><button
+                        class="rounded-full bg-slate-950 px-6 py-3 font-bold text-white">Submit ticket</button></div>
+            </form>
+        </section>
+    </main>
+    <script type="module" src="./js/support.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Admin — Northstar Books</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./css/app.css">
+</head>
+
+<body class="bg-stone-100 text-slate-900">
+    <div class="flex min-h-screen">
+        <aside class="hidden w-64 flex-col bg-slate-950 p-6 text-white lg:flex">
+            <div class="text-xl font-black">NORTHSTAR</div>
+            <div class="mt-10 space-y-2 text-sm font-semibold"><a class="admin-link active"
+                    href="#overview">Overview</a><a class="admin-link" href="#products">Products</a><a
+                    class="admin-link" href="#orders">Orders</a><a class="admin-link" href="#tickets">Tickets</a><a
+                    class="admin-link" href="#cms">CMS</a></div>
+            <div class="mt-auto text-xs text-slate-400">Protected admin area</div>
+        </aside>
+        <main class="min-w-0 flex-1">
+            <header class="flex items-center justify-between bg-stone-100 px-5 py-5 lg:px-8">
+                <div><span class="eyebrow">STORE CONTROL</span>
+                    <h1 class="mt-1 text-2xl font-black">Operations dashboard</h1>
+                </div><button id="admin-signout"
+                    class="rounded-full bg-white px-4 py-2 text-sm font-bold shadow-soft">Sign out</button>
+            </header>
+            <div class="space-y-6 px-5 pb-10 lg:px-8">
+                <section id="overview" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div class="metric"><span>Revenue</span><strong id="m-revenue">—</strong></div>
+                    <div class="metric"><span>Orders</span><strong id="m-orders">—</strong></div>
+                    <div class="metric"><span>Open tickets</span><strong id="m-tickets">—</strong></div>
+                    <div class="metric"><span>Subscribers</span><strong id="m-subs">—</strong></div>
+                </section>
+                <section id="products" class="soft-panel p-6">
+                    <div class="flex flex-wrap items-end justify-between gap-3">
+                        <div><span class="eyebrow">CATALOG</span>
+                            <h2 class="mt-1 text-xl font-black">Products</h2>
+                        </div><button id="new-product"
+                            class="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white">New
+                            product</button>
+                    </div>
+                    <div id="products-table" class="mt-5"></div>
+                </section>
+                <section id="orders" class="soft-panel p-6">
+                    <div><span class="eyebrow">FULFILLMENT</span>
+                        <h2 class="mt-1 text-xl font-black">Recent orders</h2>
+                    </div>
+                    <div id="orders-table" class="mt-5"></div>
+                </section>
+                <section id="tickets" class="soft-panel p-6">
+                    <div><span class="eyebrow">CUSTOMER CARE</span>
+                        <h2 class="mt-1 text-xl font-black">Support tickets</h2>
+                    </div>
+                    <div id="tickets-table" class="mt-5"></div>
+                </section>
+                <section id="cms" class="soft-panel p-6">
+                    <div><span class="eyebrow">CONTENT</span>
+                        <h2 class="mt-1 text-xl font-black">Store CMS</h2>
+                    </div>
+                    <form id="cms-form" class="mt-5 grid gap-4 sm:grid-cols-2"><label><span class="label">Store
+                                title</span><input name="site_title" class="field"></label><label><span
+                                class="label">Support email</span><input name="support_email" class="field"
+                                type="email"></label><label class="sm:col-span-2"><span class="label">Homepage
+                                announcement</span><textarea name="announcement"
+                                class="field min-h-28"></textarea></label>
+                        <div class="sm:col-span-2"><button
+                                class="rounded-full bg-slate-950 px-5 py-2.5 font-bold text-white">Save CMS
+                                changes</button></div>
+                    </form>
+                </section>
+            </div>
+        </main>
+    </div>
+    <script type="module" src="./js/admin.js"></script>
+</body>
+
+</html>
