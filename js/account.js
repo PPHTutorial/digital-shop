@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, getAccount, mountHeader, setButtonLoading, toast } from './ui.js';
+import { escapeHtml, finishPageLoader, getAccount, mountFooter, mountHeader, setButtonLoading, toast } from './ui.js';
 
 let account;
 
@@ -65,6 +65,7 @@ function renderOrdersList(orders) {
 
 async function load() {
   mountHeader();
+  mountFooter();
   account = await getAccount();
 
   if (!account.user) {

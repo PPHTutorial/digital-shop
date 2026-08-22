@@ -1,1 +1,59 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Contact DigiStore support and Codeink Technologies."><title>Contact DigiStore</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="./css/app.css"></head><body class="bg-slate-50"><div id="page-loader" class="page-loader"><div class="loader-card"><div class="shimmer logo"></div><div class="shimmer hero"></div><div class="shimmer short"></div></div></div><header id="site-header"></header><main class="shell py-16"><span class="eyebrow">CONTACT</span><h1 class="mt-3 text-4xl font-black text-[#142c55]">We’re here to help.</h1><p class="mt-4 max-w-xl text-slate-600">For an order, account, or download issue, send our support team a message.</p><a href="./support.html" class="button button-primary mt-7">Open support desk</a></main><script type="module">import {mountHeader} from './js/ui.js';mountHeader();</script></body></html>
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Contact DigiStore support and Codeink Technologies.">
+  <title>Contact Us | DigiStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+
+<body class="bg-slate-50 text-slate-900 flex flex-col min-h-screen">
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
+    </div>
+  </div>
+
+  <header id="site-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur shadow-sm"></header>
+
+  <main class="shell py-16 flex-1 max-w-4xl">
+    <span class="eyebrow">CONTACT &amp; INQUIRIES</span>
+    <h1 class="mt-3 text-4xl sm:text-5xl font-black text-[#142c55] tracking-tight">We’re here to help.</h1>
+    <p class="mt-4 text-base text-slate-600 leading-relaxed">
+      Have a question about an order, need licensing verification, or looking for custom engineering solutions? Reach out to our dedicated support desk.
+    </p>
+
+    <div class="mt-10 grid gap-6 sm:grid-cols-2">
+      <div class="p-8 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
+        <span class="tag !bg-orange-100 !text-orange-800">Support Desk</span>
+        <h2 class="text-xl font-black text-[#142c55]">Customer Helpdesk</h2>
+        <p class="text-xs leading-relaxed text-slate-600">Submit a ticket for order status, download token issues, or product inquiries with fast response times.</p>
+        <a href="./support.html" class="button button-primary !min-h-9 !px-4 text-xs font-bold inline-flex mt-2">Open Support Ticket →</a>
+      </div>
+
+      <div class="p-8 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
+        <span class="tag !bg-blue-100 !text-blue-800">Direct Email</span>
+        <h2 class="text-xl font-black text-[#142c55]">Email Inquiries</h2>
+        <p class="text-xs leading-relaxed text-slate-600">For enterprise partnerships, merchant opportunities, or corporate licensing, contact our executive inbox.</p>
+        <a href="mailto:hello@codeinktechnologies.com" class="button !min-h-9 !px-4 text-xs font-bold inline-flex mt-2">hello@codeinktechnologies.com</a>
+      </div>
+    </div>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module">
+    import { mountHeader, mountFooter, initMotion, finishPageLoader } from './js/ui.js';
+    mountHeader();
+    mountFooter();
+    initMotion();
+    finishPageLoader();
+  </script>
+</body>
+
+</html>

@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, getAccount, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
+import { escapeHtml, finishPageLoader, getAccount, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 import { convertAmount, formatCurrency, getExchangeRates } from './currency.js';
 
 const params = new URLSearchParams(location.search);
@@ -204,6 +204,7 @@ function setupDescription(text, title) {
 
 async function load() {
   await mountHeader();
+  mountFooter();
   const { user } = await getAccount();
   if (!user) {
     const nextUrl = `checkout.html?product=${encodeURIComponent(productId || '')}`;

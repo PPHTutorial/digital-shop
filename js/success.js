@@ -1,5 +1,8 @@
 import { supabase } from "./client.js";
-import { finishPageLoader, toast } from './ui.js';
+import { finishPageLoader, mountFooter, mountHeader, toast } from './ui.js';
+
+mountHeader();
+mountFooter();
 
 const q = new URLSearchParams(location.search);
 let token = q.get("token");

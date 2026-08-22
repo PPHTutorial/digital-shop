@@ -1,6 +1,9 @@
 import { supabase } from './client.js';
 import { CONFIG } from './config.js';
-import { setButtonLoading, toast } from './ui.js';
+import { mountFooter, mountHeader, setButtonLoading, toast } from './ui.js';
+
+mountHeader();
+mountFooter();
 
 const form = document.querySelector('#auth-form');
 const title = document.querySelector('#auth-title');

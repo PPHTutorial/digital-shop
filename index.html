@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="./css/app.css">
 </head>
 
-<body class="bg-slate-50 text-slate-900 selection:bg-orange-500 selection:text-white">
+<body class="bg-slate-50 text-slate-900 flex flex-col min-h-screen selection:bg-orange-500 selection:text-white">
   <!-- Initial Instant Page Loader -->
   <div id="page-loader" class="page-loader">
     <div class="loader-card">
@@ -23,23 +23,23 @@
   <header id="site-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur shadow-sm"></header>
 
   <!-- Quick Category Bar -->
-  <nav class="border-b border-slate-200 bg-white py-3 overflow-x-auto">
+  <nav class="border-b border-slate-200 bg-white py-3 overflow-x-auto shadow-xs">
     <div class="shell flex items-center gap-2 text-xs font-semibold whitespace-nowrap" id="quick-category-nav">
-      <button type="button" class="quick-nav-pill rounded-full bg-[#142c55] text-white px-3.5 py-1.5 transition" data-target-category="all">All Products</button>
-      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Ebooks & Guides">Ebooks &amp; Guides</button>
-      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Software & Tools">Software &amp; Tools</button>
-      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Templates & Themes">Templates &amp; Themes</button>
-      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Online Courses">Online Courses</button>
-      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Audio & Media">Audio &amp; Media</button>
-      <button type="button" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition" data-target-category="Design & Graphics">Design &amp; Graphics</button>
-      <a href="#store" class="ml-auto text-orange-600 font-bold hover:underline flex items-center gap-1">
+      <a href="./store.html" class="quick-nav-pill rounded-full bg-[#142c55] text-white px-4 py-1.5 transition">All Products</a>
+      <a href="./store.html?category=Ebooks%20%26%20Guides" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Ebooks &amp; Guides</a>
+      <a href="./store.html?category=Software%20%26%20Tools" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Software &amp; Tools</a>
+      <a href="./store.html?category=Templates%20%26%20Themes" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Templates &amp; Themes</a>
+      <a href="./store.html?category=Online%20Courses" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Online Courses</a>
+      <a href="./store.html?category=Audio%20%26%20Media" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Audio &amp; Media</a>
+      <a href="./store.html?category=Design%20%26%20Graphics" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Design &amp; Graphics</a>
+      <a href="./store.html" class="ml-auto text-orange-600 font-bold hover:underline flex items-center gap-1">
         <span>Explore Full Catalog</span>
-        <span>↓</span>
+        <span>→</span>
       </a>
     </div>
   </nav>
 
-  <main class="py-8 space-y-12">
+  <main class="py-8 space-y-12 flex-1">
 
     <!-- 1. FEATURED RELEASES SECTION -->
     <section id="section-featured" class="shell">
@@ -51,9 +51,9 @@
         <div class="flex items-center gap-3">
           <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-featured" aria-label="Scroll left">‹</button>
           <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-featured" aria-label="Scroll right">›</button>
-          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="featured">
+          <a href="./store.html" class="button !min-h-9 !py-1 !px-3 text-xs font-bold">
             See all (<span class="count-featured">0</span>) →
-          </button>
+          </a>
         </div>
       </div>
       <div id="scroll-featured" class="horizontal-scroll-container"></div>
@@ -69,9 +69,9 @@
         <div class="flex items-center gap-3">
           <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-new" aria-label="Scroll left">‹</button>
           <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-new" aria-label="Scroll right">›</button>
-          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="new">
+          <a href="./store.html?sort=newest" class="button !min-h-9 !py-1 !px-3 text-xs font-bold">
             See all (<span class="count-new">0</span>) →
-          </button>
+          </a>
         </div>
       </div>
       <div id="scroll-new" class="horizontal-scroll-container"></div>
@@ -87,9 +87,9 @@
         <div class="flex items-center gap-3">
           <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-bestsellers" aria-label="Scroll left">‹</button>
           <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-bestsellers" aria-label="Scroll right">›</button>
-          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="bestsellers">
+          <a href="./store.html" class="button !min-h-9 !py-1 !px-3 text-xs font-bold">
             See all (<span class="count-bestsellers">0</span>) →
-          </button>
+          </a>
         </div>
       </div>
       <div id="scroll-bestsellers" class="horizontal-scroll-container"></div>
@@ -105,9 +105,9 @@
         <div class="flex items-center gap-3">
           <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-trending" aria-label="Scroll left">‹</button>
           <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-trending" aria-label="Scroll right">›</button>
-          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="trending">
+          <a href="./store.html" class="button !min-h-9 !py-1 !px-3 text-xs font-bold">
             See all (<span class="count-trending">0</span>) →
-          </button>
+          </a>
         </div>
       </div>
       <div id="scroll-trending" class="horizontal-scroll-container"></div>
@@ -123,9 +123,9 @@
         <div class="flex items-center gap-3">
           <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-deals" aria-label="Scroll left">‹</button>
           <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-deals" aria-label="Scroll right">›</button>
-          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="deals">
+          <a href="./store.html" class="button !min-h-9 !py-1 !px-3 text-xs font-bold">
             See all (<span class="count-deals">0</span>) →
-          </button>
+          </a>
         </div>
       </div>
       <div id="scroll-deals" class="horizontal-scroll-container"></div>
@@ -141,9 +141,9 @@
         <div class="flex items-center gap-3">
           <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-ebooks" aria-label="Scroll left">‹</button>
           <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-ebooks" aria-label="Scroll right">›</button>
-          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="Ebooks & Guides">
+          <a href="./store.html?category=Ebooks%20%26%20Guides" class="button !min-h-9 !py-1 !px-3 text-xs font-bold">
             See all (<span class="count-ebooks">0</span>) →
-          </button>
+          </a>
         </div>
       </div>
       <div id="scroll-ebooks" class="horizontal-scroll-container"></div>
@@ -159,9 +159,9 @@
         <div class="flex items-center gap-3">
           <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-software" aria-label="Scroll left">‹</button>
           <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-software" aria-label="Scroll right">›</button>
-          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="Software & Tools">
+          <a href="./store.html?category=Software%20%26%20Tools" class="button !min-h-9 !py-1 !px-3 text-xs font-bold">
             See all (<span class="count-software">0</span>) →
-          </button>
+          </a>
         </div>
       </div>
       <div id="scroll-software" class="horizontal-scroll-container"></div>
@@ -177,9 +177,9 @@
         <div class="flex items-center gap-3">
           <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-templates" aria-label="Scroll left">‹</button>
           <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-templates" aria-label="Scroll right">›</button>
-          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="Templates & Themes">
+          <a href="./store.html?category=Templates%20%26%20Themes" class="button !min-h-9 !py-1 !px-3 text-xs font-bold">
             See all (<span class="count-templates">0</span>) →
-          </button>
+          </a>
         </div>
       </div>
       <div id="scroll-templates" class="horizontal-scroll-container"></div>
@@ -195,9 +195,9 @@
         <div class="flex items-center gap-3">
           <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-courses" aria-label="Scroll left">‹</button>
           <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-courses" aria-label="Scroll right">›</button>
-          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="Online Courses">
+          <a href="./store.html?category=Online%20Courses" class="button !min-h-9 !py-1 !px-3 text-xs font-bold">
             See all (<span class="count-courses">0</span>) →
-          </button>
+          </a>
         </div>
       </div>
       <div id="scroll-courses" class="horizontal-scroll-container"></div>
@@ -213,9 +213,9 @@
         <div class="flex items-center gap-3">
           <button type="button" class="scroll-arrow-btn" data-scroll-left="scroll-audio" aria-label="Scroll left">‹</button>
           <button type="button" class="scroll-arrow-btn" data-scroll-right="scroll-audio" aria-label="Scroll right">›</button>
-          <button type="button" class="button !min-h-9 !py-1 !px-3 text-xs font-bold see-all-btn" data-see-all="Audio & Media">
+          <a href="./store.html?category=Audio%20%26%20Media" class="button !min-h-9 !py-1 !px-3 text-xs font-bold">
             See all (<span class="count-audio">0</span>) →
-          </button>
+          </a>
         </div>
       </div>
       <div id="scroll-audio" class="horizontal-scroll-container"></div>
@@ -232,67 +232,15 @@
             Gain immediate lifetime access to software licenses, high-resolution media, development kits, and professional ebooks with multi-currency payment support.
           </p>
           <div class="pt-3 flex flex-wrap gap-3 items-center">
-            <a href="#store" class="inline-flex rounded-full bg-orange-500 px-7 py-3 font-bold text-white hover:bg-orange-400 shadow-lg shadow-orange-500/30 transition-all hover:scale-105">Browse Complete Catalog</a>
+            <a href="./store.html" class="inline-flex rounded-full bg-orange-500 px-7 py-3 font-bold text-white hover:bg-orange-400 shadow-lg shadow-orange-500/30 transition-all hover:scale-105">Explore Complete Catalog →</a>
             <a href="./support.html" class="inline-flex rounded-full bg-white/10 hover:bg-white/20 px-6 py-3 font-bold text-white transition-colors">Customer Support</a>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- COMPLETE STOREFRONT CATALOG EXPLORER (No side category panel) -->
-    <section id="store" class="shell pt-6 pb-16">
-      <div class="border-t border-slate-200 pt-10">
-        <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
-          <div>
-            <span class="eyebrow">EXPLORE STOREFRONT</span>
-            <h2 id="catalog-heading" class="text-3xl font-black tracking-tight text-[#142c55]">All Products</h2>
-            <p id="catalog-subtitle" class="text-xs text-slate-500 mt-1">Showing verified digital products available for immediate download</p>
-          </div>
-          <p id="product-count" class="text-sm font-bold text-slate-500"></p>
-        </div>
-
-        <!-- Unified Top Filter Bar -->
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-4 mb-8">
-          <!-- Top Category Filter Pills -->
-          <div id="catalog-category-pills" class="flex flex-wrap gap-2"></div>
-
-          <!-- Search & Sorting Row -->
-          <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-            <div class="relative flex-1 min-w-[240px]">
-              <input id="store-search-input" type="text" placeholder="Search by title, description, or keyword…" class="field !mt-0 !py-2 !pl-3 text-xs w-full">
-            </div>
-            <div class="flex items-center gap-2">
-              <label for="store-sort-select" class="text-xs font-bold text-slate-500 whitespace-nowrap">Sort by:</label>
-              <select id="store-sort-select" class="field !mt-0 !py-2 text-xs bg-slate-50 border-slate-200">
-                <option value="newest">Newest First</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-                <option value="title">Alphabetical (A-Z)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <!-- Product Grid (Full Width) -->
-        <div id="product-grid" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"></div>
-
-        <!-- Load More Button Container -->
-        <div id="load-more-container" class="mt-10 text-center hidden">
-          <button id="load-more-btn" type="button" class="button !py-3 !px-8 text-sm font-bold shadow-md hover:shadow-lg transition">
-            Load more products
-          </button>
-        </div>
-
-        <!-- Product Loading State -->
-        <div id="product-loading" class="mt-8 hidden">
-          <div class="progress-track max-w-xs mx-auto"></div>
-          <p class="mt-3 text-center text-sm font-semibold text-slate-500">Loading catalog items…</p>
-        </div>
-      </div>
-    </section>
-
     <!-- NEWSLETTER SUBSCRIPTION -->
-    <section id="collections" class="shell pb-10">
+    <section id="collections" class="shell pb-6">
       <div class="soft-panel grid gap-7 p-8 sm:p-10 sm:grid-cols-[1fr_auto] sm:items-center rounded-3xl">
         <div>
           <span class="eyebrow !text-orange-600">STAY INFORMED</span>
@@ -311,91 +259,7 @@
 
   </main>
 
-  <!-- ULTRA-PREMIUM MODERN FOOTER -->
-  <footer class="bg-[#0e1e38] text-slate-300 pt-16 pb-12 border-t border-slate-800">
-    <div class="shell space-y-12">
-      <!-- 5-Column Grid -->
-      <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-5 text-sm">
-        <!-- Col 1: Brand & Info -->
-        <div class="lg:col-span-2 space-y-4 pr-4">
-          <div class="flex items-center gap-3">
-            <span class="brand-mark !bg-orange-500 !text-white font-black text-lg w-10 h-10 rounded-xl flex items-center justify-center">D</span>
-            <div>
-              <span class="text-xl font-black text-white tracking-tight">DigiStore</span>
-              <span class="block text-[11px] text-slate-400 font-medium uppercase tracking-wider">by Codeink Technologies</span>
-            </div>
-          </div>
-          <p class="text-xs leading-relaxed text-slate-400 max-w-sm">
-            Empowering professionals, creators, and developers worldwide with verified, high-value digital products, comprehensive ebooks, tools, and software templates.
-          </p>
-          <div class="pt-2 flex flex-wrap gap-2 items-center text-[11px] text-slate-400">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
-              <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              <span>All Systems Operational</span>
-            </span>
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
-              <span>🔒 256-Bit SSL Encrypted</span>
-            </span>
-          </div>
-        </div>
-
-        <!-- Col 2: Categories -->
-        <div class="space-y-3">
-          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Digital Catalog</h3>
-          <ul class="space-y-2 text-xs text-slate-400">
-            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Ebooks & Guides">Ebooks &amp; Guides</a></li>
-            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Software & Tools">Software &amp; Tools</a></li>
-            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Templates & Themes">Templates &amp; Themes</a></li>
-            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Online Courses">Online Courses</a></li>
-            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Audio & Media">Audio &amp; Media</a></li>
-            <li><a href="#store" class="hover:text-orange-400 transition" data-footer-cat="Design & Graphics">Design &amp; Graphics</a></li>
-          </ul>
-        </div>
-
-        <!-- Col 3: Customer Hub -->
-        <div class="space-y-3">
-          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Customer Hub</h3>
-          <ul class="space-y-2 text-xs text-slate-400">
-            <li><a href="./account.html" class="hover:text-orange-400 transition">My Account &amp; Vault</a></li>
-            <li><a href="./account.html" class="hover:text-orange-400 transition">Order History</a></li>
-            <li><a href="./support.html" class="hover:text-orange-400 transition">Customer Helpdesk</a></li>
-            <li><a href="./support.html" class="hover:text-orange-400 transition">Submit Support Ticket</a></li>
-            <li><a href="./blog.html" class="hover:text-orange-400 transition">Articles &amp; Updates</a></li>
-            <li><a href="./about.html" class="hover:text-orange-400 transition">About Codeink</a></li>
-          </ul>
-        </div>
-
-        <!-- Col 4: Legal & Trust -->
-        <div class="space-y-3">
-          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Trust &amp; Legal</h3>
-          <ul class="space-y-2 text-xs text-slate-400">
-            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Terms of Service</a></li>
-            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Privacy Policy</a></li>
-            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Refund &amp; Return Policy</a></li>
-            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Digital License Agreement</a></li>
-            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Security &amp; Compliance</a></li>
-            <li><a href="./contact.html" class="hover:text-orange-400 transition">Contact Legal Team</a></li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- Bottom Bar with Payment Chips & Copyright -->
-      <div class="border-t border-slate-800/80 pt-8 flex flex-wrap items-center justify-between gap-6 text-xs text-slate-500">
-        <div>
-          <p>© <span id="year"></span> <strong class="text-slate-400">Codeink Technologies</strong>. All rights reserved.</p>
-          <p class="text-[11px] text-slate-500 mt-0.5">DigiStore is a registered digital merchandise platform by Codeink Technologies.</p>
-        </div>
-
-        <!-- Verified Payment Badges -->
-        <div class="flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
-          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">Flutterwave Verified</span>
-          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">NOWPayments Crypto</span>
-          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">Mobile Money (GHS/KES/UGX)</span>
-          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">Visa / Mastercard / Verve</span>
-        </div>
-      </div>
-    </div>
-  </footer>
+  <footer id="site-footer"></footer>
 
   <script type="module" src="./js/storefront.js"></script>
 </body>

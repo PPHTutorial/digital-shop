@@ -43,8 +43,8 @@ export async function mountHeader() {
     const path = window.location.pathname.toLowerCase().split('/').pop() || 'index.html';
     const hash = window.location.hash.toLowerCase();
 
-    const isCatalog = hash === '#store';
-    const isHome = (path === 'index.html' || path === '' || path === '/') && !isCatalog;
+    const isHome = (path === 'index.html' || path === '' || path === '/');
+    const isStore = path.includes('store');
     const isBlog = path.includes('blog');
     const isAbout = path.includes('about');
     const isContact = path.includes('contact');
@@ -52,7 +52,7 @@ export async function mountHeader() {
 
     const links = `
       <a href="./index.html" class="${isHome ? 'active' : ''}">${icon('house')}<span>Home</span></a>
-      <a href="./index.html#store" class="${isCatalog ? 'active' : ''}">${icon('shopping-bag')}<span>Catalog</span></a>
+      <a href="./store.html" class="${isStore ? 'active' : ''}">${icon('shopping-bag')}<span>All Products</span></a>
       <a href="./blog.html" class="${isBlog ? 'active' : ''}">${icon('newspaper')}<span>Blog</span></a>
       <a href="./about.html" class="${isAbout ? 'active' : ''}">${icon('info')}<span>About</span></a>
       <a href="./contact.html" class="${isContact ? 'active' : ''}">${icon('mail')}<span>Contact</span></a>
@@ -134,4 +134,90 @@ export async function mountHeader() {
   await render();
   supabase.auth.onAuthStateChange(() => render());
 }
+export function mountFooter() {
+  let target = document.querySelector('#site-footer');
+  if (!target) {
+    target = document.createElement('footer');
+    target.id = 'site-footer';
+    document.body.append(target);
+  }
+  const year = new Date().getFullYear();
+  target.className = 'bg-[#0e1e38] text-slate-300 pt-16 pb-12 border-t border-slate-800 mt-auto';
+  target.innerHTML = `
+    <div class="shell space-y-12">
+      <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-5 text-sm">
+        <div class="lg:col-span-2 space-y-4 pr-4">
+          <div class="flex items-center gap-3">
+            <span class="brand-mark !bg-orange-500 !text-white font-black text-lg w-10 h-10 rounded-xl flex items-center justify-center">D</span>
+            <div>
+              <span class="text-xl font-black text-white tracking-tight">DigiStore</span>
+              <span class="block text-[11px] text-slate-400 font-medium uppercase tracking-wider">by Codeink Technologies</span>
+            </div>
+          </div>
+          <p class="text-xs leading-relaxed text-slate-400 max-w-sm">
+            Empowering professionals, creators, and developers worldwide with verified, high-value digital products, comprehensive ebooks, tools, and software templates.
+          </p>
+          <div class="pt-2 flex flex-wrap gap-2 items-center text-[11px] text-slate-400">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
+              <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              <span>All Systems Operational</span>
+            </span>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
+              <span>🔒 256-Bit SSL Encrypted</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Digital Catalog</h3>
+          <ul class="space-y-2 text-xs text-slate-400">
+            <li><a href="./store.html?category=Ebooks%20%26%20Guides" class="hover:text-orange-400 transition">Ebooks &amp; Guides</a></li>
+            <li><a href="./store.html?category=Software%20%26%20Tools" class="hover:text-orange-400 transition">Software &amp; Tools</a></li>
+            <li><a href="./store.html?category=Templates%20%26%20Themes" class="hover:text-orange-400 transition">Templates &amp; Themes</a></li>
+            <li><a href="./store.html?category=Online%20Courses" class="hover:text-orange-400 transition">Online Courses</a></li>
+            <li><a href="./store.html?category=Audio%20%26%20Media" class="hover:text-orange-400 transition">Audio &amp; Media</a></li>
+            <li><a href="./store.html?category=Design%20%26%20Graphics" class="hover:text-orange-400 transition">Design &amp; Graphics</a></li>
+          </ul>
+        </div>
+
+        <div class="space-y-3">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Customer Hub</h3>
+          <ul class="space-y-2 text-xs text-slate-400">
+            <li><a href="./account.html" class="hover:text-orange-400 transition">My Account &amp; Vault</a></li>
+            <li><a href="./account.html#orders-list" class="hover:text-orange-400 transition">Order History</a></li>
+            <li><a href="./support.html" class="hover:text-orange-400 transition">Customer Helpdesk</a></li>
+            <li><a href="./support.html" class="hover:text-orange-400 transition">Submit Support Ticket</a></li>
+            <li><a href="./blog.html" class="hover:text-orange-400 transition">Articles &amp; Updates</a></li>
+            <li><a href="./about.html" class="hover:text-orange-400 transition">About Codeink</a></li>
+          </ul>
+        </div>
+
+        <div class="space-y-3">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Trust &amp; Legal</h3>
+          <ul class="space-y-2 text-xs text-slate-400">
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Terms of Service</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Privacy Policy</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Refund &amp; Return Policy</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Digital License Agreement</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Security &amp; Compliance</a></li>
+            <li><a href="./contact.html" class="hover:text-orange-400 transition">Contact Legal Team</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="border-t border-slate-800/80 pt-8 flex flex-wrap items-center justify-between gap-6 text-xs text-slate-500">
+        <div>
+          <p>© ${year} <strong class="text-slate-400">Codeink Technologies</strong>. All rights reserved.</p>
+          <p class="text-[11px] text-slate-500 mt-0.5">DigiStore is a registered digital merchandise platform by Codeink Technologies.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
+          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">Flutterwave Verified</span>
+          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">NOWPayments Crypto</span>
+          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">Mobile Money (GHS/KES/UGX)</span>
+          <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">Visa / Mastercard / Verve</span>
+        </div>
+      </div>
+    </div>`;
+}
+
 export function initMotion(){document.body.classList.add('page-enter');const items=document.querySelectorAll('.reveal');if(!('IntersectionObserver'in window)){items.forEach(i=>i.classList.add('is-visible'));return}const o=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');o.unobserve(e.target)}}),{threshold:.12});items.forEach(i=>o.observe(i))}
