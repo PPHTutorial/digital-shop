@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { escapeHtml, getAccount, icon, renderIcons, setButtonLoading, toast } from './ui.js';
+import { escapeHtml, finishPageLoader, getAccount, icon, renderIcons, setButtonLoading, toast } from './ui.js';
 
 let account, mode, editingId, dashboardData;
 const modal = document.querySelector('#editor-modal');
