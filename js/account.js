@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, getAccount, mountFooter, mountHeader, setButtonLoading, toast } from './ui.js';
+import { escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 
 let account;
 
@@ -30,12 +30,12 @@ const statusColors = {
   refunded: 'text-blue-700 bg-blue-50',
 };
 
-const statusLabels = {
-  paid: '✓ Paid',
-  pending: '⏳ Pending',
-  cancelled: '✕ Cancelled',
-  failed: '! Failed',
-  refunded: '↩ Refunded',
+const statusIcons = {
+  paid: `${icon('check', 11)} <span>Paid</span>`,
+  pending: `${icon('clock', 11)} <span>Pending</span>`,
+  cancelled: `${icon('x-circle', 11)} <span>Cancelled</span>`,
+  failed: `${icon('alert-triangle', 11)} <span>Failed</span>`,
+  refunded: `${icon('rotate-ccw', 11)} <span>Refunded</span>`,
 };
 
 function renderOrdersList(orders) {
@@ -46,7 +46,7 @@ function renderOrdersList(orders) {
   return orders
     .map((o) => {
       const colorClass = statusColors[o.status] || 'text-slate-600 bg-slate-50';
-      const label = statusLabels[o.status] || o.status;
+      const labelHtml = statusIcons[o.status] || `<span>${escapeHtml(o.status)}</span>`;
 
       return `
       <div class="flex justify-between gap-4 border-t border-slate-100 py-4 first:border-t-0">
@@ -56,7 +56,7 @@ function renderOrdersList(orders) {
         </div>
         <div class="text-right shrink-0">
           <strong class="text-sm">${o.currency} ${Number(o.amount).toFixed(2)}</strong>
-          <p class="mt-1"><span class="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold ${colorClass}">${escapeHtml(label)}</span></p>
+          <p class="mt-1"><span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${colorClass}">${labelHtml}</span></p>
         </div>
       </div>`;
     })
@@ -107,6 +107,7 @@ async function load() {
     if (form.elements[k]) form.elements[k].value = profile?.[k] ?? '';
   });
 
+  renderIcons();
   finishPageLoader();
 }
 

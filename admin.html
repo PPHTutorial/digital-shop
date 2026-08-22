@@ -5,25 +5,31 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Admin Centre | DigiStore</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="./css/app.css">
 </head>
 <body class="bg-slate-50 text-slate-900">
   <div class="min-h-screen lg:flex">
-    <aside class="bg-[#142c55] p-5 text-white lg:sticky lg:top-0 lg:h-screen lg:w-64">
-      <a class="brand !text-white" href="./index.html">
-        <span class="brand-mark">D</span>
-        <span>DigiStore<small class="!text-slate-400">Control centre</small></span>
-      </a>
-      <nav class="mt-7 flex gap-2 overflow-x-auto text-sm font-bold lg:grid">
-        <a class="admin-link active" href="#overview">Overview</a>
-        <a class="admin-link" href="#customers">Customers</a>
-        <a class="admin-link" href="#transactions">Transactions</a>
-        <a class="admin-link" href="#products">Catalog</a>
-        <a class="admin-link" href="#content">Content</a>
-        <a class="admin-link" href="#tickets">Support</a>
-      </nav>
-      <div class="mt-8 text-xs text-slate-400">
-        <a class="font-bold text-white hover:underline" href="./account.html">← Back to account</a>
+    <aside class="bg-[#142c55] p-5 text-white lg:sticky lg:top-0 lg:h-screen lg:w-64 flex flex-col justify-between shrink-0">
+      <div>
+        <a class="brand !text-white" href="./index.html">
+          <span class="brand-mark">D</span>
+          <span>DigiStore<small class="!text-slate-400">Control centre</small></span>
+        </a>
+        <nav class="mt-7 flex gap-2 overflow-x-auto text-sm font-bold lg:grid">
+          <a class="admin-link active flex items-center gap-2" href="#overview"><i data-lucide="layout-dashboard" width="16" height="16"></i><span>Overview</span></a>
+          <a class="admin-link flex items-center gap-2" href="#customers"><i data-lucide="users" width="16" height="16"></i><span>Customers</span></a>
+          <a class="admin-link flex items-center gap-2" href="#transactions"><i data-lucide="credit-card" width="16" height="16"></i><span>Transactions</span></a>
+          <a class="admin-link flex items-center gap-2" href="#products"><i data-lucide="package" width="16" height="16"></i><span>Catalog</span></a>
+          <a class="admin-link flex items-center gap-2" href="#content"><i data-lucide="file-text" width="16" height="16"></i><span>Content</span></a>
+          <a class="admin-link flex items-center gap-2" href="#tickets"><i data-lucide="life-buoy" width="16" height="16"></i><span>Support</span></a>
+        </nav>
+      </div>
+      <div class="mt-8 text-xs text-slate-400 pt-4 border-t border-slate-700">
+        <button id="admin-signout" class="button !w-full !bg-slate-800 hover:!bg-slate-700 !text-white flex items-center justify-center gap-2 text-xs">
+          <i data-lucide="log-out" width="14" height="14"></i>
+          <span>Sign out</span>
+        </button>
       </div>
     </aside>
 
@@ -149,7 +155,9 @@
           <span id="editor-eyebrow" class="eyebrow"></span>
           <h2 id="editor-title" class="mt-0.5 text-xl font-black text-[#142c55]"></h2>
         </div>
-        <button id="close-modal" type="button" class="text-2xl leading-none text-slate-400 hover:text-slate-700 bg-transparent border-0 cursor-pointer">×</button>
+        <button id="close-modal" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 bg-transparent border-0 cursor-pointer flex items-center justify-center" aria-label="Close">
+          <i data-lucide="x" width="20" height="20"></i>
+        </button>
       </div>
       <div id="editor-fields" class="admin-modal-body space-y-5"></div>
       <div class="admin-modal-footer flex items-center justify-between gap-3">
@@ -163,14 +171,16 @@
   </dialog>
 
   <!-- Details / Activity View Modal -->
-  <dialog id="details-modal" class="w-[min(94vw,640px)] rounded-2xl border-0 p-0 shadow-2xl">
+  <dialog id="details-modal" class="w-[min(94vw,640px)] rounded-2xl border-0 p-0 shadow-2xl bg-white" style="margin:auto">
     <div class="p-6">
       <div class="flex items-start justify-between pb-3 border-b border-slate-100">
         <div>
           <span id="details-eyebrow" class="eyebrow">CUSTOMER DETAILS</span>
           <h2 id="details-title" class="mt-1 text-xl font-black text-[#142c55]">Customer activity</h2>
         </div>
-        <button id="close-details-modal" type="button" class="text-2xl text-slate-400 hover:text-slate-700 bg-transparent border-0 cursor-pointer">×</button>
+        <button id="close-details-modal" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 bg-transparent border-0 cursor-pointer flex items-center justify-center" aria-label="Close">
+          <i data-lucide="x" width="20" height="20"></i>
+        </button>
       </div>
       <div id="details-content" class="mt-5 space-y-4 max-h-[60vh] overflow-y-auto pr-1"></div>
       <div class="mt-6 flex justify-end border-t border-slate-100 pt-4">
@@ -180,11 +190,13 @@
   </dialog>
 
   <!-- Image Editor Modal -->
-  <dialog id="image-editor-modal" class="image-editor-modal">
+  <dialog id="image-editor-modal" class="w-[min(94vw,680px)] rounded-2xl border-0 p-0 shadow-2xl bg-white" style="margin:auto">
     <div class="p-6">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-black text-[#142c55]">Edit Image</h2>
-        <button id="cancel-crop-btn" type="button" class="text-2xl leading-none text-slate-400 border-0 bg-transparent cursor-pointer">×</button>
+        <button id="cancel-crop-btn" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 border-0 bg-transparent cursor-pointer flex items-center justify-center" aria-label="Close">
+          <i data-lucide="x" width="20" height="20"></i>
+        </button>
       </div>
       <div class="overflow-auto rounded-xl bg-slate-100 flex justify-center items-center min-h-[200px]" style="max-height:360px">
         <canvas id="crop-canvas" class="max-w-full block"></canvas>

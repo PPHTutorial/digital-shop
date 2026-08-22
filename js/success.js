@@ -1,5 +1,5 @@
 import { supabase } from "./client.js";
-import { finishPageLoader, mountFooter, mountHeader, toast } from './ui.js';
+import { finishPageLoader, icon, mountFooter, mountHeader, renderIcons, toast } from './ui.js';
 
 mountHeader();
 mountFooter();
@@ -24,34 +24,46 @@ const MAX_POLL_ATTEMPTS = 15; // 15 x 2.5s = ~37s
 
 function showState(type, data = {}) {
   if (type === 'cancelled') {
-    if (iconContainer) iconContainer.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-2xl font-black text-amber-600';
-    if (iconSpan) iconSpan.textContent = '✕';
+    if (iconContainer) iconContainer.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-600';
+    if (iconSpan) iconSpan.innerHTML = icon('x-circle', 32);
     if (eyebrow) eyebrow.textContent = 'TRANSACTION CANCELLED';
     if (title) title.textContent = "Payment Cancelled";
     if (copy) copy.textContent = "You cancelled the payment transaction. No charges were made to your account or payment method.";
     if (area) {
       area.innerHTML = `
         <div class="flex flex-wrap justify-center gap-3">
-          <a href="./checkout.html" class="inline-flex rounded-full bg-orange-600 px-7 py-3 font-bold text-white hover:bg-orange-500 transition-colors">Try Checkout Again</a>
-          <a href="./index.html#store" class="inline-flex rounded-full bg-slate-950 px-7 py-3 font-bold text-white hover:bg-slate-800 transition-colors">Return to Catalog</a>
+          <a href="./checkout.html" class="inline-flex items-center gap-2 rounded-full bg-orange-600 px-7 py-3 font-bold text-white hover:bg-orange-500 transition-colors">
+            <i data-lucide="refresh-cw" width="16" height="16"></i>
+            <span>Try Checkout Again</span>
+          </a>
+          <a href="./store.html" class="inline-flex items-center gap-2 rounded-full bg-slate-950 px-7 py-3 font-bold text-white hover:bg-slate-800 transition-colors">
+            <i data-lucide="arrow-left" width="16" height="16"></i>
+            <span>Return to Catalog</span>
+          </a>
         </div>`;
     }
   } else if (type === 'failed') {
-    if (iconContainer) iconContainer.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-2xl font-black text-red-600';
-    if (iconSpan) iconSpan.textContent = '!';
+    if (iconContainer) iconContainer.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-600';
+    if (iconSpan) iconSpan.innerHTML = icon('alert-triangle', 32);
     if (eyebrow) eyebrow.textContent = 'PAYMENT NOT COMPLETED';
     if (title) title.textContent = "Payment Incomplete";
     if (copy) copy.textContent = data.message || "Your payment could not be confirmed or verified by the payment gateway. If funds were deducted, please contact support with your payment reference.";
     if (area) {
       area.innerHTML = `
         <div class="flex flex-wrap justify-center gap-3">
-          <a href="./checkout.html" class="inline-flex rounded-full bg-orange-600 px-7 py-3 font-bold text-white hover:bg-orange-500 transition-colors">Try Again</a>
-          <a href="./support.html" class="inline-flex rounded-full bg-slate-950 px-7 py-3 font-bold text-white hover:bg-slate-800 transition-colors">Contact Support</a>
+          <a href="./checkout.html" class="inline-flex items-center gap-2 rounded-full bg-orange-600 px-7 py-3 font-bold text-white hover:bg-orange-500 transition-colors">
+            <i data-lucide="refresh-cw" width="16" height="16"></i>
+            <span>Try Again</span>
+          </a>
+          <a href="./support.html" class="inline-flex items-center gap-2 rounded-full bg-slate-950 px-7 py-3 font-bold text-white hover:bg-slate-800 transition-colors">
+            <i data-lucide="life-buoy" width="16" height="16"></i>
+            <span>Contact Support</span>
+          </a>
         </div>`;
     }
   } else if (type === 'processing') {
-    if (iconContainer) iconContainer.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-2xl font-black text-blue-600 animate-pulse';
-    if (iconSpan) iconSpan.textContent = '⏳';
+    if (iconContainer) iconContainer.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-600 animate-pulse';
+    if (iconSpan) iconSpan.innerHTML = icon('clock', 32);
     if (eyebrow) eyebrow.textContent = 'VERIFYING PAYMENT';
     if (title) title.textContent = "Confirming your transaction…";
     if (copy) copy.textContent = data.message || "We are verifying your transaction with the payment network. Your download will appear automatically in a few seconds.";
@@ -60,30 +72,43 @@ function showState(type, data = {}) {
         <div class="space-y-4">
           <div class="progress-track max-w-xs mx-auto"></div>
           <div class="flex flex-wrap justify-center gap-3">
-            <button id="manual-verify-btn" class="button !min-h-9 !px-4 text-xs font-semibold">Check status now</button>
-            <a href="./account.html" class="button !min-h-9 !px-4 text-xs">View Account Orders</a>
+            <button id="manual-verify-btn" class="button !min-h-9 !px-4 text-xs font-semibold inline-flex items-center gap-1.5">
+              <i data-lucide="refresh-cw" width="13" height="13"></i>
+              <span>Check status now</span>
+            </button>
+            <a href="./account.html" class="button !min-h-9 !px-4 text-xs inline-flex items-center gap-1.5">
+              <i data-lucide="package" width="13" height="13"></i>
+              <span>View Account Orders</span>
+            </a>
           </div>
         </div>`;
       document.querySelector('#manual-verify-btn')?.addEventListener('click', checkPaymentStatus);
     }
   } else if (type === 'paid') {
-    if (iconContainer) iconContainer.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-2xl font-black text-green-600 shadow-md shadow-green-200';
-    if (iconSpan) iconSpan.textContent = '✓';
+    if (iconContainer) iconContainer.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600 shadow-md shadow-green-200';
+    if (iconSpan) iconSpan.innerHTML = icon('check-circle-2', 32);
     if (eyebrow) eyebrow.textContent = 'PAYMENT SUCCESSFUL';
     if (title) title.textContent = "Payment Confirmed!";
     if (copy) copy.textContent = "Thank you for your purchase! Your digital product is ready for instant download. Your access token is valid for immediate access.";
     if (area) {
       area.innerHTML = `
         <div class="space-y-4">
-          <a href="${data.url}" class="inline-flex rounded-full bg-orange-600 px-8 py-3.5 font-bold text-white hover:bg-orange-500 shadow-lg shadow-orange-600/30 transition-all hover:scale-105">⬇ Download Your Product</a>
+          <a href="${data.url}" class="inline-flex items-center gap-2 rounded-full bg-orange-600 px-8 py-3.5 font-bold text-white hover:bg-orange-500 shadow-lg shadow-orange-600/30 transition-all hover:scale-105">
+            <i data-lucide="download" width="18" height="18"></i>
+            <span>Download Your Product</span>
+          </a>
           <div>
-            <a href="./account.html" class="inline-block text-xs font-bold text-slate-500 hover:text-slate-900 underline">View in My Account Downloads</a>
+            <a href="./account.html" class="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900 underline">
+              <i data-lucide="archive" width="13" height="13"></i>
+              <span>View in My Account Downloads</span>
+            </a>
           </div>
         </div>`;
     }
     toast('Your protected download is ready.');
   }
 
+  renderIcons();
   finishPageLoader();
 }
 

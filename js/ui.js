@@ -163,7 +163,8 @@ export function mountFooter() {
               <span>All Systems Operational</span>
             </span>
             <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700">
-              <span>🔒 256-Bit SSL Encrypted</span>
+              ${icon('lock', 12)}
+              <span>256-Bit SSL Encrypted</span>
             </span>
           </div>
         </div>
@@ -218,6 +219,7 @@ export function mountFooter() {
         </div>
       </div>
     </div>`;
+  renderIcons();
 }
 
 export function initMotion(){document.body.classList.add('page-enter');const items=document.querySelectorAll('.reveal');if(!('IntersectionObserver'in window)){items.forEach(i=>i.classList.add('is-visible'));return}const o=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');o.unobserve(e.target)}}),{threshold:.12});items.forEach(i=>o.observe(i))}

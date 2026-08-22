@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { escapeHtml, getAccount, setButtonLoading, toast } from './ui.js';
+import { escapeHtml, getAccount, icon, renderIcons, setButtonLoading, toast } from './ui.js';
 
 let account, mode, editingId, dashboardData;
 const modal = document.querySelector('#editor-modal');
@@ -337,6 +337,7 @@ function renderPaginatedTable(containerSelector, dataList, heads, renderRow, pag
     if (typeof onRendered === 'function') {
       onRendered(container, pageRows);
     }
+    renderIcons();
   }
 
   renderPage();
@@ -447,10 +448,10 @@ async function load() {
     const summaryEl = document.querySelector('#orders-status-summary');
     if (summaryEl) {
       summaryEl.innerHTML = `
-        <span class="tag !bg-green-100 !text-green-800 !text-xs">✓ ${paidCount} Paid</span>
-        <span class="tag !bg-amber-100 !text-amber-800 !text-xs">⏳ ${pendingCount} Pending</span>
-        <span class="tag !bg-red-100 !text-red-700 !text-xs">✕ ${cancelledCount} Cancelled</span>
-        <span class="tag !bg-red-100 !text-red-700 !text-xs">! ${failedCount} Failed</span>
+        <span class="tag !bg-green-100 !text-green-800 !text-xs inline-flex items-center gap-1">${icon('check', 12)} ${paidCount} Paid</span>
+        <span class="tag !bg-amber-100 !text-amber-800 !text-xs inline-flex items-center gap-1">${icon('clock', 12)} ${pendingCount} Pending</span>
+        <span class="tag !bg-red-100 !text-red-700 !text-xs inline-flex items-center gap-1">${icon('x-circle', 12)} ${cancelledCount} Cancelled</span>
+        <span class="tag !bg-red-100 !text-red-700 !text-xs inline-flex items-center gap-1">${icon('alert-triangle', 12)} ${failedCount} Failed</span>
         <span class="text-slate-400 text-xs ml-1">(Only paid orders count towards revenue & purchases)</span>`;
     }
 
@@ -536,9 +537,18 @@ async function load() {
         </td>
         <td class="px-3 py-3">
           <div class="flex items-center gap-1.5 whitespace-nowrap">
-            <button class="button !min-h-8 !py-1 text-xs" data-copy-ad-link="${escapeHtml(canonicalSlug)}" title="Copy advertising link">🔗 Ad Link</button>
-            <button class="button !min-h-8 !py-1 text-xs" data-edit-product="${escapeHtml(p.id)}">Edit</button>
-            <button class="button !min-h-8 !py-1 text-xs text-red-600 hover:bg-red-50" data-delete-product="${escapeHtml(p.id)}">Delete</button>
+            <button class="button !min-h-8 !py-1 text-xs inline-flex items-center gap-1" data-copy-ad-link="${escapeHtml(canonicalSlug)}" title="Copy advertising link">
+              ${icon('link', 11)}
+              <span>Ad Link</span>
+            </button>
+            <button class="button !min-h-8 !py-1 text-xs inline-flex items-center gap-1" data-edit-product="${escapeHtml(p.id)}">
+              ${icon('edit-2', 11)}
+              <span>Edit</span>
+            </button>
+            <button class="button !min-h-8 !py-1 text-xs text-red-600 hover:bg-red-50 inline-flex items-center gap-1" data-delete-product="${escapeHtml(p.id)}">
+              ${icon('trash-2', 11)}
+              <span>Delete</span>
+            </button>
           </div>
         </td>`;
     },
