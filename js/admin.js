@@ -1155,7 +1155,7 @@ async function openEditor(type, existing = null) {
       </div>
       <div>
         <label class="label">Max Redemptions (Optional)</label>
-        <input class="field" name="max_redemptions" type="number" min="1" placeholder="Unlimited if empty" value="${full.max_redemptions ?? ''}">
+        <input class="field" name="max_redemptions" type="number" min="1" placeholder="Unlimited if empty" value="${full.max_redemptions ?? ''}">`
   }
 
   if (modal && !modal.open) {
@@ -1301,16 +1301,22 @@ function setupBackdropClose(dialog) {
 [modal, detailsModal, imgModal].forEach(setupBackdropClose);
 
 // Sign out + CMS settings
-document.querySelector('#admin-signout').onclick = async () => {
-  await supabase.auth.signOut();
-  location.href = './index.html';
-};
+document.querySelectorAll('#admin-signout, #admin-header-signout').forEach((btn) => {
+  btn.onclick = async () => {
+    await supabase.auth.signOut();
+    location.href = './index.html';
+  };
+});
 
-document.querySelector('#cms-form').onsubmit = async (e) => {
+document.querySelector('#cms-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const v = Object.fromEntries(new FormData(e.currentTarget).entries());
   const { error } = await supabase.from('site_settings').upsert({ id: 1, ...v, updated_by: account.user.id });
   toast(error ? error.message : 'Content saved.', error ? 'error' : 'success');
-};
+});
 
-load();
+load().catch((err) => {
+  console.error('Admin initialization error:', err);
+  finishPageLoader();
+});
+  
