@@ -1,4 +1,5 @@
 import { supabase } from "./client.js";
+import { toast } from './ui.js';
 const q = new URLSearchParams(location.search);
 const token = q.get("token");
 const orderId = q.get("order_id");
@@ -25,5 +26,6 @@ async function run() {
   copy.textContent =
     "Your book is ready. The download link is temporary and single-use.";
   area.innerHTML = `<a href="${data.url}" class="inline-flex rounded-full bg-slate-950 px-7 py-3 font-bold text-white">Download your book</a>`;
+  toast('Your protected download is ready.');
 }
 run();

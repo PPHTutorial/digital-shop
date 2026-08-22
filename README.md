@@ -1,5 +1,7 @@
 # Northstar Books — Secure Digital Shop Prototype
 
+> The storefront is now branded as **DigiStore**, powered by Codeink Technologies, and should be configured for `https://digistore.codeinktechnologies.com`.
+
 A static HTML + JavaScript + Tailwind storefront with a Supabase/Postgres backend layer for authentication, CMS, support tickets, payment verification, and protected digital downloads.
 
 ## Design direction
@@ -49,6 +51,27 @@ GitHub Pages can host the static frontend, but it cannot safely hold payment-pro
 3. Deploy all five Edge Functions again. Checkout now invokes the payment functions with the customer's access token, and those functions verify that the requested order belongs to that customer.
 4. Rotate the Supabase service-role key, Flutterwave secret key, NOWPayments API key, and NOWPayments IPN secret. They were previously committed in the frontend configuration and must be considered exposed. Set the replacements only with `supabase secrets set`; never put them in `js/config.js`.
 
+## Admin access and promotion codes
+
+After creating your account, grant it administrator access in the Supabase SQL Editor (replace the email):
+
+```sql
+update public.profiles
+set role = 'admin'
+where id = (select id from auth.users where email = 'you@codeinktechnologies.com');
+```
+
+Create promotion codes in the SQL Editor; checkout validates them again on the server before a payment is created:
+
+```sql
+insert into public.promo_codes (code, discount_type, discount_value, ends_at)
+values ('WELCOME10', 'percent', 10, '2027-01-01T00:00:00Z');
+```
+
+## Branded Supabase Auth email
+
+In Supabase Dashboard, open **Authentication → Emails → SMTP Settings** and enable Custom SMTP. Use a verified sender such as `no-reply@codeinktechnologies.com`, set the sender name to `DigiStore`, and enter the SMTP host, port, username, and password supplied by your email provider. Configure SPF, DKIM, and DMARC records for the sending domain. Then use **Authentication → Emails → Email Templates** to set the confirmation and recovery subjects/content to DigiStore, keeping `{{ .ConfirmationURL }}` in the confirmation template. Set **Authentication → URL Configuration** Site URL to `https://digistore.codeinktechnologies.com`, and add `https://digistore.codeinktechnologies.com/auth.html` to Redirect URLs.
+
 ## Data minimization
 
 The requested form includes age, gender, occupation, and address. Those fields are included in the prototype, but they should be retained only when they serve a real business/compliance purpose. Do not send them to payment gateways unless actually needed.
@@ -68,4 +91,5 @@ supabase functions deploy create-flutterwave-payment --project-ref synnepvvxpluo
 supabase functions deploy flutterwave-callback --project-ref synnepvvxpluoydkmphb --use-api --debug
 supabase functions deploy create-nowpayments-payment --project-ref synnepvvxpluoydkmphb --use-api --debug
 supabase functions deploy nowpayments-ipn --project-ref synnepvvxpluoydkmphb --use-api --debug
+supabase functions deploy download-book --project-ref synnepvvxpluoydkmphb --use-api --debug
 supabase functions deploy download-book --project-ref synnepvvxpluoydkmphb --use-api --debug

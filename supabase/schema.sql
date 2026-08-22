@@ -30,6 +30,38 @@ create table if not exists public.orders (
   paid_at timestamptz
 );
 
+alter table public.orders add column if not exists promo_code text;
+alter table public.orders add column if not exists discount_amount numeric(12,2) not null default 0 check (discount_amount >= 0);
+
+create table if not exists public.promo_codes (
+  id uuid primary key default gen_random_uuid(),
+  code citext unique not null,
+  discount_type text not null check (discount_type in ('percent', 'fixed')),
+  discount_value numeric(12,2) not null check (discount_value > 0),
+  starts_at timestamptz not null default now(),
+  ends_at timestamptz,
+  max_redemptions integer,
+  redemption_count integer not null default 0 check (redemption_count >= 0),
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create or replace function public.quote_promo(p_code text, p_product_id uuid)
+returns table(valid boolean, code text, discount_amount numeric, message text)
+language plpgsql
+security definer set search_path = public
+as $$
+declare promo public.promo_codes; product_price numeric;
+begin
+  select price into product_price from public.products where id = p_product_id and is_published = true;
+  select * into promo from public.promo_codes where promo_codes.code = p_code and is_active = true and starts_at <= now() and (ends_at is null or ends_at > now()) and (max_redemptions is null or redemption_count < max_redemptions);
+  if product_price is null then return query select false, null::text, 0::numeric, 'Product is unavailable.'; return; end if;
+  if promo.id is null then return query select false, null::text, 0::numeric, 'That promotion code is not available.'; return; end if;
+  return query select true, promo.code::text, least(product_price, case when promo.discount_type = 'percent' then round(product_price * promo.discount_value / 100, 2) else promo.discount_value end), 'Promotion applied.';
+end;
+$$;
+grant execute on function public.quote_promo(text, uuid) to anon, authenticated;
+
 create table if not exists public.subscribers (
   id uuid primary key default gen_random_uuid(),
   email citext unique not null,
@@ -85,6 +117,7 @@ alter table public.orders enable row level security;
 alter table public.subscribers enable row level security;
 alter table public.tickets enable row level security;
 alter table public.site_settings enable row level security;
+alter table public.promo_codes enable row level security;
 
 drop policy if exists "published products are public" on public.products;
 drop policy if exists "users read own profile" on public.profiles;
@@ -99,6 +132,7 @@ drop policy if exists "public can create tickets" on public.tickets;
 drop policy if exists "owners/admins read tickets" on public.tickets;
 drop policy if exists "admins update tickets" on public.tickets;
 drop policy if exists "admins manage cms" on public.site_settings;
+drop policy if exists "admins manage promotion codes" on public.promo_codes;
 
 create policy "published products are public" on public.products for select using (is_published = true or auth.uid() in (select id from public.profiles where role='admin'));
 create policy "users read own profile" on public.profiles for select using (auth.uid()=id or auth.uid() in (select id from public.profiles where role='admin'));
@@ -113,6 +147,7 @@ create policy "public can create tickets" on public.tickets for insert with chec
 create policy "owners/admins read tickets" on public.tickets for select using (auth.uid()=user_id or auth.uid() in (select id from public.profiles where role='admin'));
 create policy "admins update tickets" on public.tickets for update using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
 create policy "admins manage cms" on public.site_settings for all using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
+create policy "admins manage promotion codes" on public.promo_codes for all using (auth.uid() in (select id from public.profiles where role='admin')) with check (auth.uid() in (select id from public.profiles where role='admin'));
 
 insert into storage.buckets (id, name, public)
 values ('books', 'books', false)
