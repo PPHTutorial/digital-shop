@@ -3,72 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Admin Command Centre | DigiStore</title>
+  <title>Admin Centre | DigiStore</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="./css/app.css">
-  <style>
-    .admin-tab-btn.active {
-      background-color: rgba(255, 255, 255, 0.12);
-      color: #ffffff;
-      border-left: 3px solid #f97316;
-    }
-    .date-filter-pill.active {
-      background-color: #142c55;
-      color: #ffffff;
-      font-weight: 700;
-    }
-  </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
   <div class="min-h-screen lg:flex">
-    <!-- Sidebar -->
-    <aside class="bg-[#0e1e38] p-5 text-white lg:sticky lg:top-0 lg:h-screen lg:w-64 flex flex-col justify-between shrink-0 shadow-xl z-20">
+    <aside class="bg-[#142c55] p-5 text-white lg:sticky lg:top-0 lg:h-screen lg:w-64 flex flex-col justify-between shrink-0">
       <div>
         <a class="brand !text-white" href="./index.html">
-          <span class="brand-mark !bg-orange-500 !text-white">D</span>
-          <span>DigiStore<small class="!text-slate-400">Admin Operations</small></span>
+          <span class="brand-mark">D</span>
+          <span>DigiStore<small class="!text-slate-400">Control centre</small></span>
         </a>
-        <nav class="mt-7 flex gap-1.5 overflow-x-auto text-sm font-semibold lg:grid lg:gap-1">
-          <a class="admin-tab-btn flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition" href="#overview" data-view="overview">
-            <i data-lucide="layout-dashboard" width="17" height="17"></i>
-            <span>Overview</span>
-          </a>
-          <a class="admin-tab-btn flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition" href="#transactions" data-view="transactions">
-            <i data-lucide="credit-card" width="17" height="17"></i>
-            <span>Transactions</span>
-          </a>
-          <a class="admin-tab-btn flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition" href="#customers" data-view="customers">
-            <i data-lucide="users" width="17" height="17"></i>
-            <span>Customers</span>
-          </a>
-          <a class="admin-tab-btn flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition" href="#products" data-view="products">
-            <i data-lucide="package" width="17" height="17"></i>
-            <span>Catalog &amp; Ed.</span>
-          </a>
-          <a class="admin-tab-btn flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition" href="#reviews" data-view="reviews">
-            <i data-lucide="star" width="17" height="17"></i>
-            <span>Reviews</span>
-          </a>
-          <a class="admin-tab-btn flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition" href="#content" data-view="content">
-            <i data-lucide="file-text" width="17" height="17"></i>
-            <span>Content / CMS</span>
-          </a>
-          <a class="admin-tab-btn flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition" href="#tickets" data-view="tickets">
-            <i data-lucide="life-buoy" width="17" height="17"></i>
-            <span>Support</span>
-          </a>
+        <nav class="mt-7 flex gap-2 overflow-x-auto text-sm font-bold lg:grid">
+          <a class="admin-link active flex items-center gap-2" href="#overview"><i data-lucide="layout-dashboard" width="16" height="16"></i><span>Overview</span></a>
+          <a class="admin-link flex items-center gap-2" href="#customers"><i data-lucide="users" width="16" height="16"></i><span>Customers</span></a>
+          <a class="admin-link flex items-center gap-2" href="#transactions"><i data-lucide="credit-card" width="16" height="16"></i><span>Transactions</span></a>
+          <a class="admin-link flex items-center gap-2" href="#products"><i data-lucide="package" width="16" height="16"></i><span>Catalog</span></a>
+          <a class="admin-link flex items-center gap-2" href="#content"><i data-lucide="file-text" width="16" height="16"></i><span>Content</span></a>
+          <a class="admin-link flex items-center gap-2" href="#tickets"><i data-lucide="life-buoy" width="16" height="16"></i><span>Support</span></a>
         </nav>
       </div>
-
-      <div class="mt-8 text-xs text-slate-400 pt-4 border-t border-slate-800">
-        <div class="px-2 py-2 mb-3 bg-slate-900/60 rounded-xl text-[11px] space-y-1">
-          <div class="flex items-center justify-between text-slate-300">
-            <span>Live Stream Mode</span>
-            <span class="inline-block w-2 h-2 rounded-full bg-green-400"></span>
-          </div>
-          <p class="text-[10px] text-slate-500">Time-gated sales active (Aug 13 onwards)</p>
-        </div>
+      <div class="mt-8 text-xs text-slate-400 pt-4 border-t border-slate-700">
         <button id="admin-signout" class="button !w-full !bg-slate-800 hover:!bg-slate-700 !text-white flex items-center justify-center gap-2 text-xs">
           <i data-lucide="log-out" width="14" height="14"></i>
           <span>Sign out</span>
@@ -76,25 +33,16 @@
       </div>
     </aside>
 
-    <!-- Main Content Area -->
     <main class="min-w-0 flex-1">
-      <!-- Top Sticky App Bar -->
-      <header class="border-b border-slate-200 bg-white/95 backdrop-blur sticky top-0 z-10">
-        <div class="shell flex flex-wrap items-center justify-between gap-4 py-4">
+      <header class="border-b bg-white">
+        <div class="shell flex items-center justify-between py-5">
           <div>
-            <span id="screen-eyebrow" class="eyebrow">COMMAND CENTRE</span>
-            <h1 id="screen-title" class="mt-0.5 text-2xl font-black text-[#142c55]">Executive Overview</h1>
+            <span class="eyebrow">DIGISTORE OPERATIONS</span>
+            <h1 class="mt-1 text-2xl font-black text-[#142c55]">Command centre</h1>
           </div>
           <div class="flex items-center gap-3">
-            <!-- Global Date Filter Range -->
-            <div id="global-date-filters" class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
-              <button type="button" class="date-filter-pill px-3 py-1.5 rounded-lg transition" data-range="today">Today</button>
-              <button type="button" class="date-filter-pill px-3 py-1.5 rounded-lg transition" data-range="7d">7 Days</button>
-              <button type="button" class="date-filter-pill px-3 py-1.5 rounded-lg transition active" data-range="30d">30 Days</button>
-              <button type="button" class="date-filter-pill px-3 py-1.5 rounded-lg transition" data-range="all">All Time</button>
-            </div>
-            <span id="admin-user" class="hidden text-xs font-bold text-slate-600 sm:block px-2.5 py-1.5 bg-slate-100 rounded-lg"></span>
-            <button id="admin-header-signout" class="button !min-h-8 !px-3 text-xs">Log out</button>
+            <span id="admin-user" class="hidden text-sm font-bold text-slate-500 sm:block"></span>
+            <button id="admin-header-signout" class="button">Log out</button>
           </div>
         </div>
       </header>
@@ -102,280 +50,104 @@
       <div class="shell space-y-7 py-7">
         <p id="admin-status" class="status-line"></p>
 
-        <!-- ============================================================ -->
-        <!-- VIEW 1: OVERVIEW -->
-        <!-- ============================================================ -->
-        <section id="view-overview" class="admin-view space-y-7">
-          <!-- Top KPI Metrics -->
-          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="metric bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Net Revenue</span>
-              <strong id="m-revenue" class="text-2xl font-black text-[#142c55] mt-1 block">—</strong>
-              <div class="mt-2 text-[11px] text-green-600 font-semibold flex items-center gap-1">
-                <i data-lucide="trending-up" width="13" height="13"></i>
-                <span id="m-revenue-growth">+42.8% vs previous window</span>
-              </div>
-            </div>
+        <!-- Overview Section -->
+        <section id="overview" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="metric"><span>Total revenue</span><strong id="m-revenue">—</strong></div>
+          <div class="metric"><span>Paid orders</span><strong id="m-orders">—</strong></div>
+          <div class="metric"><span>Total customers</span><strong id="m-customers">—</strong></div>
+          <div class="metric"><span>Open tickets</span><strong id="m-tickets">—</strong></div>
+        </section>
 
-            <div class="metric bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Paid Transactions</span>
-              <strong id="m-orders" class="text-2xl font-black text-[#142c55] mt-1 block">—</strong>
-              <div class="mt-2 text-[11px] text-slate-500 font-medium flex items-center gap-1">
-                <i data-lucide="shopping-bag" width="13" height="13"></i>
-                <span id="m-avg-order-val">AOV: $84.20</span>
-              </div>
-            </div>
-
-            <div class="metric bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Verified Customers</span>
-              <strong id="m-customers" class="text-2xl font-black text-[#142c55] mt-1 block">—</strong>
-              <div class="mt-2 text-[11px] text-blue-600 font-semibold flex items-center gap-1">
-                <i data-lucide="globe" width="13" height="13"></i>
-                <span>Across 8 Global Regions</span>
-              </div>
-            </div>
-
-            <div class="metric bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Buyer Satisfaction</span>
-              <strong id="m-satisfaction" class="text-2xl font-black text-[#142c55] mt-1 block">4.92 / 5.0</strong>
-              <div class="mt-2 text-[11px] text-amber-600 font-semibold flex items-center gap-1">
-                <i data-lucide="star" width="13" height="13"></i>
-                <span>99.4% Positive Feedback</span>
-              </div>
-            </div>
+        <section class="grid gap-7 xl:grid-cols-[1.25fr_.75fr]">
+          <div class="soft-panel p-6">
+            <span class="eyebrow">REVENUE ANALYTICS</span>
+            <h2 class="mt-1 text-xl font-black text-[#142c55]">Seven-day revenue</h2>
+            <div id="revenue-chart" class="mt-7 h-52"></div>
           </div>
-
-          <!-- Charts Row -->
-          <div class="grid gap-7 xl:grid-cols-[1.3fr_.7fr]">
-            <div class="soft-panel p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-              <div class="flex items-center justify-between">
-                <div>
-                  <span class="eyebrow">REVENUE TRAJECTORY</span>
-                  <h2 class="mt-1 text-xl font-black text-[#142c55]">Sales &amp; Revenue Analytics</h2>
-                </div>
-                <span class="text-xs text-slate-400 font-medium">Daily Cumulative</span>
-              </div>
-              <div id="revenue-chart" class="mt-6 h-60"></div>
-            </div>
-
-            <div class="soft-panel p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-              <span class="eyebrow">DISTRIBUTION</span>
-              <h2 class="mt-1 text-xl font-black text-[#142c55]">Sales by Platform</h2>
-              <div id="platform-distribution-list" class="mt-5 space-y-3"></div>
-            </div>
-          </div>
-
-          <!-- Live Activity Stream -->
-          <div class="soft-panel p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-            <div class="flex items-center justify-between mb-4">
-              <div>
-                <span class="eyebrow">LIVE STREAM</span>
-                <h2 class="mt-1 text-xl font-black text-[#142c55]">Real-time Transaction Feed</h2>
-              </div>
-              <a href="#transactions" class="text-xs font-bold text-orange-600 hover:underline">View all transactions →</a>
-            </div>
-            <div id="overview-recent-transactions"></div>
+          <div class="soft-panel p-6">
+            <span class="eyebrow">STORE HEALTH</span>
+            <h2 class="mt-1 text-xl font-black text-[#142c55]">Operations snapshot</h2>
+            <div id="operations-list" class="mt-5 grid gap-3"></div>
           </div>
         </section>
 
-        <!-- ============================================================ -->
-        <!-- VIEW 2: TRANSACTIONS & RECEIPTS -->
-        <!-- ============================================================ -->
-        <section id="view-transactions" class="admin-view hidden space-y-6">
-          <div class="grid gap-4 sm:grid-cols-3">
-            <div class="soft-panel p-5 bg-white rounded-2xl border border-slate-200">
-              <span class="text-xs text-slate-400 font-bold uppercase">Volume (Selected Range)</span>
-              <strong id="tx-summary-vol" class="text-2xl font-black text-[#142c55] mt-1 block">—</strong>
-            </div>
-            <div class="soft-panel p-5 bg-white rounded-2xl border border-slate-200">
-              <span class="text-xs text-slate-400 font-bold uppercase">Average Ticket Size</span>
-              <strong id="tx-summary-avg" class="text-2xl font-black text-[#142c55] mt-1 block">—</strong>
-            </div>
-            <div class="soft-panel p-5 bg-white rounded-2xl border border-slate-200">
-              <span class="text-xs text-slate-400 font-bold uppercase">Success Conversion Rate</span>
-              <strong class="text-2xl font-black text-green-600 mt-1 block">99.1%</strong>
+        <!-- Customers Section -->
+        <section id="customers" class="soft-panel p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="eyebrow">CUSTOMERS &amp; USERS</span>
+              <h2 class="mt-1 text-xl font-black text-[#142c55]">Customer management</h2>
             </div>
           </div>
-
-          <div class="soft-panel p-6 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-5">
-            <div class="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <span class="eyebrow">LEDGER &amp; RECEIPTS</span>
-                <h2 class="mt-1 text-xl font-black text-[#142c55]">Transaction Records</h2>
-              </div>
-              <div class="flex items-center gap-2">
-                <input id="tx-search-input" class="field !mt-0 !py-1.5 text-xs w-60" placeholder="Search customer, ref, email…">
-              </div>
-            </div>
-
-            <div id="orders-status-summary" class="flex flex-wrap gap-2 text-xs"></div>
-            <div id="orders-filter-tabs" class="flex flex-wrap gap-1.5"></div>
-            <div id="orders-table" class="mt-4"></div>
-          </div>
+          <div id="users-table" class="mt-5"></div>
         </section>
 
-        <!-- ============================================================ -->
-        <!-- VIEW 3: CUSTOMERS -->
-        <!-- ============================================================ -->
-        <section id="view-customers" class="admin-view hidden space-y-6">
-          <div class="grid gap-4 sm:grid-cols-3">
-            <div class="soft-panel p-5 bg-white rounded-2xl border border-slate-200">
-              <span class="text-xs text-slate-400 font-bold uppercase">Customer Base</span>
-              <strong id="cust-total-count" class="text-2xl font-black text-[#142c55] mt-1 block">—</strong>
-            </div>
-            <div class="soft-panel p-5 bg-white rounded-2xl border border-slate-200">
-              <span class="text-xs text-slate-400 font-bold uppercase">Top Geographic Market</span>
-              <strong class="text-2xl font-black text-[#142c55] mt-1 block">West Africa (58%)</strong>
-            </div>
-            <div class="soft-panel p-5 bg-white rounded-2xl border border-slate-200">
-              <span class="text-xs text-slate-400 font-bold uppercase">Verified Email Reach</span>
-              <strong class="text-2xl font-black text-blue-600 mt-1 block">100% Verified</strong>
-            </div>
-          </div>
-
-          <div class="soft-panel p-6 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-5">
-            <div class="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <span class="eyebrow">USER DIRECTORY</span>
-                <h2 class="mt-1 text-xl font-black text-[#142c55]">Customer Management</h2>
-              </div>
-              <input id="user-search-input" class="field !mt-0 !py-1.5 text-xs w-60" placeholder="Search by name, email, country…">
-            </div>
-            <div id="users-table"></div>
-          </div>
+        <!-- Transactions Section -->
+        <section id="transactions" class="soft-panel p-6">
+          <span class="eyebrow">TRANSACTIONS</span>
+          <h2 class="mt-1 text-xl font-black text-[#142c55]">Orders and payments</h2>
+          <div id="orders-status-summary" class="mt-3 flex flex-wrap gap-2 text-xs"></div>
+          <div id="orders-filter-tabs" class="mt-3 flex flex-wrap gap-1.5"></div>
+          <div id="orders-table" class="mt-4"></div>
         </section>
 
-        <!-- ============================================================ -->
-        <!-- VIEW 4: CATALOG & PRODUCTS -->
-        <!-- ============================================================ -->
-        <section id="view-products" class="admin-view hidden space-y-7">
-          <div class="soft-panel p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <span class="eyebrow">DIGITAL MERCHANDISE</span>
-                <h2 class="mt-1 text-xl font-black text-[#142c55]">Products and Editions</h2>
-              </div>
-              <button id="new-product" class="button button-primary">+ Add product</button>
+        <!-- Catalog & Products Section -->
+        <section id="products" class="soft-panel p-6">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <span class="eyebrow">CATALOG</span>
+              <h2 class="mt-1 text-xl font-black text-[#142c55]">Products and digital editions</h2>
             </div>
-            <div id="products-table" class="mt-5"></div>
+            <button id="new-product" class="button button-primary">+ Add product</button>
           </div>
+          <div id="products-table" class="mt-5"></div>
 
-          <div class="soft-panel p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-            <div class="flex items-center justify-between">
-              <div>
-                <span class="eyebrow">PROMOTIONS</span>
-                <h3 class="mt-1 text-xl font-black text-[#142c55]">Discount &amp; Voucher Codes</h3>
-              </div>
-              <button id="new-promo" class="button">+ Add promotion</button>
+          <div class="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
+            <div>
+              <span class="eyebrow">DISCOUNTS</span>
+              <h3 class="mt-1 text-xl font-black text-[#142c55]">Promotion codes</h3>
             </div>
-            <div id="promos-table" class="mt-4"></div>
+            <button id="new-promo" class="button">+ Add promotion</button>
           </div>
+          <div id="promos-table" class="mt-4"></div>
         </section>
 
-        <!-- ============================================================ -->
-        <!-- VIEW 5: REVIEWS & RATINGS -->
-        <!-- ============================================================ -->
-        <section id="view-reviews" class="admin-view hidden space-y-6">
-          <div class="grid gap-4 sm:grid-cols-3">
-            <div class="soft-panel p-5 bg-white rounded-2xl border border-slate-200">
-              <span class="text-xs text-slate-400 font-bold uppercase">Average Score</span>
-              <strong class="text-2xl font-black text-[#142c55] mt-1 block">4.92 / 5.0</strong>
+        <!-- CMS Section -->
+        <section id="content" class="soft-panel p-6">
+          <span class="eyebrow">CMS &amp; JOURNAL</span>
+          <h2 class="mt-1 text-xl font-black text-[#142c55]">Store content &amp; blog</h2>
+          <div id="posts-table" class="mt-5"></div>
+          
+          <form id="cms-form" class="mt-7 grid gap-4 sm:grid-cols-2 border-t border-slate-100 pt-6">
+            <label>
+              <span class="label">Store title</span>
+              <input name="site_title" class="field">
+            </label>
+            <label>
+              <span class="label">Support email</span>
+              <input name="support_email" class="field">
+            </label>
+            <label class="sm:col-span-2">
+              <span class="label">Store announcement banner</span>
+              <textarea name="announcement" class="field" rows="2"></textarea>
+            </label>
+            <div>
+              <button class="button button-primary">Save store settings</button>
             </div>
-            <div class="soft-panel p-5 bg-white rounded-2xl border border-slate-200">
-              <span class="text-xs text-slate-400 font-bold uppercase">5-Star Reviews</span>
-              <strong class="text-2xl font-black text-green-600 mt-1 block">94%</strong>
-            </div>
-            <div class="soft-panel p-5 bg-white rounded-2xl border border-slate-200">
-              <span class="text-xs text-slate-400 font-bold uppercase">Verified Purchaser Badge</span>
-              <strong class="text-2xl font-black text-orange-600 mt-1 block">100% Active</strong>
-            </div>
-          </div>
-
-          <div class="soft-panel p-6 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <span class="eyebrow">CUSTOMER TESTIMONIALS</span>
-            <h2 class="mt-1 text-xl font-black text-[#142c55]">Verified Buyer Reviews</h2>
-            <div id="reviews-grid" class="grid gap-4 md:grid-cols-2 mt-4"></div>
-          </div>
+          </form>
         </section>
 
-        <!-- ============================================================ -->
-        <!-- VIEW 6: CONTENT & CMS -->
-        <!-- ============================================================ -->
-        <section id="view-content" class="admin-view hidden space-y-6">
-          <div class="soft-panel p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-            <span class="eyebrow">JOURNAL &amp; ARTICLES</span>
-            <h2 class="mt-1 text-xl font-black text-[#142c55]">Blog Management</h2>
-            <div id="posts-table" class="mt-5"></div>
-          </div>
-
-          <div class="soft-panel p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-            <span class="eyebrow">STORE SETTINGS</span>
-            <h2 class="mt-1 text-xl font-black text-[#142c55]">Brand and Announcement Settings</h2>
-            <form id="cms-form" class="mt-6 grid gap-4 sm:grid-cols-2">
-              <label>
-                <span class="label">Store title</span>
-                <input name="site_title" class="field">
-              </label>
-              <label>
-                <span class="label">Support email</span>
-                <input name="support_email" class="field">
-              </label>
-              <label class="sm:col-span-2">
-                <span class="label">Store announcement banner</span>
-                <textarea name="announcement" class="field" rows="2"></textarea>
-              </label>
-              <div>
-                <button class="button button-primary">Save store settings</button>
-              </div>
-            </form>
-          </div>
-        </section>
-
-        <!-- ============================================================ -->
-        <!-- VIEW 7: SUPPORT TICKETS -->
-        <!-- ============================================================ -->
-        <section id="view-tickets" class="admin-view hidden space-y-6">
-          <div class="soft-panel p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-            <span class="eyebrow">CUSTOMER CARE</span>
-            <h2 class="mt-1 text-xl font-black text-[#142c55]">Support Queue</h2>
-            <div id="tickets-table" class="mt-5"></div>
-          </div>
+        <!-- Support Queue Section -->
+        <section id="tickets" class="soft-panel p-6">
+          <span class="eyebrow">CUSTOMER CARE</span>
+          <h2 class="mt-1 text-xl font-black text-[#142c55]">Support queue</h2>
+          <div id="tickets-table" class="mt-5"></div>
         </section>
       </div>
     </main>
   </div>
 
-  <!-- ============================================================ -->
-  <!-- DIGITAL RECEIPT MODAL -->
-  <!-- ============================================================ -->
-  <dialog id="receipt-modal" class="w-[min(94vw,620px)] rounded-3xl border-0 p-0 shadow-2xl bg-white" style="margin:auto">
-    <div class="p-6 sm:p-8 space-y-6">
-      <div class="flex items-start justify-between pb-4 border-b border-slate-100">
-        <div class="flex items-center gap-3">
-          <span class="brand-mark !bg-[#142c55] !text-white font-black w-9 h-9 rounded-xl flex items-center justify-center">D</span>
-          <div>
-            <h2 class="text-base font-black text-[#142c55]">DigiStore Official Receipt</h2>
-            <span class="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Verified Digital Transaction</span>
-          </div>
-        </div>
-        <button id="close-receipt-modal" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 bg-transparent border-0 cursor-pointer" aria-label="Close">
-          <i data-lucide="x" width="20" height="20"></i>
-        </button>
-      </div>
-
-      <div id="receipt-modal-body" class="space-y-5 text-xs text-slate-600 max-h-[65vh] overflow-y-auto pr-1"></div>
-
-      <div class="flex items-center justify-between pt-4 border-t border-slate-100">
-        <button id="print-receipt-btn" type="button" class="button !min-h-9 !px-4 text-xs font-bold inline-flex items-center gap-1.5 text-blue-600 hover:bg-blue-50">
-          <i data-lucide="printer" width="13" height="13"></i>
-          <span>Print / Save PDF</span>
-        </button>
-        <button id="dismiss-receipt-btn" type="button" class="button !min-h-9 !px-4 text-xs font-bold">Close</button>
-      </div>
-    </div>
-  </dialog>
-
-  <!-- General Editor Modal -->
+  <!-- General Editor Modal (Contained & Non-bleeding) -->
   <dialog id="editor-modal" class="admin-modal-container">
     <form id="editor-form" class="flex flex-col h-full max-h-[92vh]">
       <div class="flex items-start justify-between p-5 sm:p-6 pb-4 border-b border-slate-100 bg-white shrink-0">
