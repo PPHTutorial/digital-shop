@@ -30,10 +30,18 @@ Deno.serve(async (request) => {
       return json({ error: 'Download unavailable' }, { status: 403 });
     }
     const product = Array.isArray(order.products) ? order.products[0] : order.products;
-    const { data, error } = await db.storage.from('books').createSignedUrl(product.file_path, 600);
-    if (error) throw error;
-    return json({ url: data.signedUrl });
+    let downloadUrl = product.file_path;
+
+    if (product.file_path && !product.file_path.startsWith('http://') && !product.file_path.startsWith('https://')) {
+      const cleanPath = product.file_path.replace(/^books\//, '');
+      const { data, error } = await db.storage.from('books').createSignedUrl(cleanPath, 3600);
+      if (!error && data?.signedUrl) {
+        downloadUrl = data.signedUrl;
+      }
+    }
+
+    return json({ url: downloadUrl });
   } catch (error) {
-    return json({ error: 'Unable to generate download' }, { status: 500 });
+    return json({ error: 'Unable to generate download: ' + (error?.message || 'Server error') }, { status: 500 });
   }
 });
