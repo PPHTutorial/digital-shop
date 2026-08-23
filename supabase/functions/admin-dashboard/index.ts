@@ -55,22 +55,23 @@ Deno.serve(async (request) => {
     }
 
     // Default: Fetch complete dashboard data with ALL columns for full editing
-    const [ordersResult, profilesResult, ticketsResult, productsResult, postsResult, promosResult, usersResult] = await Promise.all([
+    const [ordersResult, profilesResult, ticketsResult, productsResult, postsResult, promosResult, categoriesResult, usersResult] = await Promise.all([
       db.from('orders').select('*, products(id, title, slug, price, currency, cover_url)').order('created_at', { ascending: false }).limit(200),
       db.from('profiles').select('*').order('created_at', { ascending: false }).limit(200),
       db.from('tickets').select('*').order('created_at', { ascending: false }).limit(100),
       db.from('products').select('*').order('created_at', { ascending: false }).limit(200),
       db.from('blog_posts').select('*').order('created_at', { ascending: false }).limit(100),
       db.from('promo_codes').select('*').order('created_at', { ascending: false }).limit(100),
+      db.from('categories').select('*').order('sort_order').order('name').limit(100),
       db.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     ]);
 
     const orders = ordersResult.data || [];
     const paid = orders.filter((order) => order.status === 'paid');
-    const revenueByDay = Array.from({ length: 7 }, (_, index) => {
+    const revenueByDay = Array.from({ length: 30 }, (_, index) => {
       const date = new Date();
       date.setUTCHours(0, 0, 0, 0);
-      date.setUTCDate(date.getUTCDate() - (6 - index));
+      date.setUTCDate(date.getUTCDate() - (29 - index));
       const key = date.toISOString().slice(0, 10);
       return {
         date: key,
@@ -79,6 +80,28 @@ Deno.serve(async (request) => {
           .reduce((sum, order) => sum + Number(order.amount), 0),
       };
     });
+
+    const topProducts = [...new Map(paid.map((order) => [order.product_id, order])).keys()]
+      .map((productId) => {
+        const matching = paid.filter((order) => order.product_id === productId);
+        const product = (productsResult.data || []).find((item) => item.id === productId);
+        return {
+          id: productId,
+          title: product?.title || matching[0]?.products?.title || 'Unlisted product',
+          orders: matching.length,
+          revenue: matching.reduce((sum, order) => sum + Number(order.amount), 0),
+        };
+      })
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    const categoryStats = Array.from(new Set((productsResult.data || []).map((product) => product.category || 'General')))
+      .map((category) => {
+        const productIds = (productsResult.data || []).filter((product) => (product.category || 'General') === category).map((product) => product.id);
+        const matching = paid.filter((order) => productIds.includes(order.product_id));
+        return { category, products: productIds.length, revenue: matching.reduce((sum, order) => sum + Number(order.amount), 0) };
+      })
+      .sort((a, b) => b.revenue - a.revenue);
 
     const profilesMap = new Map((profilesResult.data || []).map((p) => [p.id, p]));
 
@@ -108,6 +131,8 @@ Deno.serve(async (request) => {
         activeProducts: (productsResult.data || []).filter((product) => product.is_published).length,
       },
       revenueByDay,
+      topProducts,
+      categoryStats,
       orders,
       profiles: profilesResult.data || [],
       users,
@@ -115,6 +140,7 @@ Deno.serve(async (request) => {
       products: productsResult.data || [],
       posts: postsResult.data || [],
       promos: promosResult.data || [],
+      categories: categoriesResult.data || [],
     });
   } catch (error) {
     return json({ error: String((error as Error)?.message || error) }, { status: 500 });

@@ -13,6 +13,20 @@ alter table public.products add column if not exists category text not null defa
 alter table public.products add column if not exists original_price numeric(12,2) check (original_price is null or original_price >= 0);
 alter table public.products add column if not exists gallery_urls text[];
 
+-- Categories are managed independently from products so merchandising teams can
+-- control the storefront taxonomy without editing application code.
+create table if not exists public.categories (
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null,
+  slug text unique not null,
+  description text,
+  image_url text,
+  is_active boolean not null default true,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade, full_name text not null, phone text, address text, gender text, country text, occupation text, age integer check(age is null or age between 13 and 120), role public.app_role not null default 'customer', created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
@@ -154,6 +168,7 @@ create trigger on_auth_user_created
   for each row execute procedure public.handle_new_user();
 
 alter table public.products enable row level security;
+alter table public.categories enable row level security;
 alter table public.profiles enable row level security;
 alter table public.orders enable row level security;
 alter table public.subscribers enable row level security;
@@ -331,6 +346,19 @@ with check (public.is_admin());
 
 create policy "admins manage promotion codes"
 on public.promo_codes
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "public read active categories"
+on public.categories
+for select
+to anon, authenticated
+using (is_active = true or public.is_admin());
+
+create policy "admins manage categories"
+on public.categories
 for all
 to authenticated
 using (public.is_admin())

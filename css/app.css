@@ -255,6 +255,22 @@ body {
   font-size: 2rem;
   font-weight: 900;
 }
+.metric small { display:block; margin-top:8px; color:#64748b; font-size:.75rem; font-weight:600; }
+.admin-screen { display:none; animation: page-enter .28s ease both; }
+.admin-screen.is-active { display:block; }
+.admin-screen-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; padding:4px 2px 0; }
+.admin-screen-heading h2 { margin:.3rem 0 0; color:#142c55; font-size:1.7rem; font-weight:900; letter-spacing:-.035em; }
+.admin-screen-heading p { max-width:630px; margin:.45rem 0 0; color:#64748b; font-size:.88rem; line-height:1.55; }
+.admin-period { display:grid; gap:5px; min-width:154px; color:#64748b; font-size:.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+.admin-period select { border:1px solid #dfe5ec; border-radius:10px; background:#fff; color:#142c55; padding:9px 11px; font-size:.82rem; font-weight:700; text-transform:none; letter-spacing:0; }
+.admin-insight { border:1px solid #dbeafe; border-radius:12px; background:#f8fbff; color:#31547b; padding:10px 13px; font-size:.75rem; font-weight:700; white-space:nowrap; }
+.admin-rank-list { display:grid; gap:12px; }
+.admin-rank-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; }
+.admin-rank-row strong { display:block; color:#1e365d; font-size:.82rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.admin-rank-row small { color:#718096; font-size:.7rem; }
+.admin-rank-value { color:#142c55; font-size:.78rem; font-weight:900; }
+.admin-rank-track { grid-column:1/-1; height:5px; overflow:hidden; border-radius:999px; background:#edf2f7; }
+.admin-rank-track span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#f97316,#fbbf24); }
 .admin-link {
   display: block;
   border-radius: 16px;
@@ -447,6 +463,9 @@ a:hover {
     bottom: 14px;
     width: calc(100vw - 28px);
   }
+  .admin-screen-heading { align-items:flex-start; flex-direction:column; }
+  .admin-period { width:100%; }
+  .admin-insight { white-space:normal; }
 }
 @media (min-width: 1024px) {
   .nav-links {
@@ -733,5 +752,4 @@ dialog[open].admin-modal-container {
   border-radius: 14px;
   padding: 16px;
 }
-
 

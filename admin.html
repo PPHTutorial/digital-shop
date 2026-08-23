@@ -16,12 +16,15 @@
           <span class="brand-mark">D</span>
           <span>DigiStore<small class="!text-slate-400">Control centre</small></span>
         </a>
-        <nav class="mt-7 flex gap-2 overflow-x-auto text-sm font-bold lg:grid">
+        <nav class="mt-7 flex gap-2 overflow-x-auto text-sm font-bold lg:grid" aria-label="Admin sections">
           <a class="admin-link active flex items-center gap-2" href="#overview"><i data-lucide="layout-dashboard" width="16" height="16"></i><span>Overview</span></a>
-          <a class="admin-link flex items-center gap-2" href="#customers"><i data-lucide="users" width="16" height="16"></i><span>Customers</span></a>
-          <a class="admin-link flex items-center gap-2" href="#transactions"><i data-lucide="credit-card" width="16" height="16"></i><span>Transactions</span></a>
           <a class="admin-link flex items-center gap-2" href="#products"><i data-lucide="package" width="16" height="16"></i><span>Catalog</span></a>
+          <a class="admin-link flex items-center gap-2" href="#categories"><i data-lucide="tags" width="16" height="16"></i><span>Categories</span></a>
+          <a class="admin-link flex items-center gap-2" href="#transactions"><i data-lucide="credit-card" width="16" height="16"></i><span>Orders</span></a>
+          <a class="admin-link flex items-center gap-2" href="#customers"><i data-lucide="users" width="16" height="16"></i><span>Customers</span></a>
+          <a class="admin-link flex items-center gap-2" href="#promotions"><i data-lucide="badge-percent" width="16" height="16"></i><span>Promotions</span></a>
           <a class="admin-link flex items-center gap-2" href="#content"><i data-lucide="file-text" width="16" height="16"></i><span>Content</span></a>
+          <a class="admin-link flex items-center gap-2" href="#automation"><i data-lucide="workflow" width="16" height="16"></i><span>Operations</span></a>
           <a class="admin-link flex items-center gap-2" href="#tickets"><i data-lucide="life-buoy" width="16" height="16"></i><span>Support</span></a>
         </nav>
       </div>
@@ -38,7 +41,7 @@
         <div class="shell flex items-center justify-between py-5">
           <div>
             <span class="eyebrow">DIGISTORE OPERATIONS</span>
-            <h1 class="mt-1 text-2xl font-black text-[#142c55]">Command centre</h1>
+            <h1 id="admin-page-title" class="mt-1 text-2xl font-black text-[#142c55]">Store overview</h1>
           </div>
           <div class="flex items-center gap-3">
             <span id="admin-user" class="hidden text-sm font-bold text-slate-500 sm:block"></span>
@@ -47,21 +50,25 @@
         </div>
       </header>
 
-      <div class="shell space-y-7 py-7">
+      <div class="shell py-7">
         <p id="admin-status" class="status-line"></p>
 
         <!-- Overview Section -->
-        <section id="overview" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div class="metric"><span>Total revenue</span><strong id="m-revenue">—</strong></div>
-          <div class="metric"><span>Paid orders</span><strong id="m-orders">—</strong></div>
-          <div class="metric"><span>Total customers</span><strong id="m-customers">—</strong></div>
-          <div class="metric"><span>Open tickets</span><strong id="m-tickets">—</strong></div>
-        </section>
-
-        <section class="grid gap-7 xl:grid-cols-[1.25fr_.75fr]">
+        <section id="overview" class="admin-screen space-y-6">
+          <div class="admin-screen-heading">
+            <div><span class="eyebrow">STORE PERFORMANCE</span><h2>Everything that needs your attention</h2><p>Commercial performance, demand and operational signals in one view.</p></div>
+            <label class="admin-period"><span>Revenue period</span><select id="revenue-period"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select></label>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="metric"><span>Total revenue</span><strong id="m-revenue">—</strong><small id="m-revenue-change">Across paid orders</small></div>
+            <div class="metric"><span>Paid orders</span><strong id="m-orders">—</strong><small id="m-aov">Average order —</small></div>
+            <div class="metric"><span>Total customers</span><strong id="m-customers">—</strong><small id="m-conversion">Customer base</small></div>
+            <div class="metric"><span>Open tickets</span><strong id="m-tickets">—</strong><small id="m-catalog">Catalog health</small></div>
+          </div>
+          <div class="grid gap-7 xl:grid-cols-[1.25fr_.75fr]">
           <div class="soft-panel p-6">
             <span class="eyebrow">REVENUE ANALYTICS</span>
-            <h2 class="mt-1 text-xl font-black text-[#142c55]">Seven-day revenue</h2>
+            <h2 class="mt-1 text-xl font-black text-[#142c55]">Revenue over time</h2>
             <div id="revenue-chart" class="mt-7 h-52"></div>
           </div>
           <div class="soft-panel p-6">
@@ -69,10 +76,17 @@
             <h2 class="mt-1 text-xl font-black text-[#142c55]">Operations snapshot</h2>
             <div id="operations-list" class="mt-5 grid gap-3"></div>
           </div>
+          </div>
+          <div class="grid gap-6 xl:grid-cols-2">
+            <div class="soft-panel p-6"><span class="eyebrow">BESTSELLERS</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Top earning products</h2><div id="top-products" class="mt-5"></div></div>
+            <div class="soft-panel p-6"><span class="eyebrow">MERCHANDISING</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Category performance</h2><div id="category-performance" class="mt-5"></div></div>
+          </div>
         </section>
 
         <!-- Customers Section -->
-        <section id="customers" class="soft-panel p-6">
+        <section id="customers" class="admin-screen space-y-6">
+          <div class="admin-screen-heading"><div><span class="eyebrow">CUSTOMERS &amp; USERS</span><h2>Customer relationships</h2><p>Keep customer profiles, account access and purchase history accurate.</p></div><div id="customers-insight" class="admin-insight"></div></div>
+          <div class="soft-panel p-6">
           <div class="flex items-center justify-between">
             <div>
               <span class="eyebrow">CUSTOMERS &amp; USERS</span>
@@ -80,42 +94,63 @@
             </div>
           </div>
           <div id="users-table" class="mt-5"></div>
+          </div>
         </section>
 
         <!-- Transactions Section -->
-        <section id="transactions" class="soft-panel p-6">
+        <section id="transactions" class="admin-screen space-y-6">
+          <div class="admin-screen-heading"><div><span class="eyebrow">TRANSACTIONS</span><h2>Orders and payments</h2><p>Review payment status, customer purchases and order trends.</p></div><div id="orders-insight" class="admin-insight"></div></div>
+          <div class="soft-panel p-6">
           <span class="eyebrow">TRANSACTIONS</span>
           <h2 class="mt-1 text-xl font-black text-[#142c55]">Orders and payments</h2>
           <div id="orders-status-summary" class="mt-3 flex flex-wrap gap-2 text-xs"></div>
           <div id="orders-filter-tabs" class="mt-3 flex flex-wrap gap-1.5"></div>
           <div id="orders-table" class="mt-4"></div>
+          </div>
         </section>
 
         <!-- Catalog & Products Section -->
-        <section id="products" class="soft-panel p-6">
+        <section id="products" class="admin-screen space-y-6">
+          <div class="admin-screen-heading"><div><span class="eyebrow">CATALOG</span><h2>Products and digital editions</h2><p>Publish, price, package and merchandise every product from one workspace.</p></div><button id="new-product" class="button button-primary">+ Add product</button></div>
+          <div class="soft-panel p-6">
           <div class="flex items-center justify-between gap-3">
             <div>
               <span class="eyebrow">CATALOG</span>
               <h2 class="mt-1 text-xl font-black text-[#142c55]">Products and digital editions</h2>
             </div>
-            <button id="new-product" class="button button-primary">+ Add product</button>
+            <span class="tag !bg-slate-100 !text-slate-600">Media-ready catalog</span>
           </div>
           <div id="products-table" class="mt-5"></div>
+          </div>
+        </section>
 
-          <div class="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
+        <section id="categories" class="admin-screen space-y-6">
+          <div class="admin-screen-heading"><div><span class="eyebrow">TAXONOMY</span><h2>Category management</h2><p>Shape storefront navigation and organize your catalog without code changes.</p></div><button id="new-category" class="button button-primary">+ Add category</button></div>
+          <div class="soft-panel p-6"><div id="categories-table"></div></div>
+        </section>
+
+        <section id="promotions" class="admin-screen space-y-6">
+          <div class="admin-screen-heading"><div><span class="eyebrow">DISCOUNTS</span><h2>Promotion codes</h2><p>Plan time-bound offers, redemptions and pricing incentives.</p></div><button id="new-promo" class="button button-primary">+ Add promotion</button></div>
+          <div class="soft-panel p-6">
+          <div class="flex items-center justify-between">
             <div>
               <span class="eyebrow">DISCOUNTS</span>
               <h3 class="mt-1 text-xl font-black text-[#142c55]">Promotion codes</h3>
             </div>
-            <button id="new-promo" class="button">+ Add promotion</button>
+            <span id="promos-insight" class="tag !bg-orange-50 !text-orange-700">Campaigns</span>
           </div>
           <div id="promos-table" class="mt-4"></div>
+          </div>
         </section>
 
         <!-- CMS Section -->
-        <section id="content" class="soft-panel p-6">
-          <span class="eyebrow">CMS &amp; JOURNAL</span>
-          <h2 class="mt-1 text-xl font-black text-[#142c55]">Store content &amp; blog</h2>
+        <section id="content" class="admin-screen space-y-6">
+          <div class="admin-screen-heading"><div><span class="eyebrow">CMS &amp; JOURNAL</span><h2>Content and store experience</h2><p>Maintain editorial content and customer-facing store information.</p></div><div id="content-insight" class="admin-insight"></div></div>
+          <div class="soft-panel p-6">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div><span class="eyebrow">CMS &amp; JOURNAL</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Store content &amp; blog</h2></div>
+            <div class="flex gap-2"><button id="new-post" class="button">New article</button><button id="run-daily-content" class="button button-primary">Generate draft</button></div>
+          </div>
           <div id="posts-table" class="mt-5"></div>
           
           <form id="cms-form" class="mt-7 grid gap-4 sm:grid-cols-2 border-t border-slate-100 pt-6">
@@ -135,13 +170,32 @@
               <button class="button button-primary">Save store settings</button>
             </div>
           </form>
+          </div>
+        </section>
+
+        <section id="automation" class="admin-screen space-y-6">
+          <div class="admin-screen-heading"><div><span class="eyebrow">AUTOMATION &amp; INDEXING</span><h2>Publishing operations</h2><p>Keep discovery and publishing workflows dependable.</p></div></div>
+          <div class="soft-panel p-6">
+          <span class="eyebrow">AUTOMATION &amp; INDEXING</span>
+          <h2 class="mt-1 text-xl font-black text-[#142c55]">Publishing operations</h2>
+          <div class="mt-5 grid gap-4 md:grid-cols-3">
+            <div class="rounded-xl border border-slate-200 p-4"><div class="flex items-center gap-2 text-[#142c55] font-black"><i data-lucide="calendar-clock" width="17" height="17"></i> Daily content</div><p class="mt-2 text-xs leading-5 text-slate-500">Scheduled task creates a draft from approved news sources. Review before publishing.</p><button id="run-daily-content-secondary" class="button mt-4 !min-h-9 !text-xs">Run now</button></div>
+            <div class="rounded-xl border border-slate-200 p-4"><div class="flex items-center gap-2 text-[#142c55] font-black"><i data-lucide="search-check" width="17" height="17"></i> Search index</div><p class="mt-2 text-xs leading-5 text-slate-500">Products and posts are queued automatically after changes.</p><button id="run-search-index" class="button mt-4 !min-h-9 !text-xs">Process queue</button></div>
+            <div class="rounded-xl border border-slate-200 p-4"><div class="flex items-center gap-2 text-[#142c55] font-black"><i data-lucide="map" width="17" height="17"></i> Sitemap</div><p class="mt-2 text-xs leading-5 text-slate-500">Public pages, products, and published posts are refreshed dynamically.</p><button id="refresh-sitemap" class="button mt-4 !min-h-9 !text-xs">Refresh sitemap</button></div>
+          </div>
+          <p id="automation-feedback" class="status-line mt-4"></p>
+          <p class="mt-4 text-xs leading-5 text-slate-500">Schedules and run history are managed securely in <a class="font-bold text-[#e86f18] underline" href="https://supabase.com/dashboard/project/synnepvvxpluoydkmphb/integrations/cron" target="_blank" rel="noopener">Supabase Cron</a>. Store the schedule credential in Vault; never put it in this dashboard or the frontend.</p>
+          </div>
         </section>
 
         <!-- Support Queue Section -->
-        <section id="tickets" class="soft-panel p-6">
+        <section id="tickets" class="admin-screen space-y-6">
+          <div class="admin-screen-heading"><div><span class="eyebrow">CUSTOMER CARE</span><h2>Support queue</h2><p>Resolve incoming issues and protect customer confidence.</p></div><div id="support-insight" class="admin-insight"></div></div>
+          <div class="soft-panel p-6">
           <span class="eyebrow">CUSTOMER CARE</span>
           <h2 class="mt-1 text-xl font-black text-[#142c55]">Support queue</h2>
           <div id="tickets-table" class="mt-5"></div>
+          </div>
         </section>
       </div>
     </main>

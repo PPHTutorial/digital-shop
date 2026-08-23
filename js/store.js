@@ -2,6 +2,7 @@ import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, toast } from './ui.js';
 
 let allProducts = [];
+let managedCategories = [];
 const params = new URLSearchParams(window.location.search);
 let activeCategory = params.get('category') || 'all';
 let activeSearchQuery = params.get('search') || '';
@@ -133,7 +134,8 @@ function renderPills() {
   const container = document.querySelector('#catalog-category-pills');
   if (!container) return;
 
-  const categories = ['all', 'Ebooks & Guides', 'Software & Tools', 'Templates & Themes', 'Online Courses', 'Audio & Media', 'Design & Graphics'];
+  const fallbackCategories = ['Ebooks & Guides', 'Software & Tools', 'Templates & Themes', 'Online Courses', 'Audio & Media', 'Design & Graphics'];
+  const categories = ['all', ...new Set([...managedCategories.map((category) => category.name), ...fallbackCategories, ...allProducts.map((product) => product.category || 'General')])];
 
   container.innerHTML = categories
     .map((cat) => {
@@ -201,11 +203,12 @@ async function init() {
 
   document.querySelector('#product-loading')?.classList.remove('hidden');
 
-  const { data, error } = await supabase
-    .from('products')
-    .select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published,created_at')
-    .eq('is_published', true)
-    .order('created_at', { ascending: false });
+  const [productsResult, categoriesResult] = await Promise.all([
+    supabase.from('products').select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published,created_at').eq('is_published', true).order('created_at', { ascending: false }),
+    supabase.from('categories').select('name,slug,description,sort_order').eq('is_active', true).order('sort_order').order('name'),
+  ]);
+  const { data, error } = productsResult;
+  managedCategories = categoriesResult.data || [];
 
   document.querySelector('#product-loading')?.classList.add('hidden');
 

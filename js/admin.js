@@ -1,4 +1,5 @@
 import { supabase } from './client.js';
+import { CONFIG } from './config.js';
 import { escapeHtml, finishPageLoader, getAccount, icon, renderIcons, setButtonLoading, toast } from './ui.js';
 
 let account, mode, editingId, dashboardData;
@@ -6,6 +7,23 @@ const modal = document.querySelector('#editor-modal');
 const detailsModal = document.querySelector('#details-modal');
 const imgModal = document.querySelector('#image-editor-modal');
 const cropCanvas = document.querySelector('#crop-canvas');
+
+const screenTitles = {
+  overview: 'Store overview', products: 'Catalog', categories: 'Categories', transactions: 'Orders',
+  customers: 'Customers', promotions: 'Promotions', content: 'Content', automation: 'Operations', tickets: 'Support',
+};
+
+function activateAdminScreen() {
+  const key = location.hash.replace('#', '') || 'overview';
+  const active = document.querySelector(`#${screenTitles[key] ? key : 'overview'}`);
+  document.querySelectorAll('.admin-screen').forEach((screen) => screen.classList.toggle('is-active', screen === active));
+  document.querySelectorAll('.admin-link').forEach((link) => link.classList.toggle('active', link.getAttribute('href') === `#${key}`));
+  const title = document.querySelector('#admin-page-title');
+  if (title) title.textContent = screenTitles[key] || screenTitles.overview;
+  window.scrollTo(0, 0);
+}
+
+window.addEventListener('hashchange', activateAdminScreen);
 
 // ============================================================
 // Slugify Helper
@@ -18,6 +36,15 @@ function slugify(text) {
     .replace(/[^a-z0-9-]/g, '')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
+}
+
+function categoryOptions(selected = 'General') {
+  const defaults = ['Ebooks & Guides', 'Software & Tools', 'Templates & Themes', 'Online Courses', 'Audio & Media', 'Design & Graphics', 'General'];
+  const managed = (dashboardData?.categories || []).map((category) => category.name);
+  return [...new Set([...managed, ...defaults, selected])]
+    .filter(Boolean)
+    .map((name) => `<option value="${escapeHtml(name)}" ${name === selected ? 'selected' : ''}>${escapeHtml(name)}</option>`)
+    .join('');
 }
 
 // ============================================================
@@ -189,6 +216,41 @@ function wireUploadZones() {
     });
   }
 
+  const galleryZone = document.querySelector('#gallery-upload-zone');
+  const galleryInput = document.querySelector('#gallery-file-input');
+  const galleryUrlsEl = document.querySelector('#gallery-urls-input');
+  const galleryPreview = document.querySelector('#gallery-preview-list');
+  const readGallery = () => (galleryUrlsEl?.value || '').split(',').map((url) => url.trim()).filter(Boolean);
+  const renderGallery = () => {
+    if (!galleryPreview) return;
+    const urls = readGallery();
+    galleryPreview.innerHTML = urls.length ? urls.map((url, index) => `
+      <div class="relative h-16 w-16 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+        <img src="${escapeHtml(url)}" alt="Gallery image ${index + 1}" class="h-full w-full object-cover">
+        <button type="button" class="absolute right-0 top-0 grid h-5 w-5 place-items-center rounded-bl bg-slate-900/70 text-xs font-bold text-white" data-remove-gallery="${index}" aria-label="Remove image">×</button>
+      </div>`).join('') : '<span class="text-xs text-slate-400">No supporting images yet.</span>';
+    galleryPreview.querySelectorAll('[data-remove-gallery]').forEach((button) => button.addEventListener('click', () => {
+      const urls = readGallery();
+      urls.splice(Number(button.dataset.removeGallery), 1);
+      galleryUrlsEl.value = urls.join(', ');
+      renderGallery();
+    }));
+  };
+  if (galleryZone && galleryInput) {
+    const handleGalleryFiles = (files) => Array.from(files || []).filter((file) => file.type.startsWith('image/')).slice(0, 1).forEach((file) => {
+      openImageEditor(file, (publicUrl) => {
+        galleryUrlsEl.value = [...readGallery(), publicUrl].join(', ');
+        renderGallery();
+      });
+    });
+    galleryZone.addEventListener('click', () => galleryInput.click());
+    galleryZone.addEventListener('dragover', (event) => { event.preventDefault(); galleryZone.classList.add('drag-over'); });
+    galleryZone.addEventListener('dragleave', () => galleryZone.classList.remove('drag-over'));
+    galleryZone.addEventListener('drop', (event) => { event.preventDefault(); galleryZone.classList.remove('drag-over'); handleGalleryFiles(event.dataTransfer.files); });
+    galleryInput.addEventListener('change', () => { handleGalleryFiles(galleryInput.files); galleryInput.value = ''; });
+    renderGallery();
+  }
+
   const fileZone = document.querySelector('#file-upload-zone');
   const fileInput = document.querySelector('#product-file-input');
   const filePathEl = document.querySelector('#file-path-input');
@@ -345,11 +407,23 @@ function renderPaginatedTable(containerSelector, dataList, heads, renderRow, pag
 
 function chart(points) {
   const max = Math.max(1, ...points.map((p) => p.revenue));
-  return `<div class="flex h-full items-end gap-2">${points.map((p) => `
-    <div class="flex flex-1 flex-col items-center gap-2">
-      <span class="text-xs font-bold">$${p.revenue.toFixed(0)}</span>
-      <div class="w-full rounded-t bg-orange-500" style="height:${Math.max(5, (p.revenue / max) * 150)}px"></div>
-      <small class="text-[10px] text-slate-400">${p.date.slice(5)}</small>
+  const stride = points.length > 12 ? 5 : 1;
+  return `<div class="flex h-full items-end gap-1.5">${points.map((p, index) => `
+    <div class="group flex flex-1 flex-col items-center justify-end gap-2 min-w-0" title="${p.date}: $${p.revenue.toFixed(2)}">
+      <span class="invisible group-hover:visible text-[10px] font-bold text-slate-600">$${p.revenue.toFixed(0)}</span>
+      <div class="w-full min-w-[4px] rounded-t bg-gradient-to-t from-orange-500 to-amber-400 transition-opacity group-hover:opacity-75" style="height:${Math.max(5, (p.revenue / max) * 150)}px"></div>
+      <small class="text-[9px] text-slate-400">${index % stride === 0 ? p.date.slice(5) : ''}</small>
+    </div>`).join('')}</div>`;
+}
+
+function renderRankList(items, valueKey, meta) {
+  if (!items?.length) return '<p class="text-sm text-slate-500">Data will appear after paid orders are recorded.</p>';
+  const max = Math.max(...items.map((item) => Number(item[valueKey]) || 0), 1);
+  return `<div class="admin-rank-list">${items.map((item) => `
+    <div class="admin-rank-row">
+      <div><strong>${escapeHtml(item.title || item.category)}</strong><small>${escapeHtml(meta(item))}</small></div>
+      <span class="admin-rank-value">$${Number(item[valueKey]).toFixed(2)}</span>
+      <div class="admin-rank-track"><span style="width:${Math.max(4, Number(item[valueKey]) / max * 100)}%"></span></div>
     </div>`).join('')}</div>`;
 }
 
@@ -373,16 +447,35 @@ async function load() {
   }
 
   dashboardData = data;
-  const { metrics, orders, users, tickets, products, promos, posts, revenueByDay } = data;
+  const { metrics, orders, users, tickets, products, promos, posts, categories = [], revenueByDay, topProducts = [], categoryStats = [] } = data;
 
   document.querySelector('#m-revenue').textContent = `$${metrics.revenue.toFixed(2)}`;
   document.querySelector('#m-orders').textContent = metrics.paidOrders;
   document.querySelector('#m-customers').textContent = metrics.customers;
   document.querySelector('#m-tickets').textContent = metrics.openTickets;
-  document.querySelector('#revenue-chart').innerHTML = chart(revenueByDay);
+  const averageOrder = metrics.paidOrders ? metrics.revenue / metrics.paidOrders : 0;
+  document.querySelector('#m-aov').textContent = `Average order $${averageOrder.toFixed(2)}`;
+  document.querySelector('#m-conversion').textContent = `${users.filter((u) => u.last_sign_in_at).length} signed in before`;
+  document.querySelector('#m-catalog').textContent = `${metrics.activeProducts} of ${products.length} products live`;
+  const renderRevenue = () => {
+    const days = Number(document.querySelector('#revenue-period')?.value || 30);
+    const selected = revenueByDay.slice(-days);
+    const total = selected.reduce((sum, item) => sum + Number(item.revenue), 0);
+    document.querySelector('#m-revenue-change').textContent = `$${total.toFixed(2)} in the selected period`;
+    document.querySelector('#revenue-chart').innerHTML = chart(selected);
+  };
+  document.querySelector('#revenue-period').onchange = renderRevenue;
+  renderRevenue();
   document.querySelector('#operations-list').innerHTML = `
-    <div class="metric !p-4"><span>Published products</span><strong>${metrics.activeProducts}</strong></div>
-    <div class="metric !p-4"><span>Support queue</span><strong>${metrics.openTickets}</strong></div>`;
+    <div class="metric !p-4"><span>Published products</span><strong>${metrics.activeProducts}</strong><small>${products.length - metrics.activeProducts} drafts remaining</small></div>
+    <div class="metric !p-4"><span>Support queue</span><strong>${metrics.openTickets}</strong><small>${tickets.filter((t) => t.status === 'pending').length} awaiting follow-up</small></div>`;
+  document.querySelector('#top-products').innerHTML = renderRankList(topProducts, 'revenue', (item) => `${item.orders} paid order${item.orders === 1 ? '' : 's'}`);
+  document.querySelector('#category-performance').innerHTML = renderRankList(categoryStats, 'revenue', (item) => `${item.products} product${item.products === 1 ? '' : 's'}`);
+  document.querySelector('#customers-insight').textContent = `${users.length} customer profile${users.length === 1 ? '' : 's'} on record`;
+  document.querySelector('#orders-insight').textContent = `${orders.filter((o) => o.status === 'paid').length} paid · ${orders.filter((o) => o.status === 'pending').length} pending`;
+  document.querySelector('#promos-insight').textContent = `${promos.filter((p) => p.is_active).length} active campaign${promos.filter((p) => p.is_active).length === 1 ? '' : 's'}`;
+  document.querySelector('#content-insight').textContent = `${posts.filter((p) => p.status === 'published').length} published article${posts.filter((p) => p.status === 'published').length === 1 ? '' : 's'}`;
+  document.querySelector('#support-insight').textContent = `${tickets.filter((t) => t.status !== 'closed').length} conversation${tickets.filter((t) => t.status !== 'closed').length === 1 ? '' : 's'} to resolve`;
 
   // 1. Customers & Users Management Table (Paginated)
   renderPaginatedTable(
@@ -580,7 +673,32 @@ async function load() {
     }
   );
 
-  // 4. Promo Codes Table (Paginated)
+  // 4. Category management is intentionally independent from products: editors
+  // can curate navigation before (or after) assigning products to it.
+  renderPaginatedTable(
+    '#categories-table',
+    categories,
+    ['Category', 'Storefront URL', 'Products', 'Visibility', 'Actions'],
+    (category) => {
+      const assigned = products.filter((product) => (product.category || 'General').toLowerCase() === category.name.toLowerCase()).length;
+      return `
+        <td class="px-3 py-3"><strong class="block text-slate-800">${escapeHtml(category.name)}</strong><span class="text-xs text-slate-500">${escapeHtml(category.description || 'No description')}</span></td>
+        <td class="px-3 py-3 text-xs font-mono text-slate-500">/${escapeHtml(category.slug)}</td>
+        <td class="px-3 py-3 text-xs font-bold">${assigned}</td>
+        <td class="px-3 py-3"><span class="tag text-[10px] ${category.is_active ? '!bg-green-100 !text-green-800' : '!bg-slate-100 !text-slate-600'}">${category.is_active ? 'Visible' : 'Hidden'}</span></td>
+        <td class="px-3 py-3"><div class="flex gap-2"><button class="button !min-h-8 !py-1 text-xs" data-edit-category="${escapeHtml(category.id)}">Edit</button><button class="button !min-h-8 !py-1 text-xs" data-toggle-category="${escapeHtml(category.id)}" data-active="${category.is_active}">${category.is_active ? 'Hide' : 'Show'}</button></div></td>`;
+    },
+    8,
+    (container) => {
+      container.querySelectorAll('[data-edit-category]').forEach((btn) => btn.addEventListener('click', () => openEditor('category', categories.find((item) => item.id === btn.dataset.editCategory))));
+      container.querySelectorAll('[data-toggle-category]').forEach((btn) => btn.addEventListener('click', async () => {
+        const { error } = await supabase.from('categories').update({ is_active: btn.dataset.active !== 'true' }).eq('id', btn.dataset.toggleCategory);
+        if (error) toast(error.message, 'error'); else { toast('Category visibility updated.'); load(); }
+      }));
+    }
+  );
+
+  // 5. Promo Codes Table (Paginated)
   renderPaginatedTable(
     '#promos-table',
     promos,
@@ -827,15 +945,15 @@ async function openEditor(type, existing = null) {
   mode = type;
   editingId = existing?.id ?? null;
 
-  document.querySelector('#editor-eyebrow').textContent = type === 'product' ? 'PRODUCT CATALOG' : 'PROMOTIONS';
+  document.querySelector('#editor-eyebrow').textContent = type === 'product' ? 'PRODUCT CATALOG' : type === 'post' ? 'JOURNAL CMS' : type === 'category' ? 'CATALOG TAXONOMY' : 'PROMOTIONS';
   document.querySelector('#editor-title').textContent =
-    type === 'product' ? (existing?.id ? 'Edit product details' : 'Add new product') : 'Add promotion code';
+    type === 'product' ? (existing?.id ? 'Edit product details' : 'Add new product') : type === 'post' ? (existing?.id ? 'Edit article' : 'Write article') : type === 'category' ? (existing?.id ? 'Edit category' : 'Add category') : 'Add promotion code';
 
   let full = existing || {};
 
   // Fetch 100% full fresh row from database so no fields are missing or truncated!
   if (editingId) {
-    const tableTarget = type === 'product' ? 'products' : 'promo_codes';
+    const tableTarget = type === 'product' ? 'products' : type === 'post' ? 'blog_posts' : type === 'category' ? 'categories' : 'promo_codes';
     const { data: fresh } = await supabase.from(tableTarget).select('*').eq('id', editingId).maybeSingle();
     if (fresh) full = fresh;
   }
@@ -861,13 +979,7 @@ async function openEditor(type, existing = null) {
           <div>
             <label class="label text-xs font-bold text-slate-700" for="product-category-input">Category *</label>
             <select class="field !mt-1" id="product-category-input" name="category">
-              <option value="Ebooks & Guides">Ebooks &amp; Guides</option>
-              <option value="Software & Tools">Software &amp; Tools</option>
-              <option value="Templates & Themes">Templates &amp; Themes</option>
-              <option value="Online Courses">Online Courses</option>
-              <option value="Audio & Media">Audio &amp; Media</option>
-              <option value="Design & Graphics">Design &amp; Graphics</option>
-              <option value="General">General</option>
+              ${categoryOptions()}
             </select>
           </div>
 
@@ -898,6 +1010,14 @@ async function openEditor(type, existing = null) {
               </div>
             </div>
             <input type="hidden" name="cover_url" id="cover-url-input" value="">
+          </div>
+
+          <div>
+            <label class="label text-xs font-bold text-slate-700">Product gallery</label>
+            <p class="help">Add supporting images one at a time. Each image uses the same crop and quality controls as the cover.</p>
+            <div class="mt-2 flex flex-wrap gap-2" id="gallery-preview-list"></div>
+            <div class="upload-zone mt-2 !p-3" id="gallery-upload-zone"><input type="file" id="gallery-file-input" accept="image/*" class="hidden"><span class="text-xs font-bold text-slate-700">Add gallery image</span></div>
+            <input type="hidden" name="gallery_urls" id="gallery-urls-input" value="">
           </div>
 
           <div>
@@ -964,15 +1084,9 @@ async function openEditor(type, existing = null) {
             </div>
 
             <div>
-              <label class="label text-xs" for="product-category-input">Category *</label>
-              <select class="field !mt-1" id="product-category-input" name="category">
-                <option value="Ebooks & Guides" ${currentCat === 'Ebooks & Guides' ? 'selected' : ''}>Ebooks &amp; Guides</option>
-                <option value="Software & Tools" ${currentCat === 'Software & Tools' ? 'selected' : ''}>Software &amp; Tools</option>
-                <option value="Templates & Themes" ${currentCat === 'Templates & Themes' ? 'selected' : ''}>Templates &amp; Themes</option>
-                <option value="Online Courses" ${currentCat === 'Online Courses' ? 'selected' : ''}>Online Courses</option>
-                <option value="Audio & Media" ${currentCat === 'Audio & Media' ? 'selected' : ''}>Audio &amp; Media</option>
-                <option value="Design & Graphics" ${currentCat === 'Design & Graphics' ? 'selected' : ''}>Design &amp; Graphics</option>
-                <option value="General" ${currentCat === 'General' ? 'selected' : ''}>General</option>
+            <label class="label text-xs" for="product-category-input">Category *</label>
+            <select class="field !mt-1" id="product-category-input" name="category">
+                ${categoryOptions(currentCat)}
               </select>
             </div>
           </div>
@@ -1021,8 +1135,11 @@ async function openEditor(type, existing = null) {
             <input type="hidden" name="cover_url" id="cover-url-input" value="${escapeHtml(full.cover_url ?? '')}">
 
             <div>
-              <label class="label text-xs">Additional Gallery Images (Comma-separated URLs)</label>
-              <input class="field text-xs !mt-1" name="gallery_urls" value="${escapeHtml(galleryVal)}" placeholder="https://…/image2.jpg, https://…/image3.jpg">
+              <label class="label text-xs">Product gallery</label>
+              <p class="help">Supporting images display as a product gallery at checkout. Add, crop and remove them here.</p>
+              <div class="mt-2 flex flex-wrap gap-2" id="gallery-preview-list"></div>
+              <div class="upload-zone mt-2 !p-3" id="gallery-upload-zone"><input type="file" id="gallery-file-input" accept="image/*" class="hidden"><span class="text-xs font-bold text-slate-700">Add gallery image</span></div>
+              <input type="hidden" name="gallery_urls" id="gallery-urls-input" value="${escapeHtml(galleryVal)}">
             </div>
           </div>
 
@@ -1149,6 +1266,27 @@ async function openEditor(type, existing = null) {
 
     renderIcons();
     setTimeout(wireUploadZones, 0);
+  } else if (type === 'post') {
+    document.querySelector('#editor-fields').innerHTML = `
+      <div><label class="label">Article title *</label><input id="post-title-input" class="field" name="title" value="${escapeHtml(full.title ?? '')}" required></div>
+      <div><label class="label">SEO slug *</label><input id="post-slug-input" class="field font-mono text-xs" name="slug" value="${escapeHtml(full.slug ?? '')}" required></div>
+      <div><label class="label">Excerpt</label><textarea class="field" name="excerpt" rows="2">${escapeHtml(full.excerpt ?? '')}</textarea></div>
+      <div><label class="label">Article content *</label><textarea class="field" name="content" rows="12" required>${escapeHtml(full.content ?? '')}</textarea></div>
+      <div class="grid grid-cols-2 gap-3"><label><span class="label">Cover image URL</span><input class="field" name="cover_url" value="${escapeHtml(full.cover_url ?? '')}"></label><label><span class="label">Source URL</span><input class="field" name="source_url" value="${escapeHtml(full.source_url ?? '')}"></label></div>
+      <label class="flex gap-2 text-sm font-bold"><input type="checkbox" name="published" ${full.status === 'published' ? 'checked' : ''}> Publish immediately</label>`;
+    const title = document.querySelector('#post-title-input'); const slug = document.querySelector('#post-slug-input');
+    title?.addEventListener('input', () => { if (!slug.dataset.edited) slug.value = slugify(title.value); }); slug?.addEventListener('input', () => { slug.dataset.edited = 'true'; });
+  } else if (type === 'category') {
+    document.querySelector('#editor-fields').innerHTML = `
+      <div class="form-section-card space-y-4">
+        <div><label class="label">Category name *</label><input id="category-name-input" class="field" name="name" value="${escapeHtml(full.name ?? '')}" placeholder="e.g. Business templates" required></div>
+        <div><label class="label">Storefront slug *</label><input id="category-slug-input" class="field font-mono text-xs" name="slug" value="${escapeHtml(full.slug ?? '')}" placeholder="business-templates" required></div>
+        <div><label class="label">Description</label><textarea class="field" name="description" rows="3" placeholder="A short customer-facing explanation">${escapeHtml(full.description ?? '')}</textarea></div>
+        <div class="grid gap-3 sm:grid-cols-2"><label><span class="label">Display order</span><input class="field" name="sort_order" type="number" min="0" value="${full.sort_order ?? 0}"></label><label class="flex items-end gap-2 pb-3 text-sm font-bold"><input type="checkbox" name="is_active" ${full.is_active !== false ? 'checked' : ''}> Show in the storefront</label></div>
+      </div>`;
+    const name = document.querySelector('#category-name-input'); const slug = document.querySelector('#category-slug-input');
+    name?.addEventListener('input', () => { if (!slug.dataset.edited) slug.value = slugify(name.value); });
+    slug?.addEventListener('input', () => { slug.dataset.edited = 'true'; });
   } else if (type === 'promo') {
     document.querySelector('#editor-fields').innerHTML = `
       <div>
@@ -1250,10 +1388,23 @@ document.querySelector('#editor-form').onsubmit = async (e) => {
     }
     if (!v.file_path) delete v.file_path;
     delete v[''];
+  } else if (mode === 'post') {
+    v.slug = slugify(v.slug || v.title);
+    v.status = e.currentTarget.elements.published.checked ? 'published' : 'draft';
+    v.published_at = v.status === 'published' ? new Date().toISOString() : null;
+    delete v.published;
   } else if (mode === 'promo') {
     v.code = v.code.toUpperCase().trim();
     v.discount_value = Number(v.discount_value);
     v.max_redemptions = v.max_redemptions ? parseInt(v.max_redemptions) : null;
+  } else if (mode === 'category') {
+    v.slug = slugify(v.slug || v.name);
+    v.sort_order = Number(v.sort_order || 0);
+    v.is_active = e.currentTarget.elements.is_active.checked;
+    if (!v.slug) {
+      toast('Please enter a category name or slug.', 'error');
+      return;
+    }
   }
 
   setButtonLoading(submitBtn, true, 'Saving…');
@@ -1262,6 +1413,14 @@ document.querySelector('#editor-form').onsubmit = async (e) => {
     ({ error } = await supabase.from('products').update(v).eq('id', editingId));
   } else if (mode === 'product') {
     ({ error } = await supabase.from('products').insert(v));
+  } else if (mode === 'post' && editingId) {
+    ({ error } = await supabase.from('blog_posts').update(v).eq('id', editingId));
+  } else if (mode === 'post') {
+    ({ error } = await supabase.from('blog_posts').insert(v));
+  } else if (mode === 'category' && editingId) {
+    ({ error } = await supabase.from('categories').update(v).eq('id', editingId));
+  } else if (mode === 'category') {
+    ({ error } = await supabase.from('categories').insert(v));
   } else {
     ({ error } = await supabase.from('promo_codes').insert(v));
   }
@@ -1273,7 +1432,7 @@ document.querySelector('#editor-form').onsubmit = async (e) => {
   }
 
   modal.close();
-  toast(editingId ? 'Product updated successfully.' : 'Product created successfully.');
+  toast(mode === 'category' ? `Category ${editingId ? 'updated' : 'created'} successfully.` : editingId ? 'Changes saved successfully.' : 'Record created successfully.');
 
   // Automatically refresh sitemap on product changes
   supabase.functions.invoke('sitemap').catch(() => {});
@@ -1291,6 +1450,28 @@ document.querySelector('#new-promo')?.addEventListener('click', (e) => {
   e.preventDefault();
   openEditor('promo');
 });
+
+document.querySelector('#new-category')?.addEventListener('click', () => openEditor('category'));
+document.querySelector('#new-post')?.addEventListener('click', () => openEditor('post'));
+
+async function runAutomation(functionName, button) {
+  const feedback = document.querySelector('#automation-feedback');
+  setButtonLoading(button, true, 'Running…');
+  if (functionName === 'sitemap') {
+    window.open(`${CONFIG.PAYMENT_FUNCTIONS_BASE}/sitemap`, '_blank', 'noopener');
+    setButtonLoading(button, false);
+    feedback.textContent = 'The live dynamic sitemap opened in a new tab.';
+    feedback.className = 'status-line success mt-4';
+    return;
+  }
+  const { data, error } = await supabase.functions.invoke(functionName);
+  setButtonLoading(button, false);
+  if (error || data?.error) { feedback.textContent = data?.error || error?.message || 'Automation failed.'; feedback.className = 'status-line error mt-4'; return; }
+  feedback.textContent = `${functionName.replace('-', ' ')} completed.`; feedback.className = 'status-line success mt-4'; toast('Automation completed.'); load();
+}
+document.querySelectorAll('#run-daily-content, #run-daily-content-secondary').forEach((button) => button?.addEventListener('click', () => runAutomation('daily-content', button)));
+document.querySelector('#run-search-index')?.addEventListener('click', (event) => runAutomation('search-index', event.currentTarget));
+document.querySelector('#refresh-sitemap')?.addEventListener('click', (event) => runAutomation('sitemap', event.currentTarget));
 
 document.querySelector('#close-modal')?.addEventListener('click', () => modal?.close());
 document.querySelector('#cancel-modal-btn')?.addEventListener('click', () => modal?.close());
@@ -1330,8 +1511,8 @@ document.querySelector('#cms-form')?.addEventListener('submit', async (e) => {
   toast(error ? error.message : 'Content saved.', error ? 'error' : 'success');
 });
 
+activateAdminScreen();
 load().catch((err) => {
   console.error('Admin initialization error:', err);
   finishPageLoader();
 });
-  

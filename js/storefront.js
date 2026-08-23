@@ -2,6 +2,20 @@ import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 
 let allProducts = [];
+let managedCategories = [];
+
+function renderQuickCategories() {
+  const nav = document.querySelector('#quick-category-nav');
+  if (!nav) return;
+  const categories = managedCategories.length ? managedCategories : [
+    { name: 'Ebooks & Guides' }, { name: 'Software & Tools' }, { name: 'Templates & Themes' },
+    { name: 'Online Courses' }, { name: 'Audio & Media' }, { name: 'Design & Graphics' },
+  ];
+  nav.innerHTML = `
+    <a href="./store.html" class="quick-nav-pill rounded-full bg-[#142c55] text-white px-4 py-1.5 transition">All Products</a>
+    ${categories.slice(0, 7).map((category) => `<a href="./store.html?category=${encodeURIComponent(category.name)}" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">${escapeHtml(category.name)}</a>`).join('')}
+    <a href="./store.html" class="ml-auto text-orange-600 font-bold hover:underline inline-flex items-center gap-1"><span>Explore Full Catalog</span><i data-lucide="arrow-right" width="13" height="13"></i></a>`;
+}
 
 // ============================================================
 // Single Product Card HTML Generator
@@ -179,11 +193,12 @@ async function load() {
   mountFooter();
 
   try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published,created_at')
-      .eq('is_published', true)
-      .order('created_at', { ascending: false });
+    const [productsResult, categoriesResult] = await Promise.all([
+      supabase.from('products').select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published,created_at').eq('is_published', true).order('created_at', { ascending: false }),
+      supabase.from('categories').select('name,slug,description,sort_order').eq('is_active', true).order('sort_order').order('name'),
+    ]);
+    const { data, error } = productsResult;
+    managedCategories = categoriesResult.data || [];
 
     if (error) {
       console.error('Error loading products:', error);
@@ -194,6 +209,7 @@ async function load() {
     console.error('Fetch error:', err);
   }
 
+  renderQuickCategories();
   renderShowcaseSections();
   renderIcons();
   finishPageLoader();

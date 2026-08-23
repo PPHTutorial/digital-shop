@@ -224,7 +224,7 @@ async function load() {
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
   let query = supabase
     .from('products')
-    .select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published');
+    .select('id,title,slug,category,description,price,original_price,currency,cover_url,gallery_urls,is_published');
 
   if (isUUID) {
     query = query.eq('id', productId);
@@ -269,7 +269,7 @@ async function load() {
 
   // Left Column
   document.querySelector('#product-title').textContent = data.title;
-  setupImageGallery(data.cover_url);
+  setupImageGallery(data.cover_url, data.gallery_urls || []);
   setupDescription(data.description, data.title);
 
   // Category Tag

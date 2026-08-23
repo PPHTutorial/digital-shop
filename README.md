@@ -82,6 +82,10 @@ Use PowerShell from the repository root:
 
 The script logs into and links Supabase, securely prompts for the required server secrets, creates the first tracked migration from `supabase/schema.sql` when required, previews then applies database migrations, deploys every Edge Function, and commits/pushes the static site to GitHub. It never stores prompted secrets in the repository. Configure GitHub Pages once to deploy from the root of `main`; thereafter each script run pushes the frontend update.
 
+## Scheduled publishing and search indexing
+
+Use **Supabase Dashboard → Integrations → Cron** to create and monitor schedules; the admin dashboard links directly to that page. Keep `CRON_SECRET` in Supabase Vault and use it only in the scheduled request, never in browser code. Schedule `daily-content` once per day and `search-index` every 5–15 minutes according to catalog activity. Supabase Cron uses `pg_cron` and can invoke Edge Functions using `pg_net`; the official guide shows the current Vault-based configuration pattern: [Scheduling Edge Functions](https://supabase.com/docs/guides/functions/schedule-functions). Authenticated admins may also run either operation on demand from the Admin → Publishing operations panel.
+
 ## Data minimization
 
 The requested form includes age, gender, occupation, and address. Those fields are included in the prototype, but they should be retained only when they serve a real business/compliance purpose. Do not send them to payment gateways unless actually needed.
