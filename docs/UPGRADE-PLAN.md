@@ -63,14 +63,34 @@ Replacing the generated-looking surface with a designed one:
 - [x] store.html + store.js (server-side search & facets)
 - [x] product.html + product.js (new PDP, reviews, wishlist)
 - [x] checkout.html + checkout.js (server-priced orders)
-- [ ] auth.html, account.html, success.html, support.html, blog.html,
-      post.html, legal.html, about.html, contact.html
-- [ ] admin.html + js/admin/*
+- [x] auth.html + js/auth.js, account.html + js/account.js
+- [x] about.html + js/about.js (reads the CMS `page`/`about` document)
+- [x] contact.html (static — no CMS document seeded for it)
+- [x] success.html + js/success.js (order-status polling, restyled)
+- [x] support.html + js/support.js (ticket form + CMS-driven FAQ)
+- [x] blog.html + js/blog.js (reads published CMS `post` documents)
+- [x] admin.html + js/admin.js — rebuilt on the console shell shared with
+      the studio. Scope narrowed deliberately: catalog/categories/
+      promotions/content moved to the studio, which already owns real
+      drafts and revisions for that data. The console now covers
+      dashboard analytics (admin_overview RPC, no more fake client-side
+      transactions), orders, customers (aggregated from orders — no
+      separate customer API exists), tickets, and site settings.
+- [ ] post.html, legal.html — no detail page/route exists yet for CMS
+      `post` and `legal` documents; the journal index and footer link to
+      them but nothing renders them yet
 - [ ] Edge Functions: server-side FX in create-flutterwave-payment,
-      download audit + multi-item in download-book
+      download audit + multi-item in download-book. `admin-dashboard` and
+      `daily-content` are now unused by the frontend (superseded by RLS +
+      admin_overview, and by the studio's editorial workflow respectively)
+      and are candidates for removal rather than migration.
 - [ ] .github/workflows/deploy.yml
 - [ ] tests/unit + tests/integration
 - [ ] README rewrite
+
+All 114 project files pass `npm run check` (JS, HTML, migrations, edge
+functions, and the design-rule lint that forbids the Tailwind CDN, pill
+radii, font-black, gradients, glow shadows, and emoji).
 
 
 ## Security fixes folded into this work
