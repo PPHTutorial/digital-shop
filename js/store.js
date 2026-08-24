@@ -202,6 +202,69 @@ function renderPills() {
   });
 }
 
+/**
+ * Renders one seller's public store. Returns false when the slug does not
+ * resolve, so the caller can fall back to the normal catalog.
+ */
+async function renderVendorStore(slug) {
+  const { data, error } = await supabase.rpc('vendor_storefront', { p_slug: slug });
+  const vendor = data?.vendor;
+
+  if (error || !vendor) {
+    document.querySelector('#product-loading')?.classList.add('hidden');
+    grid.innerHTML = `
+      <div class="soft-panel col-span-full p-10 text-center">
+        <p class="font-bold text-[#142c55]">That store could not be found.</p>
+        <p class="mt-1 text-sm text-slate-500">It may have been closed or renamed.</p>
+        <a class="button button-primary mt-4" href="./store.html">Browse all products</a>
+      </div>`;
+    finishPageLoader();
+    return true;
+  }
+
+  const products = data.products || [];
+
+  document.querySelector('#vendor-header').classList.remove('hidden');
+  document.querySelector('#store-header').classList.add('hidden');
+  document.querySelector('#vendor-title').textContent = vendor.display_name;
+  document.querySelector('#vendor-logo').innerHTML = vendor.logo_url
+    ? `<img src="${escapeHtml(vendor.logo_url)}" alt="" class="h-full w-full object-cover">`
+    : escapeHtml((vendor.display_name || '?').charAt(0).toUpperCase());
+  if (vendor.banner_url) {
+    document.querySelector('#vendor-banner').style.cssText =
+      `background-image:url('${encodeURI(vendor.banner_url)}');background-size:cover;background-position:center`;
+  }
+
+  const since = vendor.approved_at
+    ? new Date(vendor.approved_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    : null;
+  document.querySelector('#vendor-meta').textContent = [
+    `${products.length} product${products.length === 1 ? '' : 's'}`,
+    vendor.total_sales_count ? `${vendor.total_sales_count} sold` : null,
+    since ? `Selling since ${since}` : null,
+  ].filter(Boolean).join(' · ');
+
+  const bio = document.querySelector('#vendor-bio');
+  bio.textContent = vendor.bio || '';
+  bio.classList.toggle('hidden', !vendor.bio);
+
+  document.title = `${vendor.display_name} | DigiStore`;
+  document.querySelector('#product-loading')?.classList.add('hidden');
+  document.querySelector('#catalog-category-pills')?.closest('.bg-white')?.classList.add('hidden');
+
+  grid.innerHTML = products.length
+    ? products.map(createCardHtml).join('')
+    : '<div class="soft-panel col-span-full p-10 text-center text-slate-500">This store has not published anything yet.</div>';
+
+  const count = document.querySelector('#product-count');
+  if (count) count.textContent = `${products.length} product${products.length === 1 ? '' : 's'}`;
+
+  renderIcons();
+  wireShareButtons();
+  finishPageLoader();
+  return true;
+}
+
 function wireShareButtons() {
   document.querySelectorAll('.share-product-btn').forEach((btn) => {
     btn.onclick = async (e) => {
@@ -243,6 +306,13 @@ async function init() {
   });
 
   document.querySelector('#product-loading')?.classList.remove('hidden');
+
+  // A ?vendor=<slug> link shows that seller's store instead of the full catalog.
+  const vendorSlug = params.get('vendor');
+  if (vendorSlug) {
+    const shown = await renderVendorStore(vendorSlug);
+    if (shown) return;
+  }
 
   const [productsResult, categoriesResult] = await Promise.all([
     supabase.from('products').select('id,title,slug,category,description,short_description,price,original_price,currency,cover_url,file_type,file_size_bytes,purchase_count,rating_sum,rating_count,is_featured,is_published,created_at').eq('is_published', true).order('created_at', { ascending: false }),

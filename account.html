@@ -26,8 +26,26 @@
         <h1 id="account-title" class="mt-2 text-3xl font-black text-[#142c55]">Your dashboard</h1>
         <p id="account-subtitle" class="mt-2 text-slate-600">Loading your account activity…</p>
       </div>
-      <button id="edit-profile" class="button">Edit profile</button>
+      <div class="flex flex-wrap items-center gap-3">
+        <a id="seller-link" class="button hidden" href="./vendor.html"></a>
+        <button id="edit-profile" class="button">Edit profile</button>
+      </div>
     </div>
+
+    <!-- Seller invitation — replaced by a dashboard link once they sell -->
+    <section id="sell-cta" class="soft-panel mt-7 hidden p-6">
+      <div class="flex flex-wrap items-center justify-between gap-5">
+        <div class="max-w-xl">
+          <span class="eyebrow">EARN ON DIGISTORE</span>
+          <h2 class="mt-1 text-xl font-black text-[#142c55]">Sell your own digital products</h2>
+          <p class="mt-2 text-sm leading-relaxed text-slate-600">
+            Open a store, publish your work, and get paid to your bank or mobile money account.
+            We handle checkout, payment verification, and secure delivery.
+          </p>
+        </div>
+        <a class="button button-primary shrink-0" href="./vendor.html">Start selling</a>
+      </div>
+    </section>
 
     <!-- Account Metrics — Only PAID orders count -->
     <section class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

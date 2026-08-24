@@ -135,6 +135,18 @@ async function load() {
     ? new Date(profile.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
     : '—';
 
+  // Selling: show the invitation, or a shortcut straight to the seller centre.
+  const { data: vendorRow } = await supabase
+    .from('vendors').select('display_name,status').eq('user_id', user.id).maybeSingle();
+
+  if (vendorRow) {
+    const link = document.querySelector('#seller-link');
+    link.textContent = vendorRow.status === 'approved' ? 'Seller centre' : 'Seller application';
+    link.classList.remove('hidden');
+  } else {
+    document.querySelector('#sell-cta')?.classList.remove('hidden');
+  }
+
   document.querySelector('#activity-chart').innerHTML = activityChart(all);
   ordersAll = all;
   ordersPage = 1;
