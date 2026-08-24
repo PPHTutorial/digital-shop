@@ -16,43 +16,86 @@ const loadMoreBtn = document.querySelector('#load-more-btn');
 const searchInput = document.querySelector('#store-search-input');
 const sortSelect = document.querySelector('#store-sort-select');
 
+/** Human-readable file size, e.g. "2.4 MB". */
+function formatFileSize(bytes) {
+  const size = Number(bytes);
+  if (!size || size <= 0) return '';
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(size < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+}
+
+/**
+ * The small facts row under the title. Each entry only appears when the
+ * product actually carries that data, so the row never renders half-empty.
+ */
+function cardMetaHtml(p) {
+  const bits = [];
+
+  if (Number(p.rating_count) > 0) {
+    const average = (Number(p.rating_sum) / Number(p.rating_count)).toFixed(1);
+    bits.push(
+      `<span class="catalog-card__meta-item catalog-card__rating">
+         <i data-lucide="star" width="12" height="12"></i>${average}
+         <span class="text-slate-400 font-semibold">(${Number(p.rating_count)})</span>
+       </span>`
+    );
+  }
+
+  if (p.file_type) {
+    bits.push(`<span class="catalog-card__meta-item">${escapeHtml(String(p.file_type).toUpperCase())}</span>`);
+  }
+
+  const size = formatFileSize(p.file_size_bytes);
+  if (size) bits.push(`<span class="catalog-card__meta-item">${size}</span>`);
+
+  if (Number(p.purchase_count) > 0) {
+    const count = Number(p.purchase_count);
+    bits.push(`<span class="catalog-card__meta-item">${count.toLocaleString()} sold</span>`);
+  }
+
+  if (!bits.length) return '';
+  return `<div class="catalog-card__meta">${bits.join('<span class="catalog-card__meta-dot">·</span>')}</div>`;
+}
+
 function createCardHtml(p) {
   const hasDiscount = p.original_price && Number(p.original_price) > Number(p.price);
   const discountPct = hasDiscount ? Math.round((1 - Number(p.price) / Number(p.original_price)) * 100) : 0;
-  const priceHtml = hasDiscount
-    ? `<div>
-         <span class="price-original text-xs">${p.currency} ${Number(p.original_price).toFixed(2)}</span>
-         <strong class="block text-lg sm:text-xl text-[#142c55] font-black leading-tight">${p.currency} ${Number(p.price).toFixed(2)}</strong>
-       </div>`
-    : `<strong class="block text-lg sm:text-xl text-[#142c55] font-black leading-tight">${p.currency} ${Number(p.price).toFixed(2)}</strong>`;
+  const href = `./checkout.html?product=${encodeURIComponent(p.slug || p.id)}`;
+  const blurb = p.short_description || p.description || '';
 
   return `
-    <article class="catalog-card flex flex-col justify-between">
-      <div>
-        <a href="./checkout.html?product=${encodeURIComponent(p.slug || p.id)}" class="block relative overflow-hidden bg-slate-100 group">
-          ${
-            p.cover_url
-              ? `<img src="${escapeHtml(p.cover_url)}" alt="${escapeHtml(p.title)}" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy">`
-              : `<div class="w-full h-full aspect-[4/3] flex items-center justify-center text-slate-400 bg-slate-100 font-semibold text-xs">Digital Product</div>`
-          }
-          <div class="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
-            <span class="tag !text-[10px] !py-0.5 !px-2 font-bold shadow-sm">${escapeHtml(p.category || 'General')}</span>
-            ${hasDiscount ? `<span class="discount-pill shadow-sm">${discountPct}% OFF</span>` : ''}
-          </div>
-        </a>
-        <button type="button" class="catalog-card__wish share-product-btn" data-share-url="${encodeURIComponent(p.slug || p.id)}" title="Share product link" aria-label="Share this product">
-          <i data-lucide="share-2" width="14" height="14"></i>
-        </button>
-        <div class="card-body">
-          <h3 class="text-base font-black text-[#142c55] leading-snug line-clamp-2 hover:text-orange-600 transition">
-            <a href="./checkout.html?product=${encodeURIComponent(p.slug || p.id)}">${escapeHtml(p.title)}</a>
-          </h3>
-          <p class="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">${escapeHtml(p.description || '')}</p>
-        </div>
+    <article class="catalog-card">
+      <a href="${href}" class="catalog-card__media" aria-label="${escapeHtml(p.title)}">
+        ${
+          p.cover_url
+            ? `<img src="${escapeHtml(p.cover_url)}" alt="${escapeHtml(p.title)}" loading="lazy">`
+            : `<span class="catalog-card__placeholder"><i data-lucide="file-text" width="26" height="26"></i></span>`
+        }
+        <span class="catalog-card__badges">
+          ${p.is_featured ? `<span class="catalog-card__badge catalog-card__badge--featured">Featured</span>` : ''}
+          ${hasDiscount ? `<span class="catalog-card__badge catalog-card__badge--sale">−${discountPct}%</span>` : ''}
+        </span>
+      </a>
+
+      <button type="button" class="catalog-card__share share-product-btn" data-share-url="${encodeURIComponent(p.slug || p.id)}" title="Share product link" aria-label="Share this product">
+        <i data-lucide="share-2" width="14" height="14"></i>
+      </button>
+
+      <div class="catalog-card__body">
+        <span class="catalog-card__cat">${escapeHtml(p.category || 'General')}</span>
+        <h3 class="catalog-card__title"><a href="${href}">${escapeHtml(p.title)}</a></h3>
+        ${blurb ? `<p class="catalog-card__blurb">${escapeHtml(blurb)}</p>` : ''}
+        ${cardMetaHtml(p)}
       </div>
+
       <div class="catalog-card__foot">
-        ${priceHtml}
-        <a class="button button-primary !min-h-9 !px-4 !text-xs font-bold whitespace-nowrap" href="./checkout.html?product=${encodeURIComponent(p.slug || p.id)}">Get product</a>
+        <div class="catalog-card__price">
+          ${hasDiscount ? `<span class="price-original">${p.currency} ${Number(p.original_price).toFixed(2)}</span>` : ''}
+          <strong>${p.currency} ${Number(p.price).toFixed(2)}</strong>
+        </div>
+        <a class="catalog-card__cta" href="${href}">
+          Get product<i data-lucide="arrow-right" width="14" height="14"></i>
+        </a>
       </div>
     </article>`;
 }
@@ -202,7 +245,7 @@ async function init() {
   document.querySelector('#product-loading')?.classList.remove('hidden');
 
   const [productsResult, categoriesResult] = await Promise.all([
-    supabase.from('products').select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published,created_at').eq('is_published', true).order('created_at', { ascending: false }),
+    supabase.from('products').select('id,title,slug,category,description,short_description,price,original_price,currency,cover_url,file_type,file_size_bytes,purchase_count,rating_sum,rating_count,is_featured,is_published,created_at').eq('is_published', true).order('created_at', { ascending: false }),
     supabase.from('categories').select('name,slug,description,sort_order').eq('is_active', true).order('sort_order').order('name'),
   ]);
   const { data, error } = productsResult;

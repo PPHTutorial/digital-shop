@@ -26,6 +26,34 @@ function activateAdminScreen() {
 window.addEventListener('hashchange', activateAdminScreen);
 
 // ============================================================
+// Mobile navigation drawer
+// ============================================================
+function setAdminDrawer(open) {
+  const sidebar = document.querySelector('#admin-sidebar');
+  const scrim = document.querySelector('#admin-scrim');
+  const button = document.querySelector('#admin-menu-button');
+  if (!sidebar || !scrim) return;
+
+  sidebar.classList.toggle('is-open', open);
+  scrim.classList.toggle('is-open', open);
+  scrim.hidden = !open;
+  button?.setAttribute('aria-expanded', String(open));
+  document.body.style.overflow = open ? 'hidden' : '';
+  if (open) sidebar.querySelector('.admin-link')?.focus();
+}
+
+document.querySelector('#admin-menu-button')?.addEventListener('click', () => setAdminDrawer(true));
+document.querySelector('#admin-menu-close')?.addEventListener('click', () => setAdminDrawer(false));
+document.querySelector('#admin-scrim')?.addEventListener('click', () => setAdminDrawer(false));
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') setAdminDrawer(false);
+});
+// Choosing a section closes the drawer, so the content is visible straight away.
+document.querySelectorAll('.admin-link').forEach((link) => {
+  link.addEventListener('click', () => setAdminDrawer(false));
+});
+
+// ============================================================
 // Slugify Helper
 // ============================================================
 function slugify(text) {
