@@ -4,35 +4,45 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Order Status | DigiStore</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="./css/app.css">
+  <meta name="robots" content="noindex">
+  <title>Order status · DigiStore</title>
+  <script>
+    try {
+      var t = localStorage.getItem('digistore.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+    } catch (e) { /* private mode */ }
+  </script>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+  <link rel="stylesheet" href="./css/app.css?v=a4e69dd6">
 </head>
 
-<body class="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
-  <div id="page-loader" class="page-loader">
-    <div class="loader-card">
-      <div class="shimmer logo"></div>
-      <div class="shimmer hero"></div>
-      <div class="shimmer short"></div>
-    </div>
+<body class="page">
+  <div id="boot" class="boot">
+    <span class="boot__mark">DigiStore</span>
+    <div class="progress boot__bar"></div>
   </div>
 
-  <header id="site-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur shadow-sm"></header>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header id="site-header"></header>
 
-  <main class="shell flex-1 flex items-center justify-center py-12 sm:py-16">
-    <section class="soft-panel w-full max-w-2xl p-8 text-center sm:p-12 bg-white rounded-3xl border border-slate-200 shadow-md">
-      <div id="status-icon-container" class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-2xl font-black text-slate-700">
-        <span id="status-icon">…</span>
+  <main id="main" class="container container--narrow page__body flex justify-center items-start">
+    <section class="panel" style="width: 100%">
+      <div class="panel__body stack-4 center" style="padding: var(--s-9)">
+        <span id="status-icon"></span>
+        <div>
+          <span id="status-eyebrow" class="eyebrow">Transaction status</span>
+          <h1 id="status-title" class="mt-2" style="font-size: var(--t-26)">Checking your order…</h1>
+          <p id="status-copy" class="t-13 muted mt-2" style="max-width: 44ch; margin-inline: auto">
+            Please hold on while we verify your transaction status.
+          </p>
+        </div>
+        <div id="download-area" class="mt-2"></div>
       </div>
-      <span id="status-eyebrow" class="eyebrow mt-6">TRANSACTION STATUS</span>
-      <h1 id="status-title" class="mt-2 text-3xl sm:text-4xl font-black tracking-tight text-[#142c55]">Checking your order…</h1>
-      <p id="status-copy" class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-slate-600">Please hold on while we verify your transaction status.</p>
-      <div id="download-area" class="mt-8"></div>
-      <p class="mt-8 text-xs leading-5 text-slate-400 border-t border-slate-100 pt-6">
-        Need assistance with your purchase? <a class="font-bold text-slate-900 hover:underline" href="./support.html">Contact DigiStore Support</a>.
-      </p>
+      <div class="panel__foot center" style="justify-content: center">
+        <span>Need assistance with your purchase? <a href="./support.html">Contact DigiStore support</a>.</span>
+      </div>
     </section>
   </main>
 
