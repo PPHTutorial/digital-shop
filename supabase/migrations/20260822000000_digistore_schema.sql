@@ -1,20 +1,44 @@
+-- =========================
+-- Extensions / Types
+-- =========================
 create extension if not exists pgcrypto;
 create extension if not exists citext;
 
-do $$ begin create type public.app_role as enum ('customer','admin'); exception when duplicate_object then null; end $$;
-do $$ begin create type public.order_status as enum ('pending','paid','failed','refunded','cancelled'); exception when duplicate_object then null; end $$;
-do $$ begin create type public.ticket_status as enum ('open','pending','closed'); exception when duplicate_object then null; end $$;
+do $$ begin
+  create type public.app_role as enum ('customer','admin');
+exception when duplicate_object then null; end $$;
 
+do $$ begin
+  create type public.order_status as enum ('pending','paid','failed','refunded','cancelled');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type public.ticket_status as enum ('open','pending','closed');
+exception when duplicate_object then null; end $$;
+
+
+-- =========================
+-- Tables / Columns
+-- =========================
 create table if not exists public.products (
-  id uuid primary key default gen_random_uuid(), slug text unique not null, title text not null, category text not null default 'General', description text, price numeric(12,2) not null check (price >= 0), currency text not null default 'USD', cover_url text, file_path text not null, is_published boolean not null default false, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  title text not null,
+  category text not null default 'General',
+  description text,
+  price numeric(12,2) not null check (price >= 0),
+  currency text not null default 'USD',
+  cover_url text,
+  file_path text not null,
+  is_published boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 alter table public.products add column if not exists category text not null default 'General';
 alter table public.products add column if not exists original_price numeric(12,2) check (original_price is null or original_price >= 0);
 alter table public.products add column if not exists gallery_urls text[];
 
--- Categories are managed independently from products so merchandising teams can
--- control the storefront taxonomy without editing application code.
 create table if not exists public.categories (
   id uuid primary key default gen_random_uuid(),
   name text unique not null,
@@ -28,7 +52,17 @@ create table if not exists public.categories (
 );
 
 create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade, full_name text not null, phone text, address text, gender text, country text, occupation text, age integer check(age is null or age between 13 and 120), role public.app_role not null default 'customer', created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+  id uuid primary key references auth.users(id) on delete cascade,
+  full_name text not null,
+  phone text,
+  address text,
+  gender text,
+  country text,
+  occupation text,
+  age integer check (age is null or age between 13 and 120),
+  role public.app_role not null default 'customer',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.orders (
@@ -63,22 +97,6 @@ create table if not exists public.promo_codes (
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
-
-create or replace function public.quote_promo(p_code text, p_product_id uuid)
-returns table(valid boolean, code text, discount_amount numeric, message text)
-language plpgsql
-security definer set search_path = public
-as $$
-declare promo public.promo_codes; product_price numeric;
-begin
-  select price into product_price from public.products where id = p_product_id and is_published = true;
-  select * into promo from public.promo_codes where promo_codes.code = p_code and is_active = true and starts_at <= now() and (ends_at is null or ends_at > now()) and (max_redemptions is null or redemption_count < max_redemptions);
-  if product_price is null then return query select false, null::text, 0::numeric, 'Product is unavailable.'; return; end if;
-  if promo.id is null then return query select false, null::text, 0::numeric, 'That promotion code is not available.'; return; end if;
-  return query select true, promo.code::text, least(product_price, case when promo.discount_type = 'percent' then round(product_price * promo.discount_value / 100, 2) else promo.discount_value end), 'Promotion applied.';
-end;
-$$;
-grant execute on function public.quote_promo(text, uuid) to anon, authenticated;
 
 create table if not exists public.subscribers (
   id uuid primary key default gen_random_uuid(),
@@ -131,42 +149,116 @@ create table if not exists public.search_index_queue (
   processed_at timestamptz
 );
 
+
+-- =========================
+-- Functions
+-- =========================
+create or replace function public.quote_promo(p_code text, p_product_id uuid)
+returns table(valid boolean, code text, discount_amount numeric, message text)
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  promo public.promo_codes;
+  product_price numeric;
+begin
+  select price
+    into product_price
+  from public.products
+  where id = p_product_id
+    and is_published = true;
+
+  select *
+    into promo
+  from public.promo_codes
+  where promo_codes.code = p_code
+    and is_active = true
+    and starts_at <= now()
+    and (ends_at is null or ends_at > now())
+    and (max_redemptions is null or redemption_count < max_redemptions);
+
+  if product_price is null then
+    return query select false, null::text, 0::numeric, 'Product is unavailable.';
+  end if;
+
+  if promo.id is null then
+    return query select false, null::text, 0::numeric, 'That promotion code is not available.';
+  end if;
+
+  return query
+  select
+    true,
+    promo.code::text,
+    least(
+      product_price,
+      case
+        when promo.discount_type = 'percent'
+          then round(product_price * promo.discount_value / 100, 2)
+        else promo.discount_value
+      end
+    ),
+    'Promotion applied.';
+end;
+$$;
+
+grant execute on function public.quote_promo(text, uuid) to anon, authenticated;
+
 create or replace function public.queue_search_index()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger
+language plpgsql
+security definer set search_path = public as $$
 begin
   if tg_op = 'DELETE' then
-    insert into public.search_index_queue(entity_type, entity_id, operation) values (tg_argv[0], old.id, 'delete');
+    insert into public.search_index_queue(entity_type, entity_id, operation)
+    values (tg_argv[0], old.id, 'delete');
     return old;
   end if;
-  insert into public.search_index_queue(entity_type, entity_id, operation) values (tg_argv[0], new.id, 'upsert');
+
+  insert into public.search_index_queue(entity_type, entity_id, operation)
+  values (tg_argv[0], new.id, 'upsert');
+
   return new;
-end; $$;
+end;
+$$;
+
 drop trigger if exists products_search_index on public.products;
-create trigger products_search_index after insert or update or delete on public.products for each row execute procedure public.queue_search_index('product');
+create trigger products_search_index
+after insert or update or delete on public.products
+for each row execute procedure public.queue_search_index('product');
+
 drop trigger if exists blog_posts_search_index on public.blog_posts;
-create trigger blog_posts_search_index after insert or update or delete on public.blog_posts for each row execute procedure public.queue_search_index('blog_post');
+create trigger blog_posts_search_index
+after insert or update or delete on public.blog_posts
+for each row execute procedure public.queue_search_index('blog_post');
 
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
-security definer set search_path = public
-as $$
+security definer set search_path = public as $$
 begin
   insert into public.profiles (id, full_name)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1), 'Customer')
+    coalesce(
+      new.raw_user_meta_data ->> 'full_name',
+      split_part(new.email, '@', 1),
+      'Customer'
+    )
   )
   on conflict (id) do nothing;
+
   return new;
 end;
 $$;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
+after insert on auth.users
+for each row execute procedure public.handle_new_user();
 
+-- =========================
+-- RLS enable
+-- =========================
 alter table public.products enable row level security;
 alter table public.categories enable row level security;
 alter table public.profiles enable row level security;
@@ -178,11 +270,9 @@ alter table public.promo_codes enable row level security;
 alter table public.blog_posts enable row level security;
 alter table public.search_index_queue enable row level security;
 
--- -----------------------------------------------------------------------------
--- RLS helper
--- IMPORTANT: admin checks must NOT query profiles from a profiles policy.
--- The function runs as its owner (SECURITY DEFINER), avoiding recursive RLS.
--- -----------------------------------------------------------------------------
+-- =========================
+-- Admin helper
+-- =========================
 create or replace function public.is_admin()
 returns boolean
 language sql
@@ -200,10 +290,11 @@ $$;
 revoke all on function public.is_admin() from public;
 grant execute on function public.is_admin() to authenticated;
 
--- -----------------------------------------------------------------------------
--- Cleanly remove every existing policy on the tables managed by this schema.
--- This makes the script safe to rerun after earlier policy experiments.
--- -----------------------------------------------------------------------------
+
+-- =========================
+-- POLICY CLEANUP (IMPORTANT)
+-- Must run BEFORE CREATE POLICY to avoid duplicates
+-- =========================
 do $$
 declare
   r record;
@@ -214,7 +305,7 @@ begin
     where schemaname = 'public'
       and tablename in (
         'products', 'profiles', 'orders', 'subscribers', 'tickets',
-        'site_settings', 'promo_codes', 'blog_posts', 'search_index_queue'
+        'site_settings', 'promo_codes', 'blog_posts', 'search_index_queue', 'categories'
       )
   loop
     execute format('drop policy if exists %I on %I.%I', r.policyname, r.schemaname, r.tablename);
@@ -222,9 +313,12 @@ begin
 end
 $$;
 
--- -----------------------------------------------------------------------------
+
+-- =========================
+-- Policies
+-- =========================
+
 -- Products
--- -----------------------------------------------------------------------------
 create policy "published products are public"
 on public.products
 for select
@@ -241,10 +335,7 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
--- -----------------------------------------------------------------------------
 -- Profiles
--- NEVER query public.profiles directly from these policies.
--- -----------------------------------------------------------------------------
 create policy "users read own profile"
 on public.profiles
 for select
@@ -273,9 +364,7 @@ with check (
   or public.is_admin()
 );
 
--- -----------------------------------------------------------------------------
 -- Orders
--- -----------------------------------------------------------------------------
 create policy "users read own orders"
 on public.orders
 for select
@@ -294,9 +383,7 @@ with check (
   and status = 'pending'::public.order_status
 );
 
--- -----------------------------------------------------------------------------
 -- Subscribers
--- -----------------------------------------------------------------------------
 create policy "public can subscribe"
 on public.subscribers
 for insert
@@ -309,9 +396,7 @@ for select
 to authenticated
 using (public.is_admin());
 
--- -----------------------------------------------------------------------------
 -- Tickets
--- -----------------------------------------------------------------------------
 create policy "public can create tickets"
 on public.tickets
 for insert
@@ -334,9 +419,7 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
--- -----------------------------------------------------------------------------
 -- CMS
--- -----------------------------------------------------------------------------
 create policy "admins manage cms"
 on public.site_settings
 for all
@@ -351,6 +434,7 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+-- Categories
 create policy "public read active categories"
 on public.categories
 for select
@@ -364,6 +448,7 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+-- Blog posts
 create policy "public read published blogs"
 on public.blog_posts
 for select
@@ -380,6 +465,7 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+-- Search index queue
 create policy "admins manage search queue"
 on public.search_index_queue
 for all
@@ -387,6 +473,10 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+
+-- =========================
+-- Storage buckets
+-- =========================
 insert into storage.buckets (id, name, public)
 values ('books', 'books', false)
 on conflict (id) do nothing;
