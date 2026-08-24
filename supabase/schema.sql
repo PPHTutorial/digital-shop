@@ -179,10 +179,12 @@ begin
 
   if product_price is null then
     return query select false, null::text, 0::numeric, 'Product is unavailable.';
+    return;
   end if;
 
   if promo.id is null then
     return query select false, null::text, 0::numeric, 'That promotion code is not available.';
+    return;
   end if;
 
   return query

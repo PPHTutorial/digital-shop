@@ -5,6 +5,14 @@ import { convertAmount, formatCurrency, getExchangeRates } from './currency.js';
 const params = new URLSearchParams(location.search);
 let productId = params.get('product') || params.get('id') || params.get('slug');
 
+/**
+ * A promotion code may ride along on the product link
+ * (checkout.html?product=slug&promo=CODE) so a campaign or affiliate link
+ * lands with the discount already applied. `code` and `coupon` are accepted
+ * as aliases because those are what people tend to hand-write.
+ */
+const linkPromoCode = (params.get('promo') || params.get('code') || params.get('coupon') || '').trim();
+
 if (productId) {
   sessionStorage.setItem('last_selected_product', productId);
 } else {
@@ -241,17 +249,21 @@ async function load() {
   productId = data.id;
   sessionStorage.setItem('last_selected_product', data.id);
 
-  // Update address bar with clean shareable URL
+  // Update address bar with clean shareable URL. A promo code that arrived on
+  // the link is kept, so the address bar stays a working shareable link.
   const canonicalKey = data.slug || data.id;
+  const promoSuffix = linkPromoCode ? `&promo=${encodeURIComponent(linkPromoCode)}` : '';
   if (!location.search.includes(canonicalKey)) {
-    history.replaceState(null, '', `checkout.html?product=${encodeURIComponent(canonicalKey)}`);
+    history.replaceState(null, '', `checkout.html?product=${encodeURIComponent(canonicalKey)}${promoSuffix}`);
   }
 
-  // Wire share button
+  // Wire share button — shares whichever promotion is currently applied, so a
+  // discount can be passed on simply by sharing the page.
   const shareBtn = document.querySelector('#share-checkout-btn');
   if (shareBtn) {
     shareBtn.onclick = async () => {
-      const canonicalUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(canonicalKey)}`;
+      const activePromo = promotion?.code ? `&promo=${encodeURIComponent(promotion.code)}` : '';
+      const canonicalUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(canonicalKey)}${activePromo}`;
       if (navigator.share) {
         try {
           await navigator.share({ title: data.title, url: canonicalUrl });
@@ -259,7 +271,7 @@ async function load() {
         } catch {}
       }
       navigator.clipboard.writeText(canonicalUrl);
-      toast('Shareable product link copied to clipboard!');
+      toast(activePromo ? 'Link copied — the promotion is included!' : 'Shareable product link copied to clipboard!');
     };
   }
 
@@ -310,6 +322,13 @@ async function load() {
   renderTotals();
   renderIcons();
   finishPageLoader();
+
+  // A code carried on the link applies itself once the product (and therefore
+  // its price) is known. Runs last so a failure never blocks the page.
+  if (linkPromoCode) {
+    document.querySelector('#promo-code').value = linkPromoCode;
+    await applyPromoCode(linkPromoCode, { fromLink: true });
+  }
 }
 
 // Payment method UI switching
@@ -421,39 +440,73 @@ descModal?.addEventListener('click', (e) => {
 });
 
 // Promotion Code Application
-document.querySelector('#apply-promo').addEventListener('click', async (event) => {
-  if (!product) return;
-  const codeInput = document.querySelector('#promo-code');
-  const code = codeInput.value.trim();
-  const feedback = document.querySelector('#promo-feedback');
+/**
+ * Validates a code against the current product and applies it to the total.
+ *
+ * The database is the authority here as everywhere else: `quote_promo` decides
+ * whether the code is live and what it is worth. Shared by the Apply button and
+ * by the `?promo=` link parameter, so a link-applied code is checked exactly as
+ * strictly as a typed one — an expired or fully-redeemed code in a link fails
+ * the same way, it just fails quietly rather than shouting at a fresh visitor.
+ */
+async function applyPromoCode(code, { button = null, fromLink = false } = {}) {
+  if (!product) return false;
 
-  if (!code) {
+  const feedback = document.querySelector('#promo-feedback');
+  const input = document.querySelector('#promo-code');
+  const trimmed = (code || '').trim();
+
+  if (!trimmed) {
     feedback.textContent = 'Enter a promotion code first.';
     feedback.className = 'status-line error mt-2 text-xs';
-    return;
+    return false;
   }
 
-  setButtonLoading(event.currentTarget, true, 'Applying…');
+  if (button) setButtonLoading(button, true, 'Applying…');
   const { data, error } = await supabase.rpc('quote_promo', {
-    p_code: code,
+    p_code: trimmed,
     p_product_id: product.id,
   });
-  setButtonLoading(event.currentTarget, false);
+  if (button) setButtonLoading(button, false);
 
   const quote = Array.isArray(data) ? data[0] : data;
+
   if (error || !quote?.valid) {
     promotion = null;
-    feedback.textContent = quote?.message || 'That promotion code is not available.';
-    feedback.className = 'status-line error mt-2 text-xs';
     renderTotals();
-    return;
+    // A dud code in a shared link is not the visitor's fault — say it plainly
+    // and let them carry on at the normal price.
+    feedback.textContent = fromLink
+      ? `The code in this link (${trimmed}) is no longer available.`
+      : quote?.message || error?.message || 'That promotion code is not available.';
+    feedback.className = 'status-line error mt-2 text-xs';
+    return false;
   }
 
   promotion = { code: quote.code, discount_amount: Number(quote.discount_amount) };
-  feedback.textContent = `✓ Code ${quote.code} applied: Saved!`;
-  feedback.className = 'status-line success mt-2 text-xs';
+  if (input) input.value = quote.code;
   renderTotals();
-  toast('Promotion applied successfully!');
+
+  feedback.textContent = fromLink
+    ? `✓ Code ${quote.code} applied automatically.`
+    : `✓ Code ${quote.code} applied: Saved!`;
+  feedback.className = 'status-line success mt-2 text-xs';
+  toast(fromLink ? `Promotion ${quote.code} applied automatically!` : 'Promotion applied successfully!');
+  return true;
+}
+
+document.querySelector('#apply-promo').addEventListener('click', (event) => {
+  applyPromoCode(document.querySelector('#promo-code').value, { button: event.currentTarget });
+});
+
+// Enter in the code field applies it, the same as pressing Apply. The field
+// sits outside #checkout-form, so this cannot fall through to starting payment.
+document.querySelector('#promo-code')?.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  const button = document.querySelector('#apply-promo');
+  if (button?.disabled) return; // already applying
+  applyPromoCode(event.currentTarget.value, { button });
 });
 
 // Checkout Form Submission

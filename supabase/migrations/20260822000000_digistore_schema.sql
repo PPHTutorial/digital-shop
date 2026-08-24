@@ -177,12 +177,16 @@ begin
     and (ends_at is null or ends_at > now())
     and (max_redemptions is null or redemption_count < max_redemptions);
 
+  -- `return query` appends and does NOT exit; without these bare returns an
+  -- invalid code falls through and appends a bogus full-price "valid" row.
   if product_price is null then
     return query select false, null::text, 0::numeric, 'Product is unavailable.';
+    return;
   end if;
 
   if promo.id is null then
     return query select false, null::text, 0::numeric, 'That promotion code is not available.';
+    return;
   end if;
 
   return query
