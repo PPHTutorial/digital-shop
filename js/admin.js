@@ -1,1518 +1,776 @@
-import { supabase } from './client.js';
+/**
+ * Admin console.
+ *
+ * Scope is deliberately narrower than the previous dashboard: catalog,
+ * categories, promotions, and editorial content now live in the content
+ * studio (studio.html), which gives that data real drafts, revisions, and
+ * soft locks. This console covers what the studio does not — commercial
+ * performance, orders, customers, and support.
+ */
+
+import { supabase, requireAdmin, unwrap, describeError } from './client.js';
 import { CONFIG } from './config.js';
-import { escapeHtml, finishPageLoader, getAccount, icon, renderIcons, setButtonLoading, toast } from './ui.js';
+import { $, $$, html, raw, esc, on, debounce } from './dom.js';
+import { icon } from './icons.js';
+import { formatMoney, formatNumber, formatDate, formatPercent, relativeTime } from './format.js';
+import { initTheme, toggleTheme, currentTheme, toast, bootDone, setBusy } from './ui.js';
+import { lineChart, meterList, toDailyPoints } from './chart.js';
 
-let account, mode, editingId, dashboardData;
-const modal = document.querySelector('#editor-modal');
-const detailsModal = document.querySelector('#details-modal');
-const imgModal = document.querySelector('#image-editor-modal');
-const cropCanvas = document.querySelector('#crop-canvas');
+initTheme();
 
-const screenTitles = {
-  overview: 'Store overview', products: 'Catalog', categories: 'Categories', transactions: 'Orders',
-  customers: 'Customers', promotions: 'Promotions', content: 'Content', automation: 'Operations', tickets: 'Support',
+const SCREENS = ['overview', 'orders', 'customers', 'tickets', 'settings'];
+const SCREEN_TITLES = {
+  overview: 'Dashboard',
+  orders: 'Orders',
+  customers: 'Customers',
+  tickets: 'Tickets',
+  settings: 'Settings',
 };
 
-function activateAdminScreen() {
-  const key = location.hash.replace('#', '') || 'overview';
-  const active = document.querySelector(`#${screenTitles[key] ? key : 'overview'}`);
-  document.querySelectorAll('.admin-screen').forEach((screen) => screen.classList.toggle('is-active', screen === active));
-  document.querySelectorAll('.admin-link').forEach((link) => link.classList.toggle('active', link.getAttribute('href') === `#${key}`));
-  const title = document.querySelector('#admin-page-title');
-  if (title) title.textContent = screenTitles[key] || screenTitles.overview;
-  window.scrollTo(0, 0);
+const ORDER_STATUSES = ['pending', 'paid', 'failed', 'refunded', 'cancelled'];
+const STATUS_BADGE = {
+  paid: ['ok', 'Paid'],
+  pending: ['warn', 'Awaiting payment'],
+  failed: ['danger', 'Failed'],
+  cancelled: ['neutral', 'Cancelled'],
+  refunded: ['info', 'Refunded'],
+};
+
+const TICKET_STATUSES = ['open', 'pending', 'closed'];
+const TICKET_BADGE = {
+  open: ['danger', 'Open'],
+  pending: ['warn', 'Pending'],
+  closed: ['neutral', 'Closed'],
+};
+
+const PAGE_SIZE = 20;
+
+const state = {
+  account: null,
+  screen: 'overview',
+  loaded: new Set(),
+  overview: { days: 30, data: null },
+  orders: { status: '', search: '', page: 0, total: 0, rows: [] },
+  customers: { search: '', all: [] },
+  tickets: { status: '', all: [] },
+};
+
+/* ==========================================================================
+   Shell — routing, theme, sign-out, mobile rail
+   ========================================================================== */
+
+function readScreen() {
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  return SCREENS.includes(hash) ? hash : 'overview';
 }
 
-window.addEventListener('hashchange', activateAdminScreen);
-
-// ============================================================
-// Slugify Helper
-// ============================================================
-function slugify(text) {
-  return (text || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[\s_]+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+function setRail(open) {
+  $('#rail').classList.toggle('is-open', open);
+  $('#scrim').classList.toggle('is-open', open);
 }
 
-function categoryOptions(selected = 'General') {
-  const defaults = ['Ebooks & Guides', 'Software & Tools', 'Templates & Themes', 'Online Courses', 'Audio & Media', 'Design & Graphics', 'General'];
-  const managed = (dashboardData?.categories || []).map((category) => category.name);
-  return [...new Set([...managed, ...defaults, selected])]
-    .filter(Boolean)
-    .map((name) => `<option value="${escapeHtml(name)}" ${name === selected ? 'selected' : ''}>${escapeHtml(name)}</option>`)
-    .join('');
+async function applyRoute() {
+  state.screen = readScreen();
+
+  $$('.screen').forEach((section) => section.classList.toggle('is-active', section.dataset.screen === state.screen));
+  $$('.rail-link[data-screen]').forEach((link) => link.classList.toggle('is-active', link.dataset.screen === state.screen));
+  $('#crumb-title').textContent = SCREEN_TITLES[state.screen];
+  setRail(false);
+
+  try {
+    if (state.screen === 'overview') await loadOverview();
+    else if (state.screen === 'orders') await loadOrders();
+    else if (state.screen === 'customers') await loadCustomers();
+    else if (state.screen === 'tickets') await loadTickets();
+    else if (state.screen === 'settings') await loadSettings();
+  } catch (error) {
+    toast(error.message || 'Could not load this screen.', 'error');
+  }
 }
 
-// ============================================================
-// Image Editor — canvas-based crop + compress
-// ============================================================
-let editorImg = null;
-let editorCallback = null;
-let editorAspect = null;
-let editorCropBox = { x: 0, y: 0, w: 0, h: 0 };
-let editorCanvScale = { x: 1, y: 1 };
-
-function openImageEditor(file, onDone) {
-  editorCallback = onDone;
-  editorAspect = null;
-  document.querySelector('.crop-preset.active')?.classList.remove('active');
-  document.querySelector('[data-aspect="free"]')?.classList.add('active');
-  const ctx = cropCanvas.getContext('2d');
-  ctx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
-
-  const img = new Image();
-  img.onload = () => {
-    editorImg = img;
-    initCrop();
-    imgModal.showModal();
-  };
-  img.src = URL.createObjectURL(file);
+function deltaMarkup(curr, prev) {
+  curr = Number(curr) || 0;
+  prev = Number(prev) || 0;
+  if (!prev) return curr ? '<span class="delta delta--up">New this period</span>' : '<span class="delta delta--flat">No orders yet</span>';
+  const change = (curr - prev) / prev;
+  if (Math.abs(change) < 0.01) return '<span class="delta delta--flat">Flat vs prior period</span>';
+  const up = change > 0;
+  return `<span class="delta delta--${up ? 'up' : 'down'}">${icon(up ? 'trendUp' : 'trendDown', 12)}${esc(formatPercent(Math.abs(change)))} vs prior period</span>`;
 }
 
-function initCrop() {
-  const maxW = 560, maxH = 340;
-  const srcAspect = editorImg.width / editorImg.height;
-  let cw = maxW, ch = maxH;
-  if (srcAspect > maxW / maxH) ch = Math.round(cw / srcAspect);
-  else cw = Math.round(ch * srcAspect);
-  cropCanvas.width = cw;
-  cropCanvas.height = ch;
-  editorCanvScale = { x: editorImg.width / cw, y: editorImg.height / ch };
-  editorCropBox = { x: 0, y: 0, w: cw, h: ch };
-  drawCrop();
+/* ==========================================================================
+   Overview
+   ========================================================================== */
+
+async function loadOverview({ force = false } = {}) {
+  if (state.loaded.has('overview') && !force) return paintOverview();
+  state.overview.data = await unwrap(supabase.rpc('admin_overview', { p_days: state.overview.days }));
+  state.loaded.add('overview');
+  paintOverview();
 }
 
-function setCropAspect(aspect) {
-  editorAspect = aspect;
-  if (!editorImg) return;
-  const cw = cropCanvas.width, ch = cropCanvas.height;
-  if (aspect === null) {
-    editorCropBox = { x: 0, y: 0, w: cw, h: ch };
-  } else {
-    if (cw / ch > aspect) {
-      const nw = Math.round(ch * aspect);
-      editorCropBox = { x: Math.round((cw - nw) / 2), y: 0, w: nw, h: ch };
-    } else {
-      const nh = Math.round(cw / aspect);
-      editorCropBox = { x: 0, y: Math.round((ch - nh) / 2), w: cw, h: nh };
-    }
-  }
-  drawCrop();
+function activityIcon(action = '') {
+  if (action.includes('delete')) return 'trash';
+  if (action.includes('publish')) return 'checkCircle';
+  if (action.includes('order') || action.includes('refund')) return 'card';
+  return 'doc';
 }
 
-function drawCrop() {
-  const ctx = cropCanvas.getContext('2d');
-  const { x, y, w, h } = editorCropBox;
-  const cw = cropCanvas.width, ch = cropCanvas.height;
-  ctx.drawImage(editorImg, 0, 0, cw, ch);
-  ctx.fillStyle = 'rgba(0,0,0,0.52)';
-  ctx.fillRect(0, 0, cw, ch);
-  ctx.clearRect(x, y, w, h);
-  const { x: sx, y: sy } = editorCanvScale;
-  ctx.drawImage(editorImg, x * sx, y * sy, w * sx, h * sy, x, y, w, h);
-  ctx.strokeStyle = '#f97316';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
-  const s = 8;
-  ctx.fillStyle = '#f97316';
-  [[x, y], [x + w - s, y], [x, y + h - s], [x + w - s, y + h - s]].forEach(([hx, hy]) => {
-    ctx.fillRect(hx, hy, s, s);
-  });
-}
+function paintOverview() {
+  const data = state.overview.data;
+  if (!data) return;
+  const { current, previous, lifetime, series, top_products, top_categories, payment_mix, recent_activity } = data;
 
-async function applyCrop() {
-  if (!editorImg) return null;
-  const { x, y, w, h } = editorCropBox;
-  const { x: sx, y: sy } = editorCanvScale;
-  const out = document.createElement('canvas');
-  out.width = Math.round(w * sx);
-  out.height = Math.round(h * sy);
-  out.getContext('2d').drawImage(
-    editorImg,
-    x * sx, y * sy, w * sx, h * sy,
-    0, 0, out.width, out.height
-  );
-  const qualVal = document.querySelector('input[name="img-quality"]:checked')?.value ?? '0.92';
-  return new Promise((resolve) => {
-    if (qualVal === 'lossless') out.toBlob(resolve, 'image/png');
-    else out.toBlob(resolve, 'image/jpeg', parseFloat(qualVal));
-  });
-}
+  $('#overview-stats').innerHTML = html`
+    <div class="metric">
+      <span class="metric__label">Revenue</span>
+      <span class="metric__value">${formatMoney(current.revenue, 'USD')}</span>
+      <span class="metric__foot">${raw(deltaMarkup(current.revenue, previous.revenue))}</span>
+    </div>
+    <div class="metric">
+      <span class="metric__label">Paid orders</span>
+      <span class="metric__value">${formatNumber(current.orders)}</span>
+      <span class="metric__foot">Average order ${formatMoney(current.aov, 'USD')}</span>
+    </div>
+    <div class="metric">
+      <span class="metric__label">Customers</span>
+      <span class="metric__value">${formatNumber(lifetime.customers)}</span>
+      <span class="metric__foot">${formatNumber(lifetime.published_products)} of ${formatNumber(lifetime.products)} products live</span>
+    </div>
+    <div class="metric">
+      <span class="metric__label">Open tickets</span>
+      <span class="metric__value">${formatNumber(lifetime.open_tickets)}</span>
+      <span class="metric__foot">${formatNumber(current.pending)} order${current.pending === 1 ? '' : 's'} awaiting payment</span>
+    </div>
+  `;
 
-document.querySelectorAll('.crop-preset').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.crop-preset').forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    const a = btn.dataset.aspect;
-    setCropAspect(a === 'free' ? null : parseFloat(a));
-  });
-});
+  $('#overview-chart').innerHTML = lineChart(toDailyPoints(series, 'revenue'), { format: (v) => formatMoney(v, 'USD'), accent: true });
 
-[document.querySelector('#cancel-crop-btn'), document.querySelector('#cancel-crop-btn-2')].forEach((b) => {
-  b?.addEventListener('click', () => imgModal.close());
-});
-
-document.querySelector('#apply-crop-btn').addEventListener('click', async () => {
-  const applyBtn = document.querySelector('#apply-crop-btn');
-  setButtonLoading(applyBtn, true, 'Uploading…');
-  const blob = await applyCrop();
-  if (!blob) {
-    setButtonLoading(applyBtn, false);
-    return;
-  }
-  const ext = blob.type === 'image/png' ? 'png' : 'jpg';
-  const path = `covers/${Date.now()}.${ext}`;
-  const { data: up, error: upErr } = await supabase.storage
-    .from('product-images')
-    .upload(path, blob, { contentType: blob.type, upsert: true });
-  setButtonLoading(applyBtn, false);
-  if (upErr) {
-    toast(upErr.message, 'error');
-    return;
-  }
-  const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(up.path);
-  imgModal.close();
-  editorCallback?.(publicUrl);
-});
-
-// ============================================================
-// File upload helpers & dual pricing
-// ============================================================
-function wireUploadZones() {
-  const coverZone = document.querySelector('#cover-upload-zone');
-  const coverInput = document.querySelector('#cover-file-input');
-  const coverUrlEl = document.querySelector('#cover-url-input');
-  const coverPrev = document.querySelector('#cover-preview');
-
-  if (coverZone && coverInput) {
-    coverZone.addEventListener('click', () => coverInput.click());
-    coverZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      coverZone.classList.add('drag-over');
-    });
-    coverZone.addEventListener('dragleave', () => coverZone.classList.remove('drag-over'));
-    coverZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      coverZone.classList.remove('drag-over');
-      const f = e.dataTransfer.files[0];
-      if (f?.type.startsWith('image/')) handleCoverFile(f);
-    });
-    coverInput.addEventListener('change', () => {
-      const f = coverInput.files[0];
-      if (f) handleCoverFile(f);
-    });
-  }
-
-  function handleCoverFile(file) {
-    openImageEditor(file, (publicUrl) => {
-      coverUrlEl.value = publicUrl;
-      coverPrev.src = publicUrl;
-      coverPrev.classList.remove('hidden');
-      document.querySelector('#cover-upload-prompt')?.classList.add('hidden');
-    });
-  }
-
-  const galleryZone = document.querySelector('#gallery-upload-zone');
-  const galleryInput = document.querySelector('#gallery-file-input');
-  const galleryUrlsEl = document.querySelector('#gallery-urls-input');
-  const galleryPreview = document.querySelector('#gallery-preview-list');
-  const readGallery = () => (galleryUrlsEl?.value || '').split(',').map((url) => url.trim()).filter(Boolean);
-  const renderGallery = () => {
-    if (!galleryPreview) return;
-    const urls = readGallery();
-    galleryPreview.innerHTML = urls.length ? urls.map((url, index) => `
-      <div class="relative h-16 w-16 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
-        <img src="${escapeHtml(url)}" alt="Gallery image ${index + 1}" class="h-full w-full object-cover">
-        <button type="button" class="absolute right-0 top-0 grid h-5 w-5 place-items-center rounded-bl bg-slate-900/70 text-xs font-bold text-white" data-remove-gallery="${index}" aria-label="Remove image">×</button>
-      </div>`).join('') : '<span class="text-xs text-slate-400">No supporting images yet.</span>';
-    galleryPreview.querySelectorAll('[data-remove-gallery]').forEach((button) => button.addEventListener('click', () => {
-      const urls = readGallery();
-      urls.splice(Number(button.dataset.removeGallery), 1);
-      galleryUrlsEl.value = urls.join(', ');
-      renderGallery();
-    }));
-  };
-  if (galleryZone && galleryInput) {
-    const handleGalleryFiles = (files) => Array.from(files || []).filter((file) => file.type.startsWith('image/')).slice(0, 1).forEach((file) => {
-      openImageEditor(file, (publicUrl) => {
-        galleryUrlsEl.value = [...readGallery(), publicUrl].join(', ');
-        renderGallery();
-      });
-    });
-    galleryZone.addEventListener('click', () => galleryInput.click());
-    galleryZone.addEventListener('dragover', (event) => { event.preventDefault(); galleryZone.classList.add('drag-over'); });
-    galleryZone.addEventListener('dragleave', () => galleryZone.classList.remove('drag-over'));
-    galleryZone.addEventListener('drop', (event) => { event.preventDefault(); galleryZone.classList.remove('drag-over'); handleGalleryFiles(event.dataTransfer.files); });
-    galleryInput.addEventListener('change', () => { handleGalleryFiles(galleryInput.files); galleryInput.value = ''; });
-    renderGallery();
-  }
-
-  const fileZone = document.querySelector('#file-upload-zone');
-  const fileInput = document.querySelector('#product-file-input');
-  const filePathEl = document.querySelector('#file-path-input');
-  const fileStat = document.querySelector('#file-upload-status');
-
-  if (fileZone && fileInput) {
-    fileZone.addEventListener('click', () => fileInput.click());
-    fileZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      fileZone.classList.add('drag-over');
-    });
-    fileZone.addEventListener('dragleave', () => fileZone.classList.remove('drag-over'));
-    fileZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      fileZone.classList.remove('drag-over');
-      const f = e.dataTransfer.files[0];
-      if (f) handleProductFile(f);
-    });
-    fileInput.addEventListener('change', () => {
-      const f = fileInput.files[0];
-      if (f) handleProductFile(f);
-    });
-  }
-
-  async function handleProductFile(file) {
-    if (fileStat) {
-      fileStat.textContent = 'Uploading file…';
-      fileStat.className = 'text-xs mt-1 text-slate-400';
-    }
-    const path = `products/${Date.now()}-${file.name.replace(/[^a-z0-9._-]/gi, '_')}`;
-    const { data: up, error: upErr } = await supabase.storage
-      .from('books')
-      .upload(path, file, { upsert: true });
-    if (upErr) {
-      if (fileStat) {
-        fileStat.textContent = upErr.message;
-        fileStat.className = 'text-xs mt-1 text-red-600';
-      }
-      return;
-    }
-    filePathEl.value = up.path;
-    if (fileStat) {
-      fileStat.textContent = `✓ Uploaded: ${file.name}`;
-      fileStat.className = 'text-xs mt-1 text-green-700';
-    }
-    document.querySelector('#file-upload-prompt').textContent = `📁 ${file.name}`;
-  }
-
-  // Dual pricing auto-calc
-  const origEl = document.querySelector('#orig-price-input');
-  const saleEl = document.querySelector('#sale-price-input');
-  const pctEl = document.querySelector('#discount-pct-input');
-
-  function calcPct() {
-    const o = parseFloat(origEl?.value), s = parseFloat(saleEl?.value);
-    if (o > 0 && s >= 0 && pctEl) pctEl.value = ((1 - s / o) * 100).toFixed(1);
-  }
-  function calcSale() {
-    const o = parseFloat(origEl?.value), p = parseFloat(pctEl?.value);
-    if (o > 0 && p >= 0 && saleEl) saleEl.value = (o * (1 - p / 100)).toFixed(2);
-  }
-  origEl?.addEventListener('input', calcPct);
-  saleEl?.addEventListener('input', calcPct);
-  pctEl?.addEventListener('input', calcSale);
-
-  // Auto-slug generator on Title typing
-  const titleEl = document.querySelector('#product-title-input');
-  const slugEl = document.querySelector('#product-slug-input');
-  const autoSlugBtn = document.querySelector('#auto-slug-btn');
-
-  let slugManual = Boolean(slugEl?.value);
-
-  titleEl?.addEventListener('input', () => {
-    if (!slugManual || !slugEl.value.trim()) {
-      slugEl.value = slugify(titleEl.value);
-    }
-  });
-
-  slugEl?.addEventListener('input', () => {
-    slugManual = Boolean(slugEl.value.trim());
-  });
-
-  autoSlugBtn?.addEventListener('click', () => {
-    slugEl.value = slugify(titleEl?.value || '');
-    slugManual = false;
-  });
-}
-
-// ============================================================
-// Paginated Table Helper
-// ============================================================
-function renderPaginatedTable(containerSelector, dataList, heads, renderRow, pageSize = 8, onRendered = null) {
-  let currentPage = 1;
-  const container = document.querySelector(containerSelector);
-  if (!container) return;
-
-  function renderPage() {
-    if (!dataList || !dataList.length) {
-      container.innerHTML = '<p class="py-4 text-sm text-slate-500">No records found.</p>';
-      return;
-    }
-
-    const totalPages = Math.ceil(dataList.length / pageSize) || 1;
-    if (currentPage > totalPages) currentPage = totalPages;
-    if (currentPage < 1) currentPage = 1;
-
-    const start = (currentPage - 1) * pageSize;
-    const end = Math.min(start + pageSize, dataList.length);
-    const pageRows = dataList.slice(start, end);
-
-    container.innerHTML = `
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-left text-sm">
-          <thead><tr>${heads.map((h) => `<th class="px-3 py-3 text-xs uppercase tracking-wider text-slate-400 font-bold">${h}</th>`).join('')}</tr></thead>
-          <tbody class="divide-y divide-slate-100">${pageRows.map((row) => `<tr>${renderRow(row)}</tr>`).join('')}</tbody>
-        </table>
-      </div>
-      ${
-        totalPages > 1 || dataList.length > 5
-          ? `<div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-              <div>Showing <strong class="text-slate-700">${start + 1}–${end}</strong> of <strong class="text-slate-700">${dataList.length}</strong> entries</div>
-              <div class="flex items-center gap-1.5">
-                <button type="button" class="pg-prev button !min-h-8 !px-3 text-xs ${currentPage === 1 ? '!opacity-40 !pointer-events-none' : ''}">Previous</button>
-                <span class="px-2 font-bold text-slate-700">Page ${currentPage} of ${totalPages}</span>
-                <button type="button" class="pg-next button !min-h-8 !px-3 text-xs ${currentPage === totalPages ? '!opacity-40 !pointer-events-none' : ''}">Next</button>
-              </div>
-            </div>`
-          : ''
-      }
-    `;
-
-    container.querySelector('.pg-prev')?.addEventListener('click', () => {
-      if (currentPage > 1) {
-        currentPage--;
-        renderPage();
-      }
-    });
-
-    container.querySelector('.pg-next')?.addEventListener('click', () => {
-      if (currentPage < totalPages) {
-        currentPage++;
-        renderPage();
-      }
-    });
-
-    if (typeof onRendered === 'function') {
-      onRendered(container, pageRows);
-    }
-    renderIcons();
-  }
-
-  renderPage();
-}
-
-function chart(points) {
-  const max = Math.max(1, ...points.map((p) => p.revenue));
-  const stride = points.length > 12 ? 5 : 1;
-  return `<div class="flex h-full items-end gap-1.5">${points.map((p, index) => `
-    <div class="group flex flex-1 flex-col items-center justify-end gap-2 min-w-0" title="${p.date}: $${p.revenue.toFixed(2)}">
-      <span class="invisible group-hover:visible text-[10px] font-bold text-slate-600">$${p.revenue.toFixed(0)}</span>
-      <div class="w-full min-w-[4px] rounded-t bg-gradient-to-t from-orange-500 to-amber-400 transition-opacity group-hover:opacity-75" style="height:${Math.max(5, (p.revenue / max) * 150)}px"></div>
-      <small class="text-[9px] text-slate-400">${index % stride === 0 ? p.date.slice(5) : ''}</small>
-    </div>`).join('')}</div>`;
-}
-
-function renderRankList(items, valueKey, meta) {
-  if (!items?.length) return '<p class="text-sm text-slate-500">Data will appear after paid orders are recorded.</p>';
-  const max = Math.max(...items.map((item) => Number(item[valueKey]) || 0), 1);
-  return `<div class="admin-rank-list">${items.map((item) => `
-    <div class="admin-rank-row">
-      <div><strong>${escapeHtml(item.title || item.category)}</strong><small>${escapeHtml(meta(item))}</small></div>
-      <span class="admin-rank-value">$${Number(item[valueKey]).toFixed(2)}</span>
-      <div class="admin-rank-track"><span style="width:${Math.max(4, Number(item[valueKey]) / max * 100)}%"></span></div>
-    </div>`).join('')}</div>`;
-}
-
-// ============================================================
-// Dashboard Load
-// ============================================================
-async function load() {
-  account = await getAccount();
-  if (!account.user || account.profile?.role !== 'admin') {
-    location.replace('./account.html');
-    return;
-  }
-  document.querySelector('#admin-user').textContent = account.user.email;
-
-  const { data, error } = await supabase.functions.invoke('admin-dashboard');
-  if (error || data?.error) {
-    document.querySelector('#admin-status').textContent = data?.error || error?.message;
-    document.querySelector('#admin-status').className = 'status-line error';
-    finishPageLoader();
-    return;
-  }
-
-  dashboardData = data;
-  const { metrics, orders, users, tickets, products, promos, posts, categories = [], revenueByDay, topProducts = [], categoryStats = [] } = data;
-
-  document.querySelector('#m-revenue').textContent = `$${metrics.revenue.toFixed(2)}`;
-  document.querySelector('#m-orders').textContent = metrics.paidOrders;
-  document.querySelector('#m-customers').textContent = metrics.customers;
-  document.querySelector('#m-tickets').textContent = metrics.openTickets;
-  const averageOrder = metrics.paidOrders ? metrics.revenue / metrics.paidOrders : 0;
-  document.querySelector('#m-aov').textContent = `Average order $${averageOrder.toFixed(2)}`;
-  document.querySelector('#m-conversion').textContent = `${users.filter((u) => u.last_sign_in_at).length} signed in before`;
-  document.querySelector('#m-catalog').textContent = `${metrics.activeProducts} of ${products.length} products live`;
-  const renderRevenue = () => {
-    const days = Number(document.querySelector('#revenue-period')?.value || 30);
-    const selected = revenueByDay.slice(-days);
-    const total = selected.reduce((sum, item) => sum + Number(item.revenue), 0);
-    document.querySelector('#m-revenue-change').textContent = `$${total.toFixed(2)} in the selected period`;
-    document.querySelector('#revenue-chart').innerHTML = chart(selected);
-  };
-  document.querySelector('#revenue-period').onchange = renderRevenue;
-  renderRevenue();
-  document.querySelector('#operations-list').innerHTML = `
-    <div class="metric !p-4"><span>Published products</span><strong>${metrics.activeProducts}</strong><small>${products.length - metrics.activeProducts} drafts remaining</small></div>
-    <div class="metric !p-4"><span>Support queue</span><strong>${metrics.openTickets}</strong><small>${tickets.filter((t) => t.status === 'pending').length} awaiting follow-up</small></div>`;
-  document.querySelector('#top-products').innerHTML = renderRankList(topProducts, 'revenue', (item) => `${item.orders} paid order${item.orders === 1 ? '' : 's'}`);
-  document.querySelector('#category-performance').innerHTML = renderRankList(categoryStats, 'revenue', (item) => `${item.products} product${item.products === 1 ? '' : 's'}`);
-  document.querySelector('#customers-insight').textContent = `${users.length} customer profile${users.length === 1 ? '' : 's'} on record`;
-  document.querySelector('#orders-insight').textContent = `${orders.filter((o) => o.status === 'paid').length} paid · ${orders.filter((o) => o.status === 'pending').length} pending`;
-  document.querySelector('#promos-insight').textContent = `${promos.filter((p) => p.is_active).length} active campaign${promos.filter((p) => p.is_active).length === 1 ? '' : 's'}`;
-  document.querySelector('#content-insight').textContent = `${posts.filter((p) => p.status === 'published').length} published article${posts.filter((p) => p.status === 'published').length === 1 ? '' : 's'}`;
-  document.querySelector('#support-insight').textContent = `${tickets.filter((t) => t.status !== 'closed').length} conversation${tickets.filter((t) => t.status !== 'closed').length === 1 ? '' : 's'} to resolve`;
-
-  // 1. Customers & Users Management Table (Paginated)
-  renderPaginatedTable(
-    '#users-table',
-    users,
-    ['Customer / Email', 'Role', 'Phone / Country', 'Joined', 'Actions'],
-    (u) => {
-      const roleBadge = u.role === 'admin'
-        ? `<span class="tag !bg-purple-100 !text-purple-800">Admin</span>`
-        : `<span class="tag !bg-slate-100 !text-slate-700">Customer</span>`;
-      return `
-        <td class="px-3 py-3">
-          <strong class="block text-slate-800">${escapeHtml(u.full_name || 'Anonymous User')}</strong>
-          <span class="text-xs text-slate-500">${escapeHtml(u.email || '')}</span>
-        </td>
-        <td class="px-3 py-3">${roleBadge}</td>
-        <td class="px-3 py-3 text-xs text-slate-600">
-          <div>${escapeHtml(u.phone || '—')}</div>
-          <div class="text-slate-400">${escapeHtml(u.country || '—')}</div>
-        </td>
-        <td class="px-3 py-3 text-xs text-slate-500">${new Date(u.created_at).toLocaleDateString()}</td>
-        <td class="px-3 py-3">
-          <div class="flex items-center gap-2">
-            <button class="button !min-h-8 !py-1 text-xs" data-edit-customer="${escapeHtml(u.id)}">Manage</button>
-            <button class="button !min-h-8 !py-1 text-xs" data-view-customer-orders="${escapeHtml(u.id)}">Orders</button>
-          </div>
-        </td>`;
-    },
-    8,
-    (container) => {
-      container.querySelectorAll('[data-edit-customer]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const u = users.find((item) => item.id === btn.dataset.editCustomer);
-          if (u) openCustomerEditor(u);
-        });
-      });
-      container.querySelectorAll('[data-view-customer-orders]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const u = users.find((item) => item.id === btn.dataset.viewCustomerOrders);
-          if (u) viewCustomerOrders(u, orders);
-        });
-      });
-    }
-  );
-
-  // 2. Transactions / Orders Table (Paginated + Status Filter)
-  let activeOrderFilter = 'all';
-  const orderStatusColors = {
-    paid: '!bg-green-100 !text-green-800',
-    pending: '!bg-amber-100 !text-amber-800',
-    cancelled: '!bg-red-100 !text-red-700',
-    failed: '!bg-red-100 !text-red-700',
-    refunded: '!bg-blue-100 !text-blue-700',
-  };
-
-  function renderOrdersSection() {
-    const paidCount = orders.filter((o) => o.status === 'paid').length;
-    const pendingCount = orders.filter((o) => o.status === 'pending').length;
-    const cancelledCount = orders.filter((o) => o.status === 'cancelled').length;
-    const failedCount = orders.filter((o) => o.status === 'failed').length;
-
-    // Status summary badges
-    const summaryEl = document.querySelector('#orders-status-summary');
-    if (summaryEl) {
-      summaryEl.innerHTML = `
-        <span class="tag !bg-green-100 !text-green-800 !text-xs inline-flex items-center gap-1">${icon('check', 12)} ${paidCount} Paid</span>
-        <span class="tag !bg-amber-100 !text-amber-800 !text-xs inline-flex items-center gap-1">${icon('clock', 12)} ${pendingCount} Pending</span>
-        <span class="tag !bg-red-100 !text-red-700 !text-xs inline-flex items-center gap-1">${icon('x-circle', 12)} ${cancelledCount} Cancelled</span>
-        <span class="tag !bg-red-100 !text-red-700 !text-xs inline-flex items-center gap-1">${icon('alert-triangle', 12)} ${failedCount} Failed</span>
-        <span class="text-slate-400 text-xs ml-1">(Only paid orders count towards revenue & purchases)</span>`;
-    }
-
-    // Filter tabs
-    const filterEl = document.querySelector('#orders-filter-tabs');
-    if (filterEl) {
-      const tabs = [
-        { key: 'all', label: `All (${orders.length})` },
-        { key: 'paid', label: `Paid (${paidCount})` },
-        { key: 'pending', label: `Pending (${pendingCount})` },
-        { key: 'cancelled', label: `Cancelled (${cancelledCount})` },
-        { key: 'failed', label: `Failed (${failedCount})` },
-      ];
-      filterEl.innerHTML = tabs
+  $('#overview-activity').innerHTML = recent_activity?.length
+    ? `<div class="feed">${recent_activity
         .map(
-          (t) =>
-            `<button type="button" class="order-filter-tab rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-              activeOrderFilter === t.key ? 'bg-[#142c55] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }" data-filter="${t.key}">${t.label}</button>`
+          (item) => html`
+            <div class="feed__item">
+              <span class="feed__icon">${raw(icon(activityIcon(item.action || '')))}</span>
+              <span class="feed__text">
+                <strong>${item.summary || item.action}</strong>
+                <p>${item.actor || 'System'}${item.entity_type ? ` · ${item.entity_type}` : ''}</p>
+              </span>
+              <span class="feed__time">${relativeTime(item.at)}</span>
+            </div>
+          `,
         )
-        .join('');
+        .join('')}</div>`
+    : '<p class="t-13 subtle">No recent activity.</p>';
 
-      filterEl.querySelectorAll('.order-filter-tab').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          activeOrderFilter = btn.dataset.filter;
-          renderOrdersSection();
-        });
-      });
-    }
-
-    // Filtered orders list
-    const filtered = activeOrderFilter === 'all' ? orders : orders.filter((o) => o.status === activeOrderFilter);
-
-    renderPaginatedTable(
-      '#orders-table',
-      filtered,
-      ['Customer', 'Product', 'Amount', 'Status', 'Date'],
-      (o) => `
-        <td class="px-3 py-3">
-          <div class="font-medium">${escapeHtml(o.customer_email)}</div>
-          <div class="text-[11px] text-slate-400">${escapeHtml(o.provider || 'Gateway')} · ${escapeHtml(o.provider_reference || o.id.slice(0, 8))}</div>
-        </td>
-        <td class="px-3 py-3">${escapeHtml(o.products?.title || 'Digital Product')}</td>
-        <td class="px-3 py-3 font-bold">${escapeHtml(o.currency || 'USD')} ${Number(o.amount).toFixed(2)}</td>
-        <td class="px-3 py-3">
-          <span class="tag ${orderStatusColors[o.status] || '!bg-slate-100 !text-slate-600'}">${escapeHtml(o.status)}</span>
-        </td>
-        <td class="px-3 py-3 text-xs text-slate-500">${new Date(o.created_at).toLocaleDateString()}</td>`,
-      8
-    );
-  }
-
-  renderOrdersSection();
-
-  // 3. Products Catalog Table (Paginated)
-  renderPaginatedTable(
-    '#products-table',
-    products,
-    ['Product Details', 'Category', 'Pricing', 'Slug / URL', 'Status', 'Actions'],
-    (p) => {
-      const priceCell = p.original_price
-        ? `<span class="price-original text-xs">${p.currency} ${Number(p.original_price).toFixed(2)}</span>
-           <strong class="ml-1 text-slate-900 text-xs font-bold">${p.currency} ${Number(p.price).toFixed(2)}</strong>`
-        : `<strong class="text-xs font-bold text-slate-900">${p.currency} ${Number(p.price).toFixed(2)}</strong>`;
-      const canonicalSlug = p.slug || p.id;
-      return `
-        <td class="px-3 py-3">
-          <div class="flex items-center gap-2.5">
-            ${p.cover_url ? `<img src="${escapeHtml(p.cover_url)}" class="h-9 w-9 object-cover rounded-lg bg-slate-100 shrink-0">` : ''}
-            <div class="min-w-0 max-w-[180px] sm:max-w-[220px]">
-              <strong class="block text-xs font-bold text-[#142c55] truncate" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</strong>
-              <span class="text-[10px] text-slate-400 truncate block">${escapeHtml(p.description || 'No description')}</span>
-            </div>
-          </div>
-        </td>
-        <td class="px-3 py-3">
-          <span class="tag text-[10px] font-semibold">${escapeHtml(p.category || 'General')}</span>
-        </td>
-        <td class="px-3 py-3">${priceCell}</td>
-        <td class="px-3 py-3 text-[11px] font-mono text-slate-500 truncate max-w-[120px]">${escapeHtml(p.slug || '—')}</td>
-        <td class="px-3 py-3">
-          <span class="tag text-[10px] ${p.is_published ? '!bg-green-100 !text-green-800' : '!bg-slate-100 !text-slate-600'}">${p.is_published ? 'Published' : 'Draft'}</span>
-        </td>
-        <td class="px-3 py-3">
-          <div class="flex items-center gap-1.5 whitespace-nowrap">
-            <button class="button !min-h-8 !py-1 text-xs inline-flex items-center gap-1" data-copy-ad-link="${escapeHtml(canonicalSlug)}" title="Copy advertising link">
-              ${icon('link', 11)}
-              <span>Ad Link</span>
-            </button>
-            ${p.file_path ? `
-              <a href="${escapeHtml(p.file_path.includes('?') ? p.file_path + '&download=' : p.file_path + '?download=')}" target="_blank" download class="button !min-h-8 !py-1 text-xs text-blue-600 hover:bg-blue-50 inline-flex items-center gap-1" title="Direct test download for this product asset">
-                ${icon('download', 11)}
-                <span>Test File</span>
-              </a>` : ''}
-            <button class="button !min-h-8 !py-1 text-xs inline-flex items-center gap-1" data-edit-product="${escapeHtml(p.id)}">
-              ${icon('edit-2', 11)}
-              <span>Edit</span>
-            </button>
-            <button class="button !min-h-8 !py-1 text-xs text-red-600 hover:bg-red-50 inline-flex items-center gap-1" data-delete-product="${escapeHtml(p.id)}">
-              ${icon('trash-2', 11)}
-              <span>Delete</span>
-            </button>
-          </div>
-        </td>`;
-    },
-    8,
-    (container) => {
-      container.querySelectorAll('[data-copy-ad-link]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const slug = btn.dataset.copyAdLink;
-          const adUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(slug)}`;
-          navigator.clipboard.writeText(adUrl);
-          toast('Advertising link copied to clipboard!');
-        });
-      });
-      container.querySelectorAll('[data-edit-product]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const id = btn.dataset.editProduct;
-          const p = products.find((item) => item.id === id);
-          openEditor('product', p || { id });
-        });
-      });
-      container.querySelectorAll('[data-delete-product]').forEach((btn) => {
-        btn.addEventListener('click', () => deleteProduct(btn.dataset.deleteProduct));
-      });
-    }
+  $('#overview-top-products').innerHTML = meterList(
+    (top_products || []).map((p) => ({ label: p.title, value: p.revenue })),
+    { format: (v) => formatMoney(v, 'USD'), accent: true },
   );
-
-  // 4. Category management is intentionally independent from products: editors
-  // can curate navigation before (or after) assigning products to it.
-  renderPaginatedTable(
-    '#categories-table',
-    categories,
-    ['Category', 'Storefront URL', 'Products', 'Visibility', 'Actions'],
-    (category) => {
-      const assigned = products.filter((product) => (product.category || 'General').toLowerCase() === category.name.toLowerCase()).length;
-      return `
-        <td class="px-3 py-3"><strong class="block text-slate-800">${escapeHtml(category.name)}</strong><span class="text-xs text-slate-500">${escapeHtml(category.description || 'No description')}</span></td>
-        <td class="px-3 py-3 text-xs font-mono text-slate-500">/${escapeHtml(category.slug)}</td>
-        <td class="px-3 py-3 text-xs font-bold">${assigned}</td>
-        <td class="px-3 py-3"><span class="tag text-[10px] ${category.is_active ? '!bg-green-100 !text-green-800' : '!bg-slate-100 !text-slate-600'}">${category.is_active ? 'Visible' : 'Hidden'}</span></td>
-        <td class="px-3 py-3"><div class="flex gap-2"><button class="button !min-h-8 !py-1 text-xs" data-edit-category="${escapeHtml(category.id)}">Edit</button><button class="button !min-h-8 !py-1 text-xs" data-toggle-category="${escapeHtml(category.id)}" data-active="${category.is_active}">${category.is_active ? 'Hide' : 'Show'}</button></div></td>`;
-    },
-    8,
-    (container) => {
-      container.querySelectorAll('[data-edit-category]').forEach((btn) => btn.addEventListener('click', () => openEditor('category', categories.find((item) => item.id === btn.dataset.editCategory))));
-      container.querySelectorAll('[data-toggle-category]').forEach((btn) => btn.addEventListener('click', async () => {
-        const { error } = await supabase.from('categories').update({ is_active: btn.dataset.active !== 'true' }).eq('id', btn.dataset.toggleCategory);
-        if (error) toast(error.message, 'error'); else { toast('Category visibility updated.'); load(); }
-      }));
-    }
+  $('#overview-top-categories').innerHTML = meterList(
+    (top_categories || []).map((c) => ({ label: c.name, value: c.revenue })),
+    { format: (v) => formatMoney(v, 'USD') },
   );
-
-  // 5. Promo Codes Table (Paginated)
-  renderPaginatedTable(
-    '#promos-table',
-    promos,
-    ['Promo Code', 'Discount', 'Redemptions', 'Status', 'Actions'],
-    (p) => `
-      <td class="px-3 py-3 font-bold text-[#142c55] font-mono text-xs">${escapeHtml(p.code)}</td>
-      <td class="px-3 py-3 text-xs">${p.discount_type === 'percent' ? `${p.discount_value}%` : `$${p.discount_value}`}</td>
-      <td class="px-3 py-3 text-xs">${p.redemption_count} ${p.max_redemptions ? `/ ${p.max_redemptions}` : ''}</td>
-      <td class="px-3 py-3">
-        <span class="tag text-[10px] ${p.is_active ? '!bg-green-100 !text-green-800' : '!bg-slate-100 !text-slate-600'}">${p.is_active ? 'Active' : 'Paused'}</span>
-      </td>
-      <td class="px-3 py-3">
-        <div class="flex items-center gap-1.5">
-          <button class="button !min-h-8 !py-1 text-xs" data-toggle-promo="${escapeHtml(p.id)}" data-active="${p.is_active}">
-            ${p.is_active ? 'Pause' : 'Activate'}
-          </button>
-          <button class="button !min-h-8 !py-1 text-xs text-red-600 hover:bg-red-50" data-delete-promo="${escapeHtml(p.id)}">Delete</button>
-        </div>
-      </td>`,
-    8,
-    (container) => {
-      container.querySelectorAll('[data-toggle-promo]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const id = btn.dataset.togglePromo;
-          const current = btn.dataset.active === 'true';
-          setButtonLoading(btn, true, 'Updating…');
-          const { error } = await supabase.from('promo_codes').update({ is_active: !current }).eq('id', id);
-          setButtonLoading(btn, false);
-          if (error) toast(error.message, 'error');
-          else {
-            toast(`Promo code ${current ? 'paused' : 'activated'}.`);
-            load();
-          }
-        });
-      });
-      container.querySelectorAll('[data-delete-promo]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          if (!confirm('Delete this promotion code?')) return;
-          const id = btn.dataset.deletePromo;
-          const { error } = await supabase.from('promo_codes').delete().eq('id', id);
-          if (error) toast(error.message, 'error');
-          else {
-            toast('Promo code deleted.');
-            load();
-          }
-        });
-      });
-    }
+  $('#overview-payment-mix').innerHTML = meterList(
+    (payment_mix || []).map((m) => ({ label: m.provider, value: m.revenue })),
+    { format: (v) => formatMoney(v, 'USD') },
   );
-
-  // 5. Blog Posts Table (Paginated)
-  renderPaginatedTable(
-    '#posts-table',
-    posts,
-    ['Article Title', 'Status', 'Date', 'Actions'],
-    (p) => `
-      <td class="px-3 py-3">
-        <strong class="block text-xs font-bold text-[#142c55] truncate max-w-xs">${escapeHtml(p.title)}</strong>
-        <span class="text-[10px] font-mono text-slate-400">/${escapeHtml(p.slug || '')}</span>
-      </td>
-      <td class="px-3 py-3">
-        <span class="tag text-[10px] ${p.status === 'published' ? '!bg-green-100 !text-green-800' : '!bg-amber-100 !text-amber-800'}">${escapeHtml(p.status)}</span>
-      </td>
-      <td class="px-3 py-3 text-xs text-slate-500">${new Date(p.created_at).toLocaleDateString()}</td>
-      <td class="px-3 py-3">
-        <div class="flex items-center gap-1.5">
-          <button class="button !min-h-8 !py-1 text-xs" data-toggle-post="${escapeHtml(p.id)}" data-status="${p.status}">
-            ${p.status === 'published' ? 'Unpublish' : 'Publish'}
-          </button>
-          <button class="button !min-h-8 !py-1 text-xs text-red-600 hover:bg-red-50" data-delete-post="${escapeHtml(p.id)}">Delete</button>
-        </div>
-      </td>`,
-    8,
-    (container) => {
-      container.querySelectorAll('[data-toggle-post]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const id = btn.dataset.togglePost;
-          const isPub = btn.dataset.status === 'published';
-          setButtonLoading(btn, true, 'Updating…');
-          const { error } = await supabase.from('blog_posts').update({ status: isPub ? 'draft' : 'published' }).eq('id', id);
-          setButtonLoading(btn, false);
-          if (error) toast(error.message, 'error');
-          else {
-            toast(`Post ${isPub ? 'unpublished' : 'published'}.`);
-            load();
-          }
-        });
-      });
-      container.querySelectorAll('[data-delete-post]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          if (!confirm('Delete this article?')) return;
-          const id = btn.dataset.deletePost;
-          const { error } = await supabase.from('blog_posts').delete().eq('id', id);
-          if (error) toast(error.message, 'error');
-          else {
-            toast('Article deleted.');
-            load();
-          }
-        });
-      });
-    }
-  );
-
-  // 6. Tickets Table (Paginated)
-  renderPaginatedTable(
-    '#tickets-table',
-    tickets,
-    ['Sender / Email', 'Subject', 'Status', 'Date', 'Actions'],
-    (t) => `
-      <td class="px-3 py-3">
-        <strong class="block text-xs font-bold text-[#142c55]">${escapeHtml(t.name || 'User')}</strong>
-        <span class="text-[10px] text-slate-400">${escapeHtml(t.email)}</span>
-      </td>
-      <td class="px-3 py-3">
-        <span class="text-xs font-medium text-slate-700 block truncate max-w-xs">${escapeHtml(t.subject)}</span>
-        <span class="text-[10px] text-slate-400 line-clamp-1">${escapeHtml(t.message || '')}</span>
-      </td>
-      <td class="px-3 py-3">
-        <span class="tag text-[10px] ${t.status === 'closed' ? '!bg-slate-100 !text-slate-600' : '!bg-orange-100 !text-orange-800'}">${escapeHtml(t.status)}</span>
-      </td>
-      <td class="px-3 py-3 text-xs text-slate-500">${new Date(t.created_at).toLocaleDateString()}</td>
-      <td class="px-3 py-3">
-        <div class="flex items-center gap-1.5">
-          <button class="button !min-h-8 !py-1 text-xs" data-toggle-ticket="${escapeHtml(t.id)}" data-status="${t.status}">
-            ${t.status === 'closed' ? 'Reopen' : 'Resolve'}
-          </button>
-        </div>
-      </td>`,
-    8,
-    (container) => {
-      container.querySelectorAll('[data-toggle-ticket]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const id = btn.dataset.toggleTicket;
-          const isClosed = btn.dataset.status === 'closed';
-          setButtonLoading(btn, true, 'Updating…');
-          const { error } = await supabase.from('tickets').update({ status: isClosed ? 'open' : 'closed' }).eq('id', id);
-          setButtonLoading(btn, false);
-          if (error) toast(error.message, 'error');
-          else {
-            toast(`Ticket marked as ${isClosed ? 'open' : 'resolved'}.`);
-            load();
-          }
-        });
-      });
-    }
-  );
-
-  document.querySelector('#admin-status').textContent = 'Live dashboard data refreshed.';
-  document.querySelector('#admin-status').className = 'status-line success';
-  finishPageLoader();
 }
 
-// ============================================================
-// Customer Management Dialogs
-// ============================================================
-function openCustomerEditor(user) {
-  mode = 'customer';
-  editingId = user.id;
+/* ==========================================================================
+   Orders
+   ========================================================================== */
 
-  document.querySelector('#editor-eyebrow').textContent = 'CUSTOMER MANAGEMENT';
-  document.querySelector('#editor-title').textContent = `Manage: ${user.email}`;
+const ORDER_TABS = [{ value: '', label: 'All' }, ...ORDER_STATUSES.map((value) => ({ value, label: STATUS_BADGE[value][1] }))];
 
-  document.querySelector('#editor-fields').innerHTML = `
-    <div>
-      <label class="label text-xs font-bold">Full Name</label>
-      <input class="field !mt-1" name="full_name" value="${escapeHtml(user.full_name || '')}" placeholder="Customer full name">
-    </div>
+function paintOrdersTabs() {
+  $('#orders-tabs').innerHTML = ORDER_TABS.map(
+    (tab) => `<button type="button" role="tab" aria-selected="${tab.value === state.orders.status}" data-status="${esc(tab.value)}">${esc(tab.label)}</button>`,
+  ).join('');
+}
 
-    <div class="grid grid-cols-2 gap-3">
+async function loadOrders() {
+  paintOrdersTabs();
+  $('#orders-body').innerHTML = `<tr><td colspan="7"><div class="skeleton" style="height:44px"></div></td></tr>`;
+
+  const from = state.orders.page * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  let query = supabase
+    .from('orders')
+    .select(
+      'id,order_no,status,customer_name,customer_email,amount,currency,provider,provider_transaction_id,promo_code,discount_amount,paid_at,created_at,order_items(product_id,title_snapshot,unit_price,quantity)',
+      { count: 'exact' },
+    )
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (state.orders.status) query = query.eq('status', state.orders.status);
+  if (state.orders.search.trim()) {
+    const q = state.orders.search.trim().replace(/[%,]/g, '');
+    query = query.or(`order_no.ilike.%${q}%,customer_name.ilike.%${q}%,customer_email.ilike.%${q}%`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw new Error(describeError(error));
+  state.orders.rows = data || [];
+  state.orders.total = count || 0;
+  paintOrdersTable();
+}
+
+function paintOrdersTable() {
+  const rows = state.orders.rows;
+
+  $('#orders-body').innerHTML = rows.length
+    ? rows
+        .map((order) => {
+          const [tone, label] = STATUS_BADGE[order.status] || ['neutral', order.status];
+          const items = order.order_items || [];
+          return html`
+            <tr>
+              <td class="mono t-12">${order.order_no || order.id.slice(0, 8)}</td>
+              <td>
+                <span class="cell-title">${order.customer_name || 'Unnamed'}</span>
+                <span class="cell-meta">${order.customer_email}</span>
+              </td>
+              <td>
+                <span class="cell-title">${items[0]?.title_snapshot || '—'}</span>
+                ${items.length > 1 ? html`<span class="cell-meta">+${String(items.length - 1)} more</span>` : ''}
+              </td>
+              <td class="t-12 muted">${formatDate(order.created_at)}</td>
+              <td><span class="badge badge--${tone}">${label}</span></td>
+              <td class="num">${formatMoney(order.amount, order.currency)}</td>
+              <td class="num"><button class="btn btn--xs" type="button" data-order="${order.id}">View</button></td>
+            </tr>
+          `;
+        })
+        .join('')
+    : html`
+        <tr>
+          <td colspan="7">
+            <div class="empty">
+              ${raw(icon('inbox'))}
+              <p class="empty__title">No orders found</p>
+              <p class="empty__body">Try a different filter or search term.</p>
+            </div>
+          </td>
+        </tr>
+      `;
+
+  const totalPages = Math.max(1, Math.ceil(state.orders.total / PAGE_SIZE));
+  $('#orders-count').textContent = state.orders.total ? `${formatNumber(state.orders.total)} order${state.orders.total === 1 ? '' : 's'}` : '';
+  $('#orders-pagination').innerHTML = html`
+    <button class="btn btn--sm" type="button" data-page="prev" ${state.orders.page === 0 ? 'disabled' : ''}>${raw(icon('chevronLeft', 14))}</button>
+    <button class="btn btn--sm" type="button" disabled>Page ${state.orders.page + 1} of ${totalPages}</button>
+    <button class="btn btn--sm" type="button" data-page="next" ${state.orders.page + 1 >= totalPages ? 'disabled' : ''}>${raw(icon('chevronRight', 14))}</button>
+  `;
+}
+
+function openOrderModal(orderId) {
+  const order = state.orders.rows.find((entry) => entry.id === orderId);
+  if (!order) return;
+  const [tone, label] = STATUS_BADGE[order.status] || ['neutral', order.status];
+  const items = order.order_items || [];
+
+  const dialog = document.createElement('dialog');
+  dialog.className = 'dialog';
+  dialog.innerHTML = html`
+    <div class="dialog__head">
       <div>
-        <label class="label text-xs font-bold">System Role</label>
-        <select class="field !mt-1" name="role">
-          <option value="customer" ${user.role === 'customer' ? 'selected' : ''}>Customer (Standard)</option>
-          <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Administrator (Full Access)</option>
+        <h2 class="dialog__title">Order ${order.order_no || order.id.slice(0, 8)}</h2>
+        <p class="dialog__sub">${formatDate(order.created_at, 'datetime')}</p>
+      </div>
+      <span class="badge badge--${tone}">${label}</span>
+    </div>
+    <div class="dialog__body stack-5">
+      <div>
+        ${raw(
+          items
+            .map(
+              (item) => html`
+                <div class="summary-line">
+                  <span>${item.title_snapshot}${item.quantity > 1 ? ` × ${item.quantity}` : ''}</span>
+                  <span>${formatMoney(Number(item.unit_price) * item.quantity, order.currency)}</span>
+                </div>
+              `,
+            )
+            .join(''),
+        )}
+        ${Number(order.discount_amount) > 0
+          ? html`
+              <div class="summary-line">
+                <span>Discount${order.promo_code ? ` · ${order.promo_code}` : ''}</span>
+                <span class="ok">−${formatMoney(order.discount_amount, order.currency)}</span>
+              </div>
+            `
+          : ''}
+        <div class="summary-line summary-line--total">
+          <span>Total</span><span>${formatMoney(order.amount, order.currency)}</span>
+        </div>
+      </div>
+      <dl class="kv">
+        <div><dt>Customer</dt><dd>${order.customer_name || '—'}</dd></div>
+        <div><dt>Email</dt><dd class="break">${order.customer_email}</dd></div>
+        <div><dt>Payment method</dt><dd>${order.provider || '—'}</dd></div>
+        <div><dt>Provider reference</dt><dd class="mono break">${order.provider_transaction_id || '—'}</dd></div>
+        <div><dt>Paid</dt><dd>${order.paid_at ? formatDate(order.paid_at, 'datetime') : 'Not yet'}</dd></div>
+      </dl>
+      <label class="field">
+        <span class="field__label">Update status</span>
+        <select class="select" id="order-status-select">
+          ${raw(ORDER_STATUSES.map((value) => `<option value="${value}" ${value === order.status ? 'selected' : ''}>${esc(STATUS_BADGE[value][1])}</option>`).join(''))}
         </select>
-      </div>
-      <div>
-        <label class="label text-xs font-bold">Phone Number</label>
-        <input class="field !mt-1" name="phone" value="${escapeHtml(user.phone || '')}" placeholder="+123456789">
-      </div>
+      </label>
     </div>
-
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="label text-xs font-bold">Country</label>
-        <input class="field !mt-1" name="country" value="${escapeHtml(user.country || '')}" placeholder="e.g. United States, Ghana">
-      </div>
-      <div>
-        <label class="label text-xs font-bold">Occupation</label>
-        <input class="field !mt-1" name="occupation" value="${escapeHtml(user.occupation || '')}" placeholder="Occupation">
-      </div>
+    <div class="dialog__foot dialog__foot--split">
+      <button class="btn" type="button" data-close>Close</button>
+      <button class="btn btn--primary" type="button" data-save>Save status</button>
     </div>
+  `;
 
-    <div>
-      <label class="label text-xs font-bold">Address</label>
-      <textarea class="field !mt-1" name="address" rows="2" placeholder="Customer address">${escapeHtml(user.address || '')}</textarea>
-    </div>`;
+  dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.querySelector('[data-save]').addEventListener('click', async (event) => {
+    const next = dialog.querySelector('#order-status-select').value;
+    if (next === order.status) {
+      dialog.close();
+      return;
+    }
+    setBusy(event.currentTarget, true, 'Saving…');
+    const patch = { status: next };
+    if (next === 'refunded' && order.status !== 'refunded') patch.refunded_at = new Date().toISOString();
+    const { error } = await supabase.from('orders').update(patch).eq('id', order.id);
+    setBusy(event.currentTarget, false);
+    if (error) {
+      toast(describeError(error), 'error');
+      return;
+    }
+    order.status = next;
+    toast('Order status updated.');
+    dialog.close();
+    paintOrdersTable();
+    state.loaded.delete('overview');
+  });
 
-  modal.showModal();
+  document.body.append(dialog);
+  dialog.showModal();
 }
 
-function viewCustomerOrders(user, allOrders) {
-  const userOrders = allOrders.filter((o) => o.user_id === user.id || o.customer_email?.toLowerCase() === user.email?.toLowerCase());
+/* ==========================================================================
+   Customers — aggregated from orders; there is no separate customer API
+   ========================================================================== */
 
-  document.querySelector('#details-eyebrow').textContent = 'CUSTOMER RECORD';
-  document.querySelector('#details-title').textContent = `${user.full_name || user.email}`;
+async function loadCustomers({ force = false } = {}) {
+  if (state.loaded.has('customers') && !force) return paintCustomers();
 
-  let ordersHtml = userOrders.length
-    ? userOrders.map((o) => `
-        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-          <div>
-            <strong class="block text-sm text-[#142c55]">${escapeHtml(o.products?.title || 'Digital Product')}</strong>
-            <span class="text-xs text-slate-400">${new Date(o.created_at).toLocaleString()} · Ref: ${escapeHtml(o.provider_reference || o.id.slice(0, 8))}</span>
-          </div>
-          <div class="text-right">
-            <strong class="block text-sm text-slate-900">${escapeHtml(o.currency || 'USD')} ${Number(o.amount).toFixed(2)}</strong>
-            <span class="tag !text-[10px] ${o.status === 'paid' ? '!bg-green-100 !text-green-800' : '!bg-amber-100 !text-amber-800'}">${escapeHtml(o.status)}</span>
-          </div>
-        </div>
-      `).join('')
-    : '<p class="text-sm text-slate-500 py-2">No orders placed by this customer yet.</p>';
+  const { data, error } = await supabase
+    .from('orders')
+    .select('customer_name,customer_email,customer_country,amount,currency,status,created_at')
+    .order('created_at', { ascending: false })
+    .limit(1000);
+  if (error) throw new Error(describeError(error));
 
-  document.querySelector('#details-content').innerHTML = `
-    <div class="p-4 bg-orange-50 border border-orange-100 rounded-xl space-y-1 text-xs">
-      <div class="flex justify-between"><strong>Email:</strong> <span>${escapeHtml(user.email)}</span></div>
-      <div class="flex justify-between"><strong>Role:</strong> <span>${escapeHtml(user.role)}</span></div>
-      <div class="flex justify-between"><strong>Phone:</strong> <span>${escapeHtml(user.phone || '—')}</span></div>
-      <div class="flex justify-between"><strong>Country:</strong> <span>${escapeHtml(user.country || '—')}</span></div>
-      <div class="flex justify-between"><strong>Joined:</strong> <span>${new Date(user.created_at).toLocaleDateString()}</span></div>
-    </div>
-    
-    <div>
-      <h3 class="font-black text-sm text-[#142c55] mb-2">Order History (${userOrders.length})</h3>
-      <div class="space-y-2 max-h-56 overflow-y-auto">${ordersHtml}</div>
-    </div>`;
-
-  detailsModal.showModal();
-}
-
-// ============================================================
-// Entity Editor Modal (Fetching ALL Details)
-// ============================================================
-async function openEditor(type, existing = null) {
-  mode = type;
-  editingId = existing?.id ?? null;
-
-  document.querySelector('#editor-eyebrow').textContent = type === 'product' ? 'PRODUCT CATALOG' : type === 'post' ? 'JOURNAL CMS' : type === 'category' ? 'CATALOG TAXONOMY' : 'PROMOTIONS';
-  document.querySelector('#editor-title').textContent =
-    type === 'product' ? (existing?.id ? 'Edit product details' : 'Add new product') : type === 'post' ? (existing?.id ? 'Edit article' : 'Write article') : type === 'category' ? (existing?.id ? 'Edit category' : 'Add category') : 'Add promotion code';
-
-  let full = existing || {};
-
-  // Fetch 100% full fresh row from database so no fields are missing or truncated!
-  if (editingId) {
-    const tableTarget = type === 'product' ? 'products' : type === 'post' ? 'blog_posts' : type === 'category' ? 'categories' : 'promo_codes';
-    const { data: fresh } = await supabase.from(tableTarget).select('*').eq('id', editingId).maybeSingle();
-    if (fresh) full = fresh;
-  }
-
-  if (type === 'product') {
-    const isEdit = Boolean(editingId);
-    const op = full.original_price ?? '';
-    const currentCat = full.category || 'General';
-    const initialSlug = full.slug || (full.title ? slugify(full.title) : '');
-    const liveAdUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(initialSlug || 'product-slug')}`;
-
-    if (!isEdit) {
-      // ============================================================
-      // CREATE PRODUCT MODAL (Slug below description)
-      // ============================================================
-      document.querySelector('#editor-fields').innerHTML = `
-        <div class="space-y-4">
-          <div>
-            <label class="label text-xs font-bold text-slate-700" for="product-title-input">Product Title *</label>
-            <input class="field !mt-1" id="product-title-input" name="title" placeholder="e.g. Next.js SaaS Architecture Blueprint" value="" required>
-          </div>
-
-          <div>
-            <label class="label text-xs font-bold text-slate-700" for="product-category-input">Category *</label>
-            <select class="field !mt-1" id="product-category-input" name="category">
-              ${categoryOptions()}
-            </select>
-          </div>
-
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="label text-xs font-bold text-slate-700">Original price (Was)</label>
-              <input class="field !mt-1" id="orig-price-input" name="original_price" type="number" step=".01" min="0" placeholder="0.00">
-            </div>
-            <div>
-              <label class="label text-xs font-bold text-slate-700">Sale price (Now) *</label>
-              <input class="field font-bold !mt-1" id="sale-price-input" name="price" type="number" step=".01" min="0" placeholder="0.00" required>
-            </div>
-            <div>
-              <label class="label text-xs font-bold text-slate-700">Discount %</label>
-              <input class="field !mt-1" id="discount-pct-input" type="number" step="0.1" min="0" max="100" placeholder="Auto">
-            </div>
-          </div>
-
-          <div>
-            <label class="label text-xs font-bold text-slate-700">Cover Image</label>
-            <div class="upload-zone mt-1" id="cover-upload-zone">
-              <input type="file" id="cover-file-input" accept="image/*" class="hidden">
-              <img id="cover-preview" class="hidden h-28 mx-auto rounded-lg object-cover mb-2" alt="">
-              <div id="cover-upload-prompt" class="flex flex-col items-center justify-center gap-1 text-slate-500 py-2">
-                <i data-lucide="upload-cloud" width="24" height="24" class="text-slate-400"></i>
-                <span class="text-xs font-bold text-slate-700">Click or drag image to upload</span>
-                <span class="text-[11px] text-slate-400">Image crop &amp; compress tool opens automatically</span>
-              </div>
-            </div>
-            <input type="hidden" name="cover_url" id="cover-url-input" value="">
-          </div>
-
-          <div>
-            <label class="label text-xs font-bold text-slate-700">Product gallery</label>
-            <p class="help">Add supporting images one at a time. Each image uses the same crop and quality controls as the cover.</p>
-            <div class="mt-2 flex flex-wrap gap-2" id="gallery-preview-list"></div>
-            <div class="upload-zone mt-2 !p-3" id="gallery-upload-zone"><input type="file" id="gallery-file-input" accept="image/*" class="hidden"><span class="text-xs font-bold text-slate-700">Add gallery image</span></div>
-            <input type="hidden" name="gallery_urls" id="gallery-urls-input" value="">
-          </div>
-
-          <div>
-            <label class="label text-xs font-bold text-slate-700">Product Downloadable File Asset *</label>
-            <div class="upload-zone mt-1" id="file-upload-zone">
-              <input type="file" id="product-file-input" class="hidden">
-              <div id="file-upload-prompt" class="flex flex-col items-center justify-center gap-1 text-slate-500 py-2">
-                <i data-lucide="package" width="24" height="24" class="text-slate-400"></i>
-                <span class="text-xs font-bold text-slate-700">Click or drag file (ZIP, PDF, EPUB, DMG…)</span>
-                <span class="text-[11px] text-slate-400">Encrypted in private storage</span>
-              </div>
-            </div>
-            <input type="hidden" name="file_path" id="file-path-input" value="">
-            <p id="file-upload-status" class="text-xs mt-1 text-slate-500 font-medium"></p>
-          </div>
-
-          <div>
-            <label class="label text-xs font-bold text-slate-700">Product Description</label>
-            <textarea class="field !mt-1" name="description" placeholder="Comprehensive product overview, highlights, features, and bundle contents…" rows="3"></textarea>
-          </div>
-
-          <div class="form-section-card space-y-3">
-            <div class="flex items-center justify-between">
-              <label class="label text-xs font-bold text-slate-700" for="product-slug-input">SEO URL Slug *</label>
-              <button type="button" id="auto-slug-btn" class="text-xs text-orange-600 font-bold hover:underline flex items-center gap-1">
-                <i data-lucide="zap" width="12" height="12"></i>
-                <span>Auto Generate</span>
-              </button>
-            </div>
-            <input class="field font-mono text-xs !mt-1" id="product-slug-input" name="slug" placeholder="e.g. nextjs-saas-blueprint" value="" required>
-
-            <div class="p-2.5 bg-white rounded-lg border border-slate-200 text-xs space-y-1">
-              <div class="flex items-center justify-between font-bold text-slate-600">
-                <span>Checkout Link Preview</span>
-                <button type="button" id="copy-modal-ad-link" class="text-orange-600 font-bold hover:underline flex items-center gap-1">
-                  <i data-lucide="copy" width="12" height="12"></i>
-                  <span>Copy</span>
-                </button>
-              </div>
-              <div id="modal-ad-link-preview" class="font-mono text-[11px] text-slate-500 truncate">
-                ${liveAdUrl}
-              </div>
-            </div>
-          </div>
-
-          <label class="flex items-center gap-2 text-sm font-semibold cursor-pointer pt-1">
-            <input type="checkbox" name="is_published" checked class="rounded text-orange-600">
-            <span>Publish immediately in store catalog</span>
-          </label>
-        </div>`;
-    } else {
-      // ============================================================
-      // UPDATE PRODUCT MODAL (Slug placed below description)
-      // ============================================================
-      const galleryVal = Array.isArray(full.gallery_urls) ? full.gallery_urls.join(', ') : (full.gallery_urls || '');
-
-      document.querySelector('#editor-fields').innerHTML = `
-        <div class="space-y-4">
-          <div class="form-section-card space-y-3">
-            <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Product Information</h3>
-            <div>
-              <label class="label text-xs" for="product-title-input">Product Title *</label>
-              <input class="field !mt-1" id="product-title-input" name="title" value="${escapeHtml(full.title ?? '')}" required>
-            </div>
-
-            <div>
-            <label class="label text-xs" for="product-category-input">Category *</label>
-            <select class="field !mt-1" id="product-category-input" name="category">
-                ${categoryOptions(currentCat)}
-              </select>
-            </div>
-          </div>
-
-          <div class="form-section-card space-y-3">
-            <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Pricing &amp; Discounts</h3>
-            <div class="grid grid-cols-3 gap-3">
-              <div>
-                <label class="label text-xs">Original price (Was)</label>
-                <input class="field !mt-1" id="orig-price-input" name="original_price" type="number" step=".01" min="0" placeholder="0.00" value="${op}">
-              </div>
-              <div>
-                <label class="label text-xs font-bold">Sale price (Now) *</label>
-                <input class="field font-bold !mt-1" id="sale-price-input" name="price" type="number" step=".01" min="0" placeholder="0.00" value="${full.price ?? ''}" required>
-              </div>
-              <div>
-                <label class="label text-xs">Discount %</label>
-                <input class="field !mt-1" id="discount-pct-input" type="number" step="0.1" min="0" max="100" placeholder="Auto">
-              </div>
-            </div>
-          </div>
-
-          <div class="form-section-card space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Cover Image &amp; Gallery</h3>
-              ${full.cover_url ? `<span class="tag !text-[10px] !bg-green-100 !text-green-800">Cover Active</span>` : ''}
-            </div>
-
-            <div class="flex flex-wrap sm:flex-nowrap items-center gap-4">
-              ${
-                full.cover_url
-                  ? `<div class="relative group shrink-0 w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-100">
-                      <img id="cover-preview" src="${escapeHtml(full.cover_url)}" class="w-full h-full object-cover" alt="Cover">
-                     </div>`
-                  : `<img id="cover-preview" class="hidden w-20 h-20 rounded-xl object-cover border border-slate-200" alt="">`
-              }
-              <div class="upload-zone flex-1 !p-3" id="cover-upload-zone">
-                <input type="file" id="cover-file-input" accept="image/*" class="hidden">
-                <p id="cover-upload-prompt" class="text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5">
-                  <i data-lucide="image" width="14" height="14"></i>
-                  <span>${full.cover_url ? 'Replace cover image' : 'Upload cover image'}</span>
-                </p>
-                <p class="text-[10px] text-slate-400 mt-0.5">Click or drag to crop &amp; compress</p>
-              </div>
-            </div>
-            <input type="hidden" name="cover_url" id="cover-url-input" value="${escapeHtml(full.cover_url ?? '')}">
-
-            <div>
-              <label class="label text-xs">Product gallery</label>
-              <p class="help">Supporting images display as a product gallery at checkout. Add, crop and remove them here.</p>
-              <div class="mt-2 flex flex-wrap gap-2" id="gallery-preview-list"></div>
-              <div class="upload-zone mt-2 !p-3" id="gallery-upload-zone"><input type="file" id="gallery-file-input" accept="image/*" class="hidden"><span class="text-xs font-bold text-slate-700">Add gallery image</span></div>
-              <input type="hidden" name="gallery_urls" id="gallery-urls-input" value="${escapeHtml(galleryVal)}">
-            </div>
-          </div>
-
-          <div class="form-section-card space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="text-xs font-black text-[#142c55] uppercase tracking-wider">Downloadable Asset</h3>
-              ${full.file_path ? `<span class="tag !text-[10px] !bg-green-100 !text-green-800">File Linked</span>` : '<span class="tag !text-[10px] !bg-amber-100 !text-amber-800">Pending Upload</span>'}
-            </div>
-
-            <div class="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-3">
-              <div class="flex items-center gap-2.5 min-w-0">
-                <div class="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 text-orange-600 flex items-center justify-center shrink-0">
-                  <i data-lucide="file-check" width="16" height="16"></i>
-                </div>
-                <div class="min-w-0">
-                  <span class="block text-xs font-bold text-slate-800 truncate">${full.file_path ? escapeHtml(full.file_path) : 'No file uploaded yet'}</span>
-                  <span class="block text-[10px] text-slate-400">Stored in encrypted bucket</span>
-                </div>
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                ${
-                  full.file_path
-                    ? `<a href="${escapeHtml(full.file_path.includes('?') ? full.file_path + '&download=' : full.file_path + '?download=')}" target="_blank" download class="button !min-h-7 !py-1 !px-2.5 text-[11px] font-bold text-blue-600 hover:bg-blue-50 inline-flex items-center gap-1">
-                        <i data-lucide="download" width="11" height="11"></i>
-                        <span>Test File</span>
-                       </a>`
-                    : ''
-                }
-                <div class="upload-zone !p-1.5 !px-3 cursor-pointer text-xs font-bold text-orange-600 hover:bg-orange-50 border-orange-200" id="file-upload-zone">
-                  <input type="file" id="product-file-input" class="hidden">
-                  <span id="file-upload-prompt" class="flex items-center gap-1 text-xs">
-                    <i data-lucide="upload" width="12" height="12"></i>
-                    <span>${full.file_path ? 'Replace File' : 'Upload File'}</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-            <input type="hidden" name="file_path" id="file-path-input" value="${escapeHtml(full.file_path ?? '')}">
-            <p id="file-upload-status" class="text-xs text-slate-500 font-medium"></p>
-          </div>
-
-          <div class="form-section-card space-y-2">
-            <div class="flex items-center justify-between">
-              <label class="text-xs font-black text-[#142c55] uppercase tracking-wider">Product Description</label>
-              <button type="button" id="toggle-desc-size-btn" class="text-xs text-orange-600 font-bold hover:underline">Expand Editor</button>
-            </div>
-            <textarea class="field !mt-1" id="product-desc-textarea" name="description" placeholder="Comprehensive product description, chapters, instructions…" rows="3">${escapeHtml(full.description ?? '')}</textarea>
-          </div>
-
-          <div class="form-section-card space-y-3">
-            <div class="flex items-center justify-between">
-              <label class="text-xs font-black text-[#142c55] uppercase tracking-wider" for="product-slug-input">SEO URL Slug *</label>
-              <button type="button" id="auto-slug-btn" class="text-xs text-orange-600 font-bold hover:underline flex items-center gap-1">
-                <i data-lucide="zap" width="12" height="12"></i>
-                <span>Auto Generate</span>
-              </button>
-            </div>
-            <input class="field font-mono text-xs !mt-1" id="product-slug-input" name="slug" value="${escapeHtml(initialSlug)}" required>
-
-            <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5 shadow-inner">
-              <div class="flex items-center justify-between text-xs font-bold text-slate-700">
-                <span class="flex items-center gap-1.5">
-                  <i data-lucide="link" width="13" height="13" class="text-orange-500"></i>
-                  <span>Live Advertising &amp; Checkout Link</span>
-                </span>
-                <button type="button" id="copy-modal-ad-link" class="text-orange-600 font-bold hover:underline flex items-center gap-1">
-                  <i data-lucide="copy" width="12" height="12"></i>
-                  <span>Copy Link</span>
-                </button>
-              </div>
-              <div id="modal-ad-link-preview" class="font-mono text-[11px] text-slate-600 truncate">
-                ${liveAdUrl}
-              </div>
-            </div>
-          </div>
-
-          <label class="flex items-center gap-2 text-sm font-semibold cursor-pointer pt-1">
-            <input type="checkbox" name="is_published" ${full.is_published ? 'checked' : ''} class="rounded text-orange-600">
-            <span>Publish in store catalog</span>
-          </label>
-        </div>`;
-
-      // Wire description toggle
-      const descArea = document.querySelector('#product-desc-textarea');
-      const toggleDescBtn = document.querySelector('#toggle-desc-size-btn');
-      toggleDescBtn?.addEventListener('click', () => {
-        if (descArea.rows === 3) {
-          descArea.rows = 8;
-          toggleDescBtn.textContent = 'Collapse';
-        } else {
-          descArea.rows = 3;
-          toggleDescBtn.textContent = 'Expand Editor';
-        }
+  const byEmail = new Map();
+  for (const row of data || []) {
+    const key = row.customer_email;
+    if (!key) continue;
+    if (!byEmail.has(key)) {
+      byEmail.set(key, {
+        name: row.customer_name,
+        email: key,
+        country: row.customer_country,
+        currency: row.currency,
+        orders: 0,
+        spend: 0,
+        pending: 0,
+        last: row.created_at,
+        history: [],
       });
     }
-
-    // Live shareable ad link updates
-    const slugInput = document.querySelector('#product-slug-input');
-    const adPreview = document.querySelector('#modal-ad-link-preview');
-    const copyAdBtn = document.querySelector('#copy-modal-ad-link');
-
-    function updateAdLink() {
-      const s = slugInput?.value.trim() || 'product-slug';
-      const u = `${window.location.origin}/checkout.html?product=${encodeURIComponent(s)}`;
-      if (adPreview) adPreview.textContent = u;
+    const entry = byEmail.get(key);
+    entry.history.push(row);
+    if (row.status === 'paid') {
+      entry.orders += 1;
+      entry.spend += Number(row.amount) || 0;
     }
+    if (row.status === 'pending') entry.pending += 1;
+    if (!entry.name && row.customer_name) entry.name = row.customer_name;
+    if (new Date(row.created_at) > new Date(entry.last)) entry.last = row.created_at;
+  }
 
-    slugInput?.addEventListener('input', updateAdLink);
-    document.querySelector('#product-title-input')?.addEventListener('input', () => setTimeout(updateAdLink, 10));
-    document.querySelector('#auto-slug-btn')?.addEventListener('click', () => {
-      const titleVal = document.querySelector('#product-title-input')?.value || '';
-      if (slugInput && titleVal) {
-        slugInput.value = slugify(titleVal);
-        updateAdLink();
-      }
-    });
+  state.customers.all = Array.from(byEmail.values()).sort((a, b) => b.spend - a.spend);
+  state.loaded.add('customers');
+  paintCustomers();
+}
 
-    copyAdBtn?.addEventListener('click', () => {
-      const s = slugInput?.value.trim() || 'product-slug';
-      const u = `${window.location.origin}/checkout.html?product=${encodeURIComponent(s)}`;
-      navigator.clipboard.writeText(u);
-      toast('Advertising link copied to clipboard!');
-    });
+function paintCustomers() {
+  const q = state.customers.search.trim().toLowerCase();
+  const rows = q
+    ? state.customers.all.filter((c) => (c.name || '').toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
+    : state.customers.all;
 
-    renderIcons();
-    setTimeout(wireUploadZones, 0);
-  } else if (type === 'post') {
-    document.querySelector('#editor-fields').innerHTML = `
-      <div><label class="label">Article title *</label><input id="post-title-input" class="field" name="title" value="${escapeHtml(full.title ?? '')}" required></div>
-      <div><label class="label">SEO slug *</label><input id="post-slug-input" class="field font-mono text-xs" name="slug" value="${escapeHtml(full.slug ?? '')}" required></div>
-      <div><label class="label">Excerpt</label><textarea class="field" name="excerpt" rows="2">${escapeHtml(full.excerpt ?? '')}</textarea></div>
-      <div><label class="label">Article content *</label><textarea class="field" name="content" rows="12" required>${escapeHtml(full.content ?? '')}</textarea></div>
-      <div class="grid grid-cols-2 gap-3"><label><span class="label">Cover image URL</span><input class="field" name="cover_url" value="${escapeHtml(full.cover_url ?? '')}"></label><label><span class="label">Source URL</span><input class="field" name="source_url" value="${escapeHtml(full.source_url ?? '')}"></label></div>
-      <label class="flex gap-2 text-sm font-bold"><input type="checkbox" name="published" ${full.status === 'published' ? 'checked' : ''}> Publish immediately</label>`;
-    const title = document.querySelector('#post-title-input'); const slug = document.querySelector('#post-slug-input');
-    title?.addEventListener('input', () => { if (!slug.dataset.edited) slug.value = slugify(title.value); }); slug?.addEventListener('input', () => { slug.dataset.edited = 'true'; });
-  } else if (type === 'category') {
-    document.querySelector('#editor-fields').innerHTML = `
-      <div class="form-section-card space-y-4">
-        <div><label class="label">Category name *</label><input id="category-name-input" class="field" name="name" value="${escapeHtml(full.name ?? '')}" placeholder="e.g. Business templates" required></div>
-        <div><label class="label">Storefront slug *</label><input id="category-slug-input" class="field font-mono text-xs" name="slug" value="${escapeHtml(full.slug ?? '')}" placeholder="business-templates" required></div>
-        <div><label class="label">Description</label><textarea class="field" name="description" rows="3" placeholder="A short customer-facing explanation">${escapeHtml(full.description ?? '')}</textarea></div>
-        <div class="grid gap-3 sm:grid-cols-2"><label><span class="label">Display order</span><input class="field" name="sort_order" type="number" min="0" value="${full.sort_order ?? 0}"></label><label class="flex items-end gap-2 pb-3 text-sm font-bold"><input type="checkbox" name="is_active" ${full.is_active !== false ? 'checked' : ''}> Show in the storefront</label></div>
-      </div>`;
-    const name = document.querySelector('#category-name-input'); const slug = document.querySelector('#category-slug-input');
-    name?.addEventListener('input', () => { if (!slug.dataset.edited) slug.value = slugify(name.value); });
-    slug?.addEventListener('input', () => { slug.dataset.edited = 'true'; });
-  } else if (type === 'promo') {
-    document.querySelector('#editor-fields').innerHTML = `
+  $('#customers-body').innerHTML = rows.length
+    ? rows
+        .map(
+          (c) => html`
+            <tr>
+              <td>
+                <span class="cell-title">${c.name || 'Unnamed customer'}</span>
+                <span class="cell-meta">${c.email}</span>
+              </td>
+              <td class="t-12 muted">${c.country || '—'}</td>
+              <td class="num">${formatNumber(c.orders)}${c.pending ? ` (+${String(c.pending)} pending)` : ''}</td>
+              <td class="num">${formatMoney(c.spend, c.currency)}</td>
+              <td class="t-12 muted">${relativeTime(c.last)}</td>
+              <td class="num"><button class="btn btn--xs" type="button" data-customer="${c.email}">View</button></td>
+            </tr>
+          `,
+        )
+        .join('')
+    : html`
+        <tr>
+          <td colspan="6">
+            <div class="empty">${raw(icon('users'))}<p class="empty__title">No customers found</p></div>
+          </td>
+        </tr>
+      `;
+}
+
+function openCustomerModal(email) {
+  const customer = state.customers.all.find((c) => c.email === email);
+  if (!customer) return;
+
+  const dialog = document.createElement('dialog');
+  dialog.className = 'dialog';
+  dialog.innerHTML = html`
+    <div class="dialog__head">
       <div>
-        <label class="label">Promo Code *</label>
-        <input class="field font-mono uppercase font-bold" name="code" placeholder="e.g. SAVE20" value="${escapeHtml(full.code ?? '')}" required>
+        <h2 class="dialog__title">${customer.name || 'Unnamed customer'}</h2>
+        <p class="dialog__sub">${customer.email}</p>
       </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="label">Discount Type</label>
-          <select class="field" name="discount_type">
-            <option value="percent" ${full.discount_type === 'percent' ? 'selected' : ''}>Percentage (%)</option>
-            <option value="fixed" ${full.discount_type === 'fixed' ? 'selected' : ''}>Fixed Amount ($)</option>
-          </select>
+    </div>
+    <div class="dialog__body stack-5">
+      <div class="stat-row">
+        <div class="metric">
+          <span class="metric__label">Lifetime spend</span>
+          <span class="metric__value">${formatMoney(customer.spend, customer.currency)}</span>
+          <span class="metric__foot">${formatNumber(customer.orders)} paid order${customer.orders === 1 ? '' : 's'}</span>
         </div>
-        <div>
-          <label class="label">Discount Value *</label>
-          <input class="field" name="discount_value" type="number" step=".01" min="0.01" placeholder="e.g. 20" value="${full.discount_value ?? ''}" required>
+        <div class="metric">
+          <span class="metric__label">Last order</span>
+          <span class="metric__value" style="font-size: var(--t-18)">${formatDate(customer.last)}</span>
+          <span class="metric__foot">${customer.country || 'Country unknown'}</span>
         </div>
       </div>
       <div>
-        <label class="label">Max Redemptions (Optional)</label>
-        <input class="field" name="max_redemptions" type="number" min="1" placeholder="Unlimited if empty" value="${full.max_redemptions ?? ''}">`
-  }
+        <span class="panel__title">Order history</span>
+        <div class="mt-3">
+          ${raw(
+            customer.history
+              .slice(0, 20)
+              .map((row) => {
+                const [tone, label] = STATUS_BADGE[row.status] || ['neutral', row.status];
+                return html`
+                  <div class="summary-line">
+                    <span>${formatDate(row.created_at)} <span class="badge badge--${tone}">${label}</span></span>
+                    <span>${formatMoney(row.amount, row.currency)}</span>
+                  </div>
+                `;
+              })
+              .join(''),
+          )}
+        </div>
+      </div>
+    </div>
+    <div class="dialog__foot">
+      <button class="btn btn--primary" type="button" data-close>Close</button>
+    </div>
+  `;
 
-  if (modal && !modal.open) {
-    modal.showModal();
-  }
+  dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
 }
 
-async function deleteProduct(id) {
-  if (!confirm('Are you sure you want to delete this product? This action cannot be undone.')) return;
-  const { error } = await supabase.from('products').delete().eq('id', id);
-  if (error) {
-    toast(error.message, 'error');
-    return;
-  }
-  toast('Product deleted.');
-  // Refresh sitemap in background
-  supabase.functions.invoke('sitemap').catch(() => {});
-  load();
+/* ==========================================================================
+   Tickets
+   ========================================================================== */
+
+const TICKET_TABS = [{ value: '', label: 'All' }, ...TICKET_STATUSES.map((value) => ({ value, label: TICKET_BADGE[value][1] }))];
+
+function paintTicketsTabs() {
+  $('#tickets-tabs').innerHTML = TICKET_TABS.map(
+    (tab) => `<button type="button" role="tab" aria-selected="${tab.value === state.tickets.status}" data-status="${esc(tab.value)}">${esc(tab.label)}</button>`,
+  ).join('');
 }
 
-// ============================================================
-// Form Submit Handling
-// ============================================================
-document.querySelector('#editor-form').onsubmit = async (e) => {
-  e.preventDefault();
-  const submitBtn = document.querySelector('#editor-submit-btn');
-  const v = Object.fromEntries(new FormData(e.currentTarget).entries());
-
-  if (mode === 'customer') {
-    setButtonLoading(submitBtn, true, 'Updating customer…');
-    const { data: res, error } = await supabase.functions.invoke('admin-dashboard', {
-      body: {
-        action: 'update_user_role',
-        target_user_id: editingId,
-        role: v.role,
-        full_name: v.full_name,
-        phone: v.phone,
-        country: v.country,
-        address: v.address,
-        occupation: v.occupation,
-      },
-    });
-    setButtonLoading(submitBtn, false);
-
-    if (error || res?.error) {
-      toast(res?.error || error?.message, 'error');
-      return;
-    }
-
-    toast('Customer updated successfully!');
-    modal.close();
-    load();
-    return;
+async function loadTickets({ force = false } = {}) {
+  if (!state.loaded.has('tickets') || force) {
+    const { data, error } = await supabase
+      .from('tickets')
+      .select('id,name,email,order_ref,category,subject,message,status,created_at')
+      .order('created_at', { ascending: false })
+      .limit(300);
+    if (error) throw new Error(describeError(error));
+    state.tickets.all = data || [];
+    state.loaded.add('tickets');
   }
-
-  if (mode === 'product') {
-    v.price = Number(v.price);
-    v.currency = 'USD';
-    v.is_published = e.currentTarget.elements.is_published.checked;
-    v.original_price = v.original_price ? Number(v.original_price) : null;
-    v.category = v.category || 'General';
-    v.slug = slugify(v.slug || v.title);
-
-    if (v.gallery_urls) {
-      v.gallery_urls = v.gallery_urls.split(',').map((s) => s.trim()).filter(Boolean);
-    } else {
-      v.gallery_urls = null;
-    }
-
-    if (!v.slug) {
-      toast('Please enter a title or slug for the product.', 'error');
-      return;
-    }
-    if (!v.file_path && !editingId) {
-      toast('Please upload a downloadable product file first.', 'error');
-      return;
-    }
-    if (!v.file_path) delete v.file_path;
-    delete v[''];
-  } else if (mode === 'post') {
-    v.slug = slugify(v.slug || v.title);
-    v.status = e.currentTarget.elements.published.checked ? 'published' : 'draft';
-    v.published_at = v.status === 'published' ? new Date().toISOString() : null;
-    delete v.published;
-  } else if (mode === 'promo') {
-    v.code = v.code.toUpperCase().trim();
-    v.discount_value = Number(v.discount_value);
-    v.max_redemptions = v.max_redemptions ? parseInt(v.max_redemptions) : null;
-  } else if (mode === 'category') {
-    v.slug = slugify(v.slug || v.name);
-    v.sort_order = Number(v.sort_order || 0);
-    v.is_active = e.currentTarget.elements.is_active.checked;
-    if (!v.slug) {
-      toast('Please enter a category name or slug.', 'error');
-      return;
-    }
-  }
-
-  setButtonLoading(submitBtn, true, 'Saving…');
-  let error;
-  if (mode === 'product' && editingId) {
-    ({ error } = await supabase.from('products').update(v).eq('id', editingId));
-  } else if (mode === 'product') {
-    ({ error } = await supabase.from('products').insert(v));
-  } else if (mode === 'post' && editingId) {
-    ({ error } = await supabase.from('blog_posts').update(v).eq('id', editingId));
-  } else if (mode === 'post') {
-    ({ error } = await supabase.from('blog_posts').insert(v));
-  } else if (mode === 'category' && editingId) {
-    ({ error } = await supabase.from('categories').update(v).eq('id', editingId));
-  } else if (mode === 'category') {
-    ({ error } = await supabase.from('categories').insert(v));
-  } else {
-    ({ error } = await supabase.from('promo_codes').insert(v));
-  }
-  setButtonLoading(submitBtn, false);
-
-  if (error) {
-    toast(error.message, 'error');
-    return;
-  }
-
-  modal.close();
-  toast(mode === 'category' ? `Category ${editingId ? 'updated' : 'created'} successfully.` : editingId ? 'Changes saved successfully.' : 'Record created successfully.');
-
-  // Automatically refresh sitemap on product changes
-  supabase.functions.invoke('sitemap').catch(() => {});
-
-  load();
-};
-
-// Wiring dialog close & modal buttons
-document.querySelector('#new-product')?.addEventListener('click', (e) => {
-  e.preventDefault();
-  openEditor('product');
-});
-
-document.querySelector('#new-promo')?.addEventListener('click', (e) => {
-  e.preventDefault();
-  openEditor('promo');
-});
-
-document.querySelector('#new-category')?.addEventListener('click', () => openEditor('category'));
-document.querySelector('#new-post')?.addEventListener('click', () => openEditor('post'));
-
-async function runAutomation(functionName, button) {
-  const feedback = document.querySelector('#automation-feedback');
-  setButtonLoading(button, true, 'Running…');
-  if (functionName === 'sitemap') {
-    window.open(`${CONFIG.PAYMENT_FUNCTIONS_BASE}/sitemap`, '_blank', 'noopener');
-    setButtonLoading(button, false);
-    feedback.textContent = 'The live dynamic sitemap opened in a new tab.';
-    feedback.className = 'status-line success mt-4';
-    return;
-  }
-  const { data, error } = await supabase.functions.invoke(functionName);
-  setButtonLoading(button, false);
-  if (error || data?.error) { feedback.textContent = data?.error || error?.message || 'Automation failed.'; feedback.className = 'status-line error mt-4'; return; }
-  feedback.textContent = `${functionName.replace('-', ' ')} completed.`; feedback.className = 'status-line success mt-4'; toast('Automation completed.'); load();
+  paintTicketsTabs();
+  paintTickets();
 }
-document.querySelectorAll('#run-daily-content, #run-daily-content-secondary').forEach((button) => button?.addEventListener('click', () => runAutomation('daily-content', button)));
-document.querySelector('#run-search-index')?.addEventListener('click', (event) => runAutomation('search-index', event.currentTarget));
-document.querySelector('#refresh-sitemap')?.addEventListener('click', (event) => runAutomation('sitemap', event.currentTarget));
 
-document.querySelector('#close-modal')?.addEventListener('click', () => modal?.close());
-document.querySelector('#cancel-modal-btn')?.addEventListener('click', () => modal?.close());
-document.querySelector('#close-details-modal')?.addEventListener('click', () => detailsModal?.close());
-document.querySelector('#close-details-btn')?.addEventListener('click', () => detailsModal?.close());
+function paintTickets() {
+  const rows = state.tickets.status ? state.tickets.all.filter((t) => t.status === state.tickets.status) : state.tickets.all;
 
-// Close dialogs ONLY when strictly clicking on the outer backdrop outside modal rect
-function setupBackdropClose(dialog) {
-  if (!dialog) return;
-  dialog.addEventListener('click', (e) => {
-    const rect = dialog.getBoundingClientRect();
-    const isOutside =
-      e.clientX < rect.left ||
-      e.clientX > rect.right ||
-      e.clientY < rect.top ||
-      e.clientY > rect.bottom;
-    if (isOutside && dialog.open) {
+  $('#tickets-body').innerHTML = rows.length
+    ? rows
+        .map((ticket) => {
+          const [tone, label] = TICKET_BADGE[ticket.status] || ['neutral', ticket.status];
+          return html`
+            <tr>
+              <td>
+                <span class="cell-title">${ticket.subject}</span>
+                ${ticket.order_ref ? html`<span class="cell-meta">Ref ${ticket.order_ref}</span>` : ''}
+              </td>
+              <td>
+                <span class="cell-title">${ticket.name || 'Anonymous'}</span>
+                <span class="cell-meta">${ticket.email}</span>
+              </td>
+              <td class="t-12 muted">${ticket.category}</td>
+              <td class="t-12 muted">${relativeTime(ticket.created_at)}</td>
+              <td><span class="badge badge--${tone}">${label}</span></td>
+              <td class="num"><button class="btn btn--xs" type="button" data-ticket="${ticket.id}">Open</button></td>
+            </tr>
+          `;
+        })
+        .join('')
+    : html`
+        <tr>
+          <td colspan="6">
+            <div class="empty">${raw(icon('inbox'))}<p class="empty__title">No tickets here</p></div>
+          </td>
+        </tr>
+      `;
+}
+
+function openTicketModal(id) {
+  const ticket = state.tickets.all.find((t) => t.id === id);
+  if (!ticket) return;
+  const [tone, label] = TICKET_BADGE[ticket.status] || ['neutral', ticket.status];
+
+  const dialog = document.createElement('dialog');
+  dialog.className = 'dialog';
+  dialog.innerHTML = html`
+    <div class="dialog__head">
+      <div>
+        <h2 class="dialog__title">${ticket.subject}</h2>
+        <p class="dialog__sub">${ticket.name || 'Anonymous'} · ${ticket.email} · ${formatDate(ticket.created_at, 'datetime')}</p>
+      </div>
+      <span class="badge badge--${tone}">${label}</span>
+    </div>
+    <div class="dialog__body stack-5">
+      <dl class="kv">
+        <div><dt>Category</dt><dd>${ticket.category}</dd></div>
+        ${ticket.order_ref ? html`<div><dt>Order reference</dt><dd class="mono">${ticket.order_ref}</dd></div>` : ''}
+      </dl>
+      <p class="t-14" style="white-space: pre-wrap">${ticket.message}</p>
+      <label class="field">
+        <span class="field__label">Update status</span>
+        <select class="select" id="ticket-status-select">
+          ${raw(TICKET_STATUSES.map((value) => `<option value="${value}" ${value === ticket.status ? 'selected' : ''}>${esc(TICKET_BADGE[value][1])}</option>`).join(''))}
+        </select>
+      </label>
+    </div>
+    <div class="dialog__foot dialog__foot--split">
+      <a class="btn" href="mailto:${ticket.email}?subject=${encodeURIComponent(`Re: ${ticket.subject}`)}">${raw(icon('mail', 14))}<span>Reply by email</span></a>
+      <button class="btn btn--primary" type="button" data-save>Save status</button>
+    </div>
+  `;
+
+  dialog.querySelector('[data-save]').addEventListener('click', async (event) => {
+    const next = dialog.querySelector('#ticket-status-select').value;
+    if (next === ticket.status) {
       dialog.close();
+      return;
     }
+    setBusy(event.currentTarget, true, 'Saving…');
+    const { error } = await supabase.from('tickets').update({ status: next }).eq('id', ticket.id);
+    setBusy(event.currentTarget, false);
+    if (error) {
+      toast(describeError(error), 'error');
+      return;
+    }
+    ticket.status = next;
+    toast('Ticket status updated.');
+    dialog.close();
+    paintTickets();
+    refreshCounts();
   });
+
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
 }
 
-[modal, detailsModal, imgModal].forEach(setupBackdropClose);
+/* ==========================================================================
+   Settings
+   ========================================================================== */
 
-// Sign out + CMS settings
-document.querySelectorAll('#admin-signout, #admin-header-signout').forEach((btn) => {
-  btn.onclick = async () => {
+function toLocalInput(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+async function loadSettings({ force = false } = {}) {
+  if (state.loaded.has('settings') && !force) return;
+  const { data, error } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
+  if (error) throw new Error(describeError(error));
+
+  const form = $('#settings-form');
+  const s = data || {};
+  form.site_title.value = s.site_title || '';
+  form.tagline.value = s.tagline || '';
+  form.support_email.value = s.support_email || '';
+  form.default_currency.value = s.default_currency || 'USD';
+  form.announcement.value = s.announcement || '';
+  form.announcement_active.checked = Boolean(s.announcement_active);
+  form.announcement_ends_at.value = s.announcement_ends_at ? toLocalInput(s.announcement_ends_at) : '';
+  form.checkout_note.value = s.checkout_note || '';
+  state.loaded.add('settings');
+}
+
+/* ==========================================================================
+   Boot
+   ========================================================================== */
+
+async function refreshCounts() {
+  const [{ count: pendingOrders }, { count: openTickets }] = await Promise.all([
+    supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase.from('tickets').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+  ]);
+  const orderBadge = $('#count-orders');
+  if (orderBadge) orderBadge.textContent = pendingOrders ? String(pendingOrders) : '';
+  const ticketBadge = $('#count-tickets');
+  if (ticketBadge) ticketBadge.textContent = openTickets ? String(openTickets) : '';
+}
+
+async function boot() {
+  const account = await requireAdmin('admin.html');
+  if (!account) return;
+  state.account = account;
+
+  $('#admin-user').textContent = account.profile?.full_name || account.user.email;
+
+  $('#admin-theme').innerHTML = icon(currentTheme() === 'dark' ? 'sun' : 'moon');
+  $('#admin-theme').addEventListener('click', (event) => {
+    const next = toggleTheme();
+    event.currentTarget.innerHTML = icon(next === 'dark' ? 'sun' : 'moon');
+  });
+
+  $('#rail-toggle').innerHTML = icon('menu');
+  $('#rail-toggle').addEventListener('click', () => setRail(true));
+  $('#scrim').addEventListener('click', () => setRail(false));
+
+  $('#admin-signout').addEventListener('click', async () => {
     await supabase.auth.signOut();
-    location.href = './index.html';
-  };
-});
+    window.location.href = './index.html';
+  });
 
-document.querySelector('#cms-form')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const v = Object.fromEntries(new FormData(e.currentTarget).entries());
-  const { error } = await supabase.from('site_settings').upsert({ id: 1, ...v, updated_by: account.user.id });
-  toast(error ? error.message : 'Content saved.', error ? 'error' : 'success');
-});
+  on($('#orders-tabs'), 'click', 'button', (event, button) => {
+    state.orders.status = button.dataset.status;
+    state.orders.page = 0;
+    loadOrders().catch((error) => toast(error.message, 'error'));
+  });
+  on($('#orders-body'), 'click', '[data-order]', (event, button) => openOrderModal(button.dataset.order));
+  $('#orders-search').addEventListener(
+    'input',
+    debounce((event) => {
+      state.orders.search = event.target.value;
+      state.orders.page = 0;
+      loadOrders().catch((error) => toast(error.message, 'error'));
+    }, 300),
+  );
+  on($('#orders-pagination'), 'click', 'button[data-page]', (event, button) => {
+    state.orders.page += button.dataset.page === 'next' ? 1 : -1;
+    loadOrders().catch((error) => toast(error.message, 'error'));
+  });
 
-activateAdminScreen();
-load().catch((err) => {
-  console.error('Admin initialization error:', err);
-  finishPageLoader();
+  on($('#customers-body'), 'click', '[data-customer]', (event, button) => openCustomerModal(button.dataset.customer));
+  $('#customers-search').addEventListener(
+    'input',
+    debounce((event) => {
+      state.customers.search = event.target.value;
+      paintCustomers();
+    }, 200),
+  );
+
+  on($('#tickets-tabs'), 'click', 'button', (event, button) => {
+    state.tickets.status = button.dataset.status;
+    paintTickets();
+  });
+  on($('#tickets-body'), 'click', '[data-ticket]', (event, button) => openTicketModal(button.dataset.ticket));
+
+  $('#overview-range').addEventListener('change', (event) => {
+    state.overview.days = Number(event.target.value);
+    loadOverview({ force: true }).catch((error) => toast(error.message, 'error'));
+  });
+
+  $('#settings-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    setBusy(button, true, 'Saving…');
+
+    const payload = {
+      site_title: form.site_title.value.trim(),
+      tagline: form.tagline.value.trim(),
+      support_email: form.support_email.value.trim(),
+      default_currency: form.default_currency.value,
+      announcement: form.announcement.value.trim(),
+      announcement_active: form.announcement_active.checked,
+      announcement_ends_at: form.announcement_ends_at.value ? new Date(form.announcement_ends_at.value).toISOString() : null,
+      checkout_note: form.checkout_note.value.trim(),
+      updated_by: state.account.user.id,
+    };
+    const { error } = await supabase.from('site_settings').update(payload).eq('id', 1);
+    setBusy(button, false);
+    if (error) {
+      toast(describeError(error), 'error');
+      return;
+    }
+    toast('Store settings saved.');
+  });
+
+  $('#view-sitemap').href = `${CONFIG.FUNCTIONS_URL}/sitemap`;
+  $('#run-search-index').addEventListener('click', async (event) => {
+    const feedback = $('#automation-feedback');
+    setBusy(event.currentTarget, true, 'Processing…');
+    try {
+      const { data, error } = await supabase.functions.invoke('search-index');
+      if (error) throw error;
+      feedback.textContent = data?.message || `Processed ${data?.processed ?? 0} queued item(s).`;
+      feedback.className = 'status status--ok';
+    } catch (error) {
+      feedback.textContent = error.message || 'Could not process the search queue.';
+      feedback.className = 'status status--error';
+    }
+    setBusy(event.currentTarget, false);
+  });
+
+  window.addEventListener('hashchange', () => {
+    applyRoute().catch((error) => toast(error.message, 'error'));
+  });
+
+  await applyRoute();
+  refreshCounts().catch(() => {});
+  bootDone();
+}
+
+boot().catch((error) => {
+  console.error(error);
+  toast(error.message || 'The admin console failed to start.', 'error');
+  bootDone();
 });
