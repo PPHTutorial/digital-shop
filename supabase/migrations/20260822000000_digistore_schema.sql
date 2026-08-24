@@ -293,7 +293,9 @@ grant execute on function public.is_admin() to authenticated;
 
 -- =========================
 -- POLICY CLEANUP (IMPORTANT)
--- Must run BEFORE CREATE POLICY to avoid duplicates
+-- Belt-and-suspenders: sweep any stray policy on these tables, then every
+-- CREATE POLICY below also has its own explicit DROP POLICY IF EXISTS so a
+-- single missed table name here can never cause an "already exists" error.
 -- =========================
 do $$
 declare
@@ -319,6 +321,7 @@ $$;
 -- =========================
 
 -- Products
+drop policy if exists "published products are public" on public.products;
 create policy "published products are public"
 on public.products
 for select
@@ -328,6 +331,7 @@ using (
   or public.is_admin()
 );
 
+drop policy if exists "admins manage products" on public.products;
 create policy "admins manage products"
 on public.products
 for all
@@ -336,6 +340,7 @@ using (public.is_admin())
 with check (public.is_admin());
 
 -- Profiles
+drop policy if exists "users read own profile" on public.profiles;
 create policy "users read own profile"
 on public.profiles
 for select
@@ -345,12 +350,14 @@ using (
   or public.is_admin()
 );
 
+drop policy if exists "users insert own profile" on public.profiles;
 create policy "users insert own profile"
 on public.profiles
 for insert
 to authenticated
 with check (auth.uid() = id);
 
+drop policy if exists "users update own profile" on public.profiles;
 create policy "users update own profile"
 on public.profiles
 for update
@@ -365,6 +372,7 @@ with check (
 );
 
 -- Orders
+drop policy if exists "users read own orders" on public.orders;
 create policy "users read own orders"
 on public.orders
 for select
@@ -374,6 +382,7 @@ using (
   or public.is_admin()
 );
 
+drop policy if exists "users create own pending orders" on public.orders;
 create policy "users create own pending orders"
 on public.orders
 for insert
@@ -384,12 +393,14 @@ with check (
 );
 
 -- Subscribers
+drop policy if exists "public can subscribe" on public.subscribers;
 create policy "public can subscribe"
 on public.subscribers
 for insert
 to anon, authenticated
 with check (true);
 
+drop policy if exists "admins read subscribers" on public.subscribers;
 create policy "admins read subscribers"
 on public.subscribers
 for select
@@ -397,12 +408,14 @@ to authenticated
 using (public.is_admin());
 
 -- Tickets
+drop policy if exists "public can create tickets" on public.tickets;
 create policy "public can create tickets"
 on public.tickets
 for insert
 to anon, authenticated
 with check (true);
 
+drop policy if exists "owners/admins read tickets" on public.tickets;
 create policy "owners/admins read tickets"
 on public.tickets
 for select
@@ -412,6 +425,7 @@ using (
   or public.is_admin()
 );
 
+drop policy if exists "admins update tickets" on public.tickets;
 create policy "admins update tickets"
 on public.tickets
 for update
@@ -420,6 +434,7 @@ using (public.is_admin())
 with check (public.is_admin());
 
 -- CMS
+drop policy if exists "admins manage cms" on public.site_settings;
 create policy "admins manage cms"
 on public.site_settings
 for all
@@ -427,6 +442,7 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "admins manage promotion codes" on public.promo_codes;
 create policy "admins manage promotion codes"
 on public.promo_codes
 for all
@@ -435,12 +451,14 @@ using (public.is_admin())
 with check (public.is_admin());
 
 -- Categories
+drop policy if exists "public read active categories" on public.categories;
 create policy "public read active categories"
 on public.categories
 for select
 to anon, authenticated
 using (is_active = true or public.is_admin());
 
+drop policy if exists "admins manage categories" on public.categories;
 create policy "admins manage categories"
 on public.categories
 for all
@@ -449,6 +467,7 @@ using (public.is_admin())
 with check (public.is_admin());
 
 -- Blog posts
+drop policy if exists "public read published blogs" on public.blog_posts;
 create policy "public read published blogs"
 on public.blog_posts
 for select
@@ -458,6 +477,7 @@ using (
   or public.is_admin()
 );
 
+drop policy if exists "admins manage blogs" on public.blog_posts;
 create policy "admins manage blogs"
 on public.blog_posts
 for all
@@ -466,6 +486,7 @@ using (public.is_admin())
 with check (public.is_admin());
 
 -- Search index queue
+drop policy if exists "admins manage search queue" on public.search_index_queue;
 create policy "admins manage search queue"
 on public.search_index_queue
 for all
