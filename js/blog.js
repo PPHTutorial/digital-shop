@@ -1,66 +1,37 @@
-/**
- * Journal index. Reads published `post` documents from the CMS
- * (`cms_documents`, type `post`) — there is no separate blog API.
- */
-
 import { supabase } from './client.js';
-import { $, esc } from './dom.js';
-import { formatDate } from './format.js';
-import { initTheme, mountHeader, mountFooter, bootDone } from './ui.js';
+import { escapeHtml, finishPageLoader, mountFooter, mountHeader } from './ui.js';
 
-initTheme();
-mountHeader();
-mountFooter();
+async function init() {
+  mountHeader();
+  mountFooter();
 
-async function loadPosts() {
+  const grid = document.querySelector('#blog-grid');
   const { data, error } = await supabase
-    .from('cms_documents')
-    .select('title,slug,published,published_at')
-    .eq('type', 'post')
-    .not('published', 'is', null)
+    .from('blog_posts')
+    .select('title,slug,excerpt,cover_url,published_at')
+    .eq('status', 'published')
     .order('published_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
+
+  grid.innerHTML = error
+    ? '<p class="text-red-700">The journal is unavailable right now.</p>'
+    : data?.length
+    ? data
+        .map(
+          (post) => `
+      <article class="catalog-card overflow-hidden bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition">
+        ${post.cover_url ? `<img src="${post.cover_url}" alt="" class="h-44 w-full object-cover">` : ''}
+        <div class="p-6">
+          <span class="tag">Journal</span>
+          <h2 class="mt-3 text-xl font-black text-[#142c55]">${escapeHtml(post.title)}</h2>
+          <p class="mt-3 text-sm leading-relaxed text-slate-600">${escapeHtml(post.excerpt || '')}</p>
+          <span class="mt-4 block text-xs font-semibold text-slate-400">${new Date(post.published_at).toLocaleDateString()}</span>
+        </div>
+      </article>`
+        )
+        .join('')
+    : '<p class="text-slate-500 col-span-full py-8 text-center bg-white rounded-2xl border border-slate-200">New journal articles and release notes are coming soon.</p>';
+
+  finishPageLoader();
 }
 
-function paint(posts) {
-  const grid = $('#blog-grid');
-  if (!posts.length) {
-    grid.innerHTML = `
-      <div class="empty" style="grid-column: 1 / -1">
-        <p class="empty__title">No articles yet</p>
-        <p class="empty__body">New journal articles and release notes are coming soon.</p>
-      </div>`;
-    return;
-  }
-
-  grid.innerHTML = posts
-    .map((post) => {
-      const doc = post.published || {};
-      const meta = [post.published_at ? formatDate(post.published_at) : '', doc.reading_minutes ? `${doc.reading_minutes} min read` : '']
-        .filter(Boolean)
-        .join(' · ');
-      return `
-        <article class="article">
-          ${doc.cover ? `<img class="article__media" src="${esc(doc.cover)}" alt="" loading="lazy" decoding="async">` : ''}
-          <div class="article__body">
-            <span class="tag">Journal</span>
-            <h2 class="article__title">${esc(post.title)}</h2>
-            <p class="article__excerpt">${esc(doc.excerpt || '')}</p>
-          </div>
-          ${meta ? `<div class="article__foot">${esc(meta)}</div>` : ''}
-        </article>`;
-    })
-    .join('');
-}
-
-async function run() {
-  try {
-    paint(await loadPosts());
-  } catch {
-    paint([]);
-  }
-  bootDone();
-}
-
-run();
+init();

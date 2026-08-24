@@ -1,566 +1,254 @@
-/**
- * Shared UI: site chrome, notifications, dialogs, and theme.
- *
- * Everything here renders with the design-system classes in css/src — no
- * inline styling, no utility-class soup, and no runtime CSS injection.
- */
+import { supabase } from './client.js';
 
-import { supabase, getAccount } from './client.js';
-import { CONFIG } from './config.js';
-import { icon } from './icons.js';
-import { $, esc, html, raw, when, on, trapFocus } from './dom.js';
-import { initials } from './format.js';
-
-export { esc, html, raw, when } from './dom.js';
-export { icon } from './icons.js';
-
-/* ==========================================================================
-   Theme
-   ========================================================================== */
-
-const THEME_KEY = 'digistore.theme';
-
-/** Applies the saved theme before first paint. Call at module top level. */
-export function initTheme() {
-  let stored = null;
-  try {
-    stored = localStorage.getItem(THEME_KEY);
-  } catch {
-    stored = null;
-  }
-  if (stored === 'dark' || stored === 'light') {
-    document.documentElement.dataset.theme = stored;
-  }
-  return stored ?? 'system';
+export function startPageLoader() {
+  if (document.querySelector('#page-loader')) return;
+  const l = document.createElement('div');
+  l.id = 'page-loader';
+  l.className = 'page-loader';
+  l.innerHTML = '<div class="loader-card"><div class="shimmer logo"></div><div class="shimmer hero"></div><div class="shimmer short"></div></div>';
+  document.body.prepend(l);
 }
-
-export function currentTheme() {
-  const explicit = document.documentElement.dataset.theme;
-  if (explicit) return explicit;
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-export function toggleTheme() {
-  const next = currentTheme() === 'dark' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = next;
-  try {
-    localStorage.setItem(THEME_KEY, next);
-  } catch {
-    /* private mode — the choice simply does not persist */
-  }
-  document.dispatchEvent(new CustomEvent('themechange', { detail: next }));
-  return next;
-}
-
-/* ==========================================================================
-   Boot screen
-   ========================================================================== */
-
-export function bootDone() {
-  const boot = $('#boot');
-  if (!boot) return;
-  boot.classList.add('is-done');
-  setTimeout(() => boot.remove(), 300);
-}
-
-/* ==========================================================================
-   Toast
-   ========================================================================== */
-
-const TOAST_ICON = { ok: 'checkCircle', error: 'alertCircle', info: 'info' };
-
-/**
- * Shows a transient message. `type` is one of ok | error | info.
- * Errors stay twice as long because they usually require reading.
- */
-export function toast(message, type = 'ok', { duration } = {}) {
-  let region = $('#toaster');
-  if (!region) {
-    region = document.createElement('div');
-    region.id = 'toaster';
-    region.className = 'toaster';
-    region.setAttribute('role', 'status');
-    region.setAttribute('aria-live', 'polite');
-    document.body.append(region);
-  }
-
-  const node = document.createElement('div');
-  node.className = `toast toast--${type}`;
-  node.innerHTML = html`
-    ${raw(icon(TOAST_ICON[type] || 'info'))}
-    <p>${message}</p>
-    <button class="toast__close" type="button" aria-label="Dismiss">${raw(icon('x', 14))}</button>
-  `;
-
-  const dismiss = () => {
-    node.style.opacity = '0';
-    setTimeout(() => node.remove(), 160);
-  };
-
-  node.querySelector('.toast__close').addEventListener('click', dismiss);
-  region.append(node);
-  setTimeout(dismiss, duration ?? (type === 'error' ? 9000 : 4500));
-  return dismiss;
-}
-
-/* ==========================================================================
-   Busy state
-   ========================================================================== */
-
-/** Swaps a button into a disabled, spinner-labelled state and back again. */
-export function setBusy(button, busy, label = 'Working…') {
-  if (!button) return;
-  if (busy) {
-    if (button.dataset.idleHtml === undefined) button.dataset.idleHtml = button.innerHTML;
-    button.disabled = true;
-    button.setAttribute('aria-busy', 'true');
-    button.innerHTML = `<span class="spinner"></span>${esc(label)}`;
-  } else {
-    button.disabled = false;
-    button.removeAttribute('aria-busy');
-    if (button.dataset.idleHtml !== undefined) {
-      button.innerHTML = button.dataset.idleHtml;
-      delete button.dataset.idleHtml;
-    }
+export function finishPageLoader() {
+  const loader = document.querySelector('#page-loader');
+  if (loader) {
+    loader.classList.add('is-done');
+    setTimeout(() => {
+      loader.remove();
+    }, 400);
   }
 }
-
-/* ==========================================================================
-   Confirm dialog — replaces window.confirm
-   ========================================================================== */
-
-export function confirmDialog({
-  title,
-  body = '',
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
-  tone = 'primary',
-} = {}) {
-  return new Promise((resolve) => {
-    const dialog = document.createElement('dialog');
-    dialog.className = 'dialog dialog--narrow';
-    dialog.innerHTML = html`
-      <div class="dialog__head">
-        <div>
-          <h2 class="dialog__title">${title}</h2>
-          ${when(body, () => html`<p class="dialog__sub">${body}</p>`)}
-        </div>
-      </div>
-      <div class="dialog__foot">
-        <button class="btn" value="cancel" type="button">${cancelLabel}</button>
-        <button class="btn btn--${tone === 'danger' ? 'danger' : 'primary'}" value="confirm" type="button">
-          ${confirmLabel}
-        </button>
-      </div>
-    `;
-
-    const finish = (result) => {
-      release();
-      dialog.close();
-      dialog.remove();
-      resolve(result);
-    };
-
-    dialog.querySelector('[value="cancel"]').addEventListener('click', () => finish(false));
-    dialog.querySelector('[value="confirm"]').addEventListener('click', () => finish(true));
-    dialog.addEventListener('cancel', (event) => {
-      event.preventDefault();
-      finish(false);
-    });
-
-    document.body.append(dialog);
-    const release = trapFocus(dialog);
-    dialog.showModal();
-    dialog.querySelector('[value="confirm"]').focus();
-  });
-}
-
-/** Closes a `<dialog>` when the backdrop, rather than the panel, is clicked. */
-export function closeOnBackdrop(dialog) {
-  dialog.addEventListener('mousedown', (event) => {
-    if (event.target !== dialog) return;
-    const box = dialog.getBoundingClientRect();
-    const inside =
-      event.clientX >= box.left &&
-      event.clientX <= box.right &&
-      event.clientY >= box.top &&
-      event.clientY <= box.bottom;
-    if (!inside) dialog.close();
-  });
-}
-
-/* ==========================================================================
-   Site header
-   ========================================================================== */
-
-const NAV = [
-  { href: './index.html', label: 'Home', icon: 'home', match: ['index.html', ''] },
-  { href: './store.html', label: 'Catalog', icon: 'store', match: ['store.html'] },
-  { href: './blog.html', label: 'Journal', icon: 'journal', match: ['blog.html', 'post.html'] },
-  { href: './about.html', label: 'About', icon: 'info', match: ['about.html'] },
-  { href: './contact.html', label: 'Contact', icon: 'mail', match: ['contact.html'] },
-  { href: './support.html', label: 'Support', icon: 'support', match: ['support.html'] },
-];
-
-function currentPage() {
-  return (window.location.pathname.split('/').pop() || 'index.html').toLowerCase();
-}
-
-function navMarkup(page) {
-  return NAV.map(
-    (item) => html`
-      <a href="${item.href}" class="${item.match.includes(page) ? 'is-active' : ''}">${item.label}</a>
-    `,
-  ).join('');
-}
-
-function drawerNavMarkup(page) {
-  return NAV.map(
-    (item) => html`
-      <a href="${item.href}" class="${item.match.includes(page) ? 'is-active' : ''}">
-        ${raw(icon(item.icon))}<span>${item.label}</span>
-      </a>
-    `,
-  ).join('');
-}
-
-function accountMarkup(account) {
-  if (!account.user) {
-    return html`
-      <a class="btn btn--sm hide-sm" href="./auth.html">Sign in</a>
-      <a class="btn btn--sm btn--primary" href="./auth.html?mode=signup">Create account</a>
-    `;
+export function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+export function toast(message,type='success'){let r=document.querySelector('#toast-region');if(!r){r=document.createElement('div');r.id='toast-region';r.className='toast-region';document.body.append(r)}const e=document.createElement('div');e.className=`toast toast-${type}`;e.innerHTML=`<span>${type==='error'?'!':'✓'}</span><p>${escapeHtml(message)}</p><button>×</button>`;e.querySelector('button').onclick=()=>e.remove();r.append(e);setTimeout(()=>e.remove(),6000)}
+export function setButtonLoading(b,loading,label='Please wait…'){if(!b)return;if(loading){b.dataset.label=b.textContent;b.disabled=true;b.innerHTML=`<span class="spinner"></span>${label}`}else{b.disabled=false;b.textContent=b.dataset.label||b.textContent}}
+export async function getAccount(){const{data:{user}}=await supabase.auth.getUser();if(!user)return{user:null,profile:null};const{data:profile}=await supabase.from('profiles').select('full_name,role,phone,address,country,occupation,age,created_at').eq('id',user.id).maybeSingle();return{user,profile}}
+export const icon = (name, size = 18) => `<i data-lucide="${name}" width="${size}" height="${size}"></i>`;
+export function renderIcons() {
+  if (window.lucide) {
+    window.lucide.createIcons();
+    return;
   }
-
-  const name = account.profile?.full_name || account.user.email || 'Account';
-  return html`
-    <details class="account">
-      <summary>
-        <span class="account__trigger">
-          <span class="avatar">${initials(name)}</span>
-          <span>${name}</span>
-          ${raw(icon('chevronDown'))}
-        </span>
-      </summary>
-      <div class="account__panel menu">
-        <div class="account__identity">
-          <strong>${name}</strong>
-          <small>${account.user.email}</small>
-        </div>
-        <a class="menu__item" href="./account.html">${raw(icon('dashboard'))} Overview</a>
-        <a class="menu__item" href="./account.html#library">${raw(icon('download'))} My library</a>
-        <a class="menu__item" href="./account.html#orders">${raw(icon('inbox'))} Orders</a>
-        ${when(
-          account.isAdmin,
-          () => html`
-            <div class="menu__sep"></div>
-            <a class="menu__item" href="./admin.html">${raw(icon('shield'))} Admin console</a>
-            <a class="menu__item" href="./studio.html">${raw(icon('docs'))} Content studio</a>
-          `,
-        )}
-        <div class="menu__sep"></div>
-        <button class="menu__item menu__item--danger" type="button" data-signout>
-          ${raw(icon('logout'))} Sign out
-        </button>
-      </div>
-    </details>
-  `;
+  const script = document.createElement('script');
+  script.src = 'https://unpkg.com/lucide@latest';
+  script.onload = () => window.lucide?.createIcons();
+  document.head.append(script);
 }
 
-/**
- * Renders the header into `#site-header` and keeps it in sync with auth state.
- * Safe to call on any page; no-ops when the mount point is absent.
- */
-export async function mountHeader({ categories = [] } = {}) {
-  const target = $('#site-header');
+export async function mountHeader() {
+  const target = document.querySelector('#site-header');
   if (!target) return;
-
   const render = async () => {
-    const account = await getAccount();
-    const page = currentPage();
+    const { user, profile } = await getAccount();
+    const name = profile?.full_name || 'My account';
 
-    target.className = 'site-header';
-    target.innerHTML = html`
-      <div class="utility">
-        <div class="container utility__inner">
-          <span>Instant, verified delivery on every digital order.</span>
-          <div class="utility__list">
-            <a href="./support.html">Help centre</a>
-            <a href="mailto:${CONFIG.SUPPORT_EMAIL}">${CONFIG.SUPPORT_EMAIL}</a>
-          </div>
-        </div>
-      </div>
-      <div class="container masthead">
-        <a class="wordmark" href="./index.html">
-          <span class="wordmark__mark">D</span>
-          <span>
-            <span class="wordmark__name">${CONFIG.STORE_NAME}</span>
-            <span class="wordmark__by">by ${CONFIG.STORE_OPERATOR}</span>
-          </span>
-        </a>
-        <nav class="nav" aria-label="Primary">${raw(navMarkup(page))}</nav>
-        <div class="masthead__actions">
-          <button class="btn btn--sm btn--ghost btn--icon" type="button" data-theme-toggle
-                  aria-label="Switch colour theme" title="Switch colour theme">
-            ${raw(icon(currentTheme() === 'dark' ? 'sun' : 'moon'))}
-          </button>
-          ${raw(accountMarkup(account))}
-          <button class="btn btn--sm btn--ghost btn--icon hide-md" type="button" data-drawer-open aria-label="Open menu">
-            ${raw(icon('menu'))}
-          </button>
-        </div>
-      </div>
-      ${when(
-        categories.length,
-        () => html`
-          <div class="catstrip">
-            <div class="container catstrip__inner">
-              <a href="./store.html" class="${page === 'store.html' && !new URLSearchParams(location.search).get('category') ? 'is-active' : ''}">All products</a>
-              ${raw(
-                categories
-                  .slice(0, 8)
-                  .map(
-                    (category) => html`
-                      <a href="./store.html?category=${encodeURIComponent(category.name)}">${category.name}</a>
-                    `,
-                  )
-                  .join(''),
-              )}
-              <a class="catstrip__end" href="./store.html">Browse catalog →</a>
-            </div>
-          </div>
-        `,
-      )}
+    const path = window.location.pathname.toLowerCase().split('/').pop() || 'index.html';
+    const hash = window.location.hash.toLowerCase();
+
+    const isHome = (path === 'index.html' || path === '' || path === '/');
+    const isStore = path.includes('store');
+    const isBlog = path.includes('blog');
+    const isAbout = path.includes('about');
+    const isContact = path.includes('contact');
+    const isSupport = path.includes('support');
+
+    const links = `
+      <a href="./index.html" class="${isHome ? 'active' : ''}">${icon('house')}<span>Home</span></a>
+      <a href="./store.html" class="${isStore ? 'active' : ''}">${icon('shopping-bag')}<span>All Products</span></a>
+      <a href="./blog.html" class="${isBlog ? 'active' : ''}">${icon('newspaper')}<span>Blog</span></a>
+      <a href="./about.html" class="${isAbout ? 'active' : ''}">${icon('info')}<span>About</span></a>
+      <a href="./contact.html" class="${isContact ? 'active' : ''}">${icon('mail')}<span>Contact</span></a>
+      <a href="./support.html" class="${isSupport ? 'active' : ''}">${icon('circle-help')}<span>Support</span></a>
     `;
-
-    mountDrawer(page, account);
-    wireHeaderEvents(target);
+    target.innerHTML = `
+      <div class="utility-bar">
+        <div class="shell utility-content">
+          <span>Digital products, delivered securely</span>
+          <a href="mailto:hello@codeinktechnologies.com">hello@codeinktechnologies.com</a>
+        </div>
+      </div>
+      <div class="main-nav-container">
+        <div class="main-nav">
+          <a href="./index.html" class="brand">
+            <span class="brand-mark">D</span>
+            <span>DigiStore<small>powered by codeinktechnologies</small></span>
+          </a>
+          <nav class="nav-links" aria-label="Main navigation">${links}</nav>
+          <div class="nav-actions">
+            ${
+              user
+                ? `<details class="account-popover">
+                    <summary class="account-chip">
+                      <span class="avatar">${escapeHtml(name[0].toUpperCase())}</span>
+                      <span>${escapeHtml(name)}</span>
+                      ${icon('chevron-down', 15)}
+                    </summary>
+                    <div class="account-popover-panel">
+                      <strong>${escapeHtml(name)}</strong>
+                      <a href="./account.html">${icon('layout-dashboard', 16)} Overview</a>
+                      <a href="./account.html#orders-list">${icon('package', 16)} Orders</a>
+                      <a href="./checkout.html">${icon('shopping-cart', 16)} Cart / checkout</a>
+                      ${profile?.role === 'admin' ? `<a href="./admin.html">${icon('shield-check', 16)} Admin centre</a>` : ''}
+                      <button id="sign-out">${icon('log-out', 16)} Log out</button>
+                    </div>
+                  </details>`
+                : `<a class="text-action" href="./auth.html">Log in</a><a class="button button-primary" href="./auth.html?mode=signup">Get started</a>`
+            }
+            <button id="mobile-menu-button" class="mobile-menu-button" aria-label="Open menu">${icon('menu', 22)}</button>
+          </div>
+        </div>
+      </div>
+      <aside id="mobile-drawer" class="mobile-drawer" aria-hidden="true">
+        <div class="mobile-drawer-head">
+          <strong>DigiStore</strong>
+          <button id="mobile-menu-close" aria-label="Close menu">${icon('x', 22)}</button>
+        </div>
+        <nav>
+          ${links}
+          ${
+            user
+              ? `<a href="./account.html">${icon('user-round')} ${escapeHtml(name)}</a>
+                 ${profile?.role === 'admin' ? `<a href="./admin.html">${icon('shield-check')} Admin centre</a>` : ''}
+                 <button id="mobile-sign-out">${icon('log-out')} Log out</button>`
+              : ''
+          }
+        </nav>
+      </aside>
+    `;
+    renderIcons();
+    finishPageLoader();
+    const drawer = target.querySelector('#mobile-drawer');
+    target.querySelector('#mobile-menu-button').onclick = () => {
+      drawer.classList.add('open');
+      drawer.setAttribute('aria-hidden', 'false');
+    };
+    target.querySelector('#mobile-menu-close').onclick = () => {
+      drawer.classList.remove('open');
+      drawer.setAttribute('aria-hidden', 'true');
+    };
+    const logout = async () => {
+      await supabase.auth.signOut();
+      location.href = './index.html';
+    };
+    target.querySelector('#sign-out')?.addEventListener('click', logout);
+    target.querySelector('#mobile-sign-out')?.addEventListener('click', logout);
   };
-
   await render();
-  supabase.auth.onAuthStateChange(() => {
-    render().catch(() => {});
-  });
+  supabase.auth.onAuthStateChange(() => render());
 }
-
-function wireHeaderEvents(target) {
-  target.querySelector('[data-theme-toggle]')?.addEventListener('click', (event) => {
-    const next = toggleTheme();
-    event.currentTarget.innerHTML = icon(next === 'dark' ? 'sun' : 'moon');
-  });
-
-  on(target, 'click', '[data-signout]', async () => {
-    await supabase.auth.signOut();
-    window.location.href = './index.html';
-  });
-
-  target.querySelector('[data-drawer-open]')?.addEventListener('click', () => setDrawer(true));
-
-  // A details-based menu should close when focus or the pointer leaves it.
-  const account = target.querySelector('.account');
-  if (account) {
-    document.addEventListener('click', (event) => {
-      if (account.open && !account.contains(event.target)) account.open = false;
-    });
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && account.open) account.open = false;
-    });
-  }
-}
-
-function mountDrawer(page, account) {
-  document.querySelector('#drawer')?.remove();
-  document.querySelector('#scrim')?.remove();
-
-  const scrim = document.createElement('div');
-  scrim.id = 'scrim';
-  scrim.className = 'scrim';
-
-  const drawer = document.createElement('aside');
-  drawer.id = 'drawer';
-  drawer.className = 'drawer';
-  drawer.setAttribute('aria-hidden', 'true');
-  drawer.innerHTML = html`
-    <div class="drawer__head">
-      <span class="wordmark">
-        <span class="wordmark__mark">D</span>
-        <span class="wordmark__name">${CONFIG.STORE_NAME}</span>
-      </span>
-      <button class="btn btn--sm btn--ghost btn--icon" type="button" data-drawer-close aria-label="Close menu">
-        ${raw(icon('x'))}
-      </button>
-    </div>
-    <nav class="drawer__nav" aria-label="Mobile">
-      ${raw(drawerNavMarkup(page))}
-      <hr />
-      ${when(
-        account.user,
-        () => html`
-          <a href="./account.html">${raw(icon('user'))}<span>My account</span></a>
-          ${when(
-            account.isAdmin,
-            () => html`
-              <a href="./admin.html">${raw(icon('shield'))}<span>Admin console</span></a>
-              <a href="./studio.html">${raw(icon('docs'))}<span>Content studio</span></a>
-            `,
-          )}
-          <button type="button" data-signout>${raw(icon('logout'))}<span>Sign out</span></button>
-        `,
-      )}
-      ${when(
-        !account.user,
-        () => html`
-          <a href="./auth.html">${raw(icon('login'))}<span>Sign in</span></a>
-          <a href="./auth.html?mode=signup">${raw(icon('user'))}<span>Create account</span></a>
-        `,
-      )}
-    </nav>
-  `;
-
-  document.body.append(scrim, drawer);
-  scrim.addEventListener('click', () => setDrawer(false));
-  drawer.querySelector('[data-drawer-close]').addEventListener('click', () => setDrawer(false));
-  on(drawer, 'click', '[data-signout]', async () => {
-    await supabase.auth.signOut();
-    window.location.href = './index.html';
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') setDrawer(false);
-  });
-}
-
-function setDrawer(open) {
-  const drawer = $('#drawer');
-  const scrim = $('#scrim');
-  if (!drawer || !scrim) return;
-  drawer.classList.toggle('is-open', open);
-  scrim.classList.toggle('is-open', open);
-  drawer.setAttribute('aria-hidden', String(!open));
-  document.body.style.overflow = open ? 'hidden' : '';
-  if (open) drawer.querySelector('a, button')?.focus();
-}
-
-/* ==========================================================================
-   Site footer
-   ========================================================================== */
-
-const FOOTER_COLUMNS = [
-  {
-    title: 'Catalog',
-    links: [
-      ['Ebooks & guides', './store.html?category=Ebooks%20%26%20Guides'],
-      ['Software & tools', './store.html?category=Software%20%26%20Tools'],
-      ['Templates & themes', './store.html?category=Templates%20%26%20Themes'],
-      ['Online courses', './store.html?category=Online%20Courses'],
-      ['Audio & media', './store.html?category=Audio%20%26%20Media'],
-      ['Design & graphics', './store.html?category=Design%20%26%20Graphics'],
-    ],
-  },
-  {
-    title: 'Your account',
-    links: [
-      ['Overview', './account.html'],
-      ['Purchase history', './account.html#orders'],
-      ['Download library', './account.html#library'],
-      ['Help centre', './support.html'],
-      ['Journal', './blog.html'],
-    ],
-  },
-  {
-    title: 'Company',
-    links: [
-      ['About DigiStore', './about.html'],
-      ['Contact', './contact.html'],
-      ['Terms of service', './legal.html#terms'],
-      ['Privacy policy', './legal.html#privacy'],
-      ['Refund policy', './legal.html#refunds'],
-      ['Licence agreement', './legal.html#licence'],
-    ],
-  },
-];
-
-const PAY_MARKS = `
-  <svg viewBox="0 0 48 16" role="img" aria-label="Visa"><text x="0" y="12.5" fill="currentColor" font-family="system-ui,sans-serif" font-size="13" font-weight="700" font-style="italic" letter-spacing="0.5">VISA</text></svg>
-  <svg viewBox="0 0 34 16" role="img" aria-label="Mastercard"><circle cx="11" cy="8" r="6.5" fill="none" stroke="currentColor"/><circle cx="21" cy="8" r="6.5" fill="none" stroke="currentColor"/></svg>
-  <svg viewBox="0 0 78 16" role="img" aria-label="Flutterwave"><circle cx="7" cy="8" r="5.5" fill="none" stroke="currentColor"/><text x="17" y="12" fill="currentColor" font-family="system-ui,sans-serif" font-size="10" font-weight="600">Flutterwave</text></svg>
-  <svg viewBox="0 0 44 16" role="img" aria-label="Mobile Money"><rect x="1" y="1.5" width="9" height="13" rx="1.5" fill="none" stroke="currentColor"/><text x="14" y="12" fill="currentColor" font-family="system-ui,sans-serif" font-size="10" font-weight="600">MoMo</text></svg>
-  <svg viewBox="0 0 62 16" role="img" aria-label="Crypto via NOWPayments"><path d="M4 3v10l7-5z" fill="none" stroke="currentColor"/><text x="15" y="12" fill="currentColor" font-family="system-ui,sans-serif" font-size="10" font-weight="600">Crypto</text></svg>
-`;
-
 export function mountFooter() {
-  let target = $('#site-footer');
+  let target = document.querySelector('#site-footer');
   if (!target) {
     target = document.createElement('footer');
     target.id = 'site-footer';
     document.body.append(target);
   }
-
-  target.className = 'site-footer';
-  target.innerHTML = html`
-    <div class="container">
-      <div class="footer__grid">
-        <div class="footer__col">
-          <span class="wordmark">
-            <span class="wordmark__mark">D</span>
-            <span>
-              <span class="wordmark__name">${CONFIG.STORE_NAME}</span>
-              <span class="wordmark__by">by ${CONFIG.STORE_OPERATOR}</span>
-            </span>
-          </span>
-          <p class="footer__about">
-            A digital storefront for practitioners: ebooks, software, templates, and courses,
-            each delivered through a signed, expiring link the moment payment clears.
+  const year = new Date().getFullYear();
+  target.className = 'bg-[#0e1e38] text-slate-300 pt-16 pb-12 border-t border-slate-800 mt-auto';
+  target.innerHTML = `
+    <div class="shell space-y-12">
+      <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-5 text-sm">
+        <div class="lg:col-span-2 space-y-4 pr-4">
+          <div class="flex items-center gap-3">
+            <span class="brand-mark !bg-orange-500 !text-white font-black text-lg w-10 h-10 rounded-xl flex items-center justify-center">D</span>
+            <div>
+              <span class="text-xl font-black text-white tracking-tight">DigiStore</span>
+              <span class="block text-[11px] text-slate-400 font-medium uppercase tracking-wider">by Codeink Technologies</span>
+            </div>
+          </div>
+          <p class="text-xs leading-relaxed text-slate-400 max-w-sm">
+            Empowering professionals, creators, and developers worldwide with verified, high-value digital products, comprehensive ebooks, tools, and software templates.
           </p>
-          <div class="row row-2 mt-5">
-            <span class="tag">${raw(icon('shield', 12))} Verified merchant</span>
-            <span class="tag">${raw(icon('lock', 12))} TLS encrypted</span>
+          <div class="pt-2 flex flex-wrap gap-2 items-center text-[11px] text-slate-400">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-slate-300 font-medium">
+              ${icon('shield-check', 13)}
+              <span>Verified Merchant Platform</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-slate-300 font-medium">
+              ${icon('lock', 13)}
+              <span>256-Bit SSL Encrypted</span>
+            </span>
           </div>
         </div>
-        ${raw(
-          FOOTER_COLUMNS.map(
-            (column) => html`
-              <div class="footer__col">
-                <h3>${column.title}</h3>
-                <ul class="list-reset">
-                  ${raw(column.links.map(([label, href]) => html`<li><a href="${href}">${label}</a></li>`).join(''))}
-                </ul>
-              </div>
-            `,
-          ).join(''),
-        )}
-      </div>
-      <div class="footer__base">
-        <p>© ${new Date().getFullYear()} ${CONFIG.STORE_OPERATOR}. All rights reserved.</p>
-        <div class="footer__pay">
-          <span>Payments</span>
-          ${raw(PAY_MARKS)}
+
+        <div class="space-y-3">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Digital Catalog</h3>
+          <ul class="space-y-2 text-xs text-slate-400">
+            <li><a href="./store.html?category=Ebooks%20%26%20Guides" class="hover:text-orange-400 transition">Ebooks &amp; Guides</a></li>
+            <li><a href="./store.html?category=Software%20%26%20Tools" class="hover:text-orange-400 transition">Software &amp; Tools</a></li>
+            <li><a href="./store.html?category=Templates%20%26%20Themes" class="hover:text-orange-400 transition">Templates &amp; Themes</a></li>
+            <li><a href="./store.html?category=Online%20Courses" class="hover:text-orange-400 transition">Online Courses</a></li>
+            <li><a href="./store.html?category=Audio%20%26%20Media" class="hover:text-orange-400 transition">Audio &amp; Media</a></li>
+            <li><a href="./store.html?category=Design%20%26%20Graphics" class="hover:text-orange-400 transition">Design &amp; Graphics</a></li>
+          </ul>
+        </div>
+
+        <div class="space-y-3">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Customer Hub</h3>
+          <ul class="space-y-2 text-xs text-slate-400">
+            <li><a href="./account.html" class="hover:text-orange-400 transition">My Account &amp; Vault</a></li>
+            <li><a href="./account.html#orders-list" class="hover:text-orange-400 transition">Order History</a></li>
+            <li><a href="./support.html" class="hover:text-orange-400 transition">Customer Helpdesk</a></li>
+            <li><a href="./support.html" class="hover:text-orange-400 transition">Submit Support Ticket</a></li>
+            <li><a href="./blog.html" class="hover:text-orange-400 transition">Articles &amp; Updates</a></li>
+            <li><a href="./about.html" class="hover:text-orange-400 transition">About Codeink</a></li>
+          </ul>
+        </div>
+
+        <div class="space-y-3">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Trust &amp; Legal</h3>
+          <ul class="space-y-2 text-xs text-slate-400">
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Terms of Service</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Privacy Policy</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Refund &amp; Return Policy</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Digital License Agreement</a></li>
+            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Security &amp; Compliance</a></li>
+            <li><a href="./contact.html" class="hover:text-orange-400 transition">Contact Legal Team</a></li>
+          </ul>
         </div>
       </div>
-    </div>
-  `;
+
+      <div class="border-t border-slate-800/80 pt-8 flex flex-wrap items-center justify-between gap-6 text-xs text-slate-500">
+        <div>
+          <p>© ${year} <strong class="text-slate-400">Codeink Technologies</strong>. All rights reserved.</p>
+          <p class="text-[11px] text-slate-500 mt-0.5">DigiStore is a registered digital merchandise platform by Codeink Technologies.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-5 sm:gap-6">
+          <div class="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition cursor-default" title="Flutterwave Verified Partner">
+            <svg class="h-4 w-auto" viewBox="0 0 120 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12.5 0C5.6 0 0 5.6 0 12.5C0 19.4 5.6 25 12.5 25C13.8 25 15.1 24.8 16.3 24.4C13.2 21.6 11.2 17.5 11.2 13C11.2 8.5 13.2 4.4 16.3 1.6C15.1 1.2 13.8 0 12.5 0Z" fill="#FB9129"/>
+              <path d="M17.5 3.2C15.1 5.7 13.7 9.2 13.7 13C13.7 16.8 15.1 20.3 17.5 22.8C20 20.3 21.4 16.8 21.4 13C21.4 9.2 20 5.7 17.5 3.2Z" fill="#F5A623"/>
+              <path d="M22.5 1.6C25.6 4.4 27.6 8.5 27.6 13C27.6 17.5 25.6 21.6 22.5 24.4C23.7 24.8 25 25 26.3 25C33.2 25 38.8 19.4 38.8 12.5C38.8 5.6 33.2 0 26.3 0C25 0 23.7 0.2 22.5 1.6Z" fill="#2563EB"/>
+              <text x="44" y="17" fill="#FFFFFF" font-family="system-ui, sans-serif" font-weight="800" font-size="12" letter-spacing="-0.2">Flutterwave</text>
+            </svg>
+          </div>
+          <div class="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition cursor-default" title="NOWPayments Crypto Gateway">
+            <svg class="h-4 w-auto" viewBox="0 0 125 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="13" r="10" fill="#00E5FF" fill-opacity="0.15"/>
+              <path d="M8 8L16 13L8 18V8Z" fill="#00E5FF"/>
+              <text x="26" y="17" fill="#00E5FF" font-family="system-ui, sans-serif" font-weight="800" font-size="11.5" letter-spacing="0.2">NOWPayments</text>
+            </svg>
+          </div>
+          <div class="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition cursor-default" title="Mobile Money (GHS / KES / UGX / RWF)">
+            <svg class="h-4 w-auto" viewBox="0 0 105 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="13" r="8" fill="#FFCC00"/>
+              <path d="M7 10H13V16H7V10Z" fill="#000000"/>
+              <text x="22" y="17" fill="#FFCC00" font-family="system-ui, sans-serif" font-weight="800" font-size="11.5">MoMo &amp; M-Pesa</text>
+            </svg>
+          </div>
+          <div class="flex items-center opacity-80 hover:opacity-100 transition cursor-default" title="Visa">
+            <svg class="h-4 w-auto" viewBox="0 0 45 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <text x="2" y="14" fill="#60A5FA" font-family="system-ui, sans-serif" font-weight="900" font-style="italic" font-size="16" letter-spacing="1">VISA</text>
+            </svg>
+          </div>
+          <div class="flex items-center opacity-80 hover:opacity-100 transition cursor-default" title="Mastercard">
+            <svg class="h-4 w-auto" viewBox="0 0 34 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="10" r="9" fill="#EB001B"/>
+              <circle cx="24" cy="10" r="9" fill="#F79E1B" fill-opacity="0.85"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  renderIcons();
 }
 
-/* ==========================================================================
-   Scroll reveal
-   ========================================================================== */
-
-/** Adds `.is-visible` to `[data-reveal]` elements as they enter the viewport. */
-export function initReveal(root = document) {
-  const items = root.querySelectorAll('[data-reveal]:not(.is-visible)');
-  if (!items.length) return;
-  if (!('IntersectionObserver' in window)) {
-    items.forEach((item) => item.classList.add('is-visible'));
-    return;
-  }
-  const observer = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        entry.target.classList.add('is-visible');
-        observer.unobserve(entry.target);
-      }
-    },
-    { threshold: 0.1, rootMargin: '0px 0px -40px' },
-  );
-  items.forEach((item) => observer.observe(item));
-}
+export function initMotion(){document.body.classList.add('page-enter');const items=document.querySelectorAll('.reveal');if(!('IntersectionObserver'in window)){items.forEach(i=>i.classList.add('is-visible'));return}const o=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');o.unobserve(e.target)}}),{threshold:.12});items.forEach(i=>o.observe(i))}

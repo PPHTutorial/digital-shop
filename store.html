@@ -1,111 +1,76 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description"
-        content="The complete DigiStore catalog — ebooks, software and tools, templates, courses, audio, and design assets.">
-  <title>Catalog · DigiStore</title>
-  <link rel="canonical" href="https://digistore.codeinktechnologies.com/store.html">
-  <script>
-    try {
-      var t = localStorage.getItem('digistore.theme');
-      if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
-    } catch (e) { /* private mode */ }
-  </script>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
-  <link rel="stylesheet" href="./css/app.css?v=a4e69dd6">
+  <meta name="description" content="Explore the complete DigiStore catalog — digital ebooks, software tools, UI templates, online courses, and media assets.">
+  <title>All Products Catalog | DigiStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="./css/app.css">
 </head>
 
-<body class="page">
-  <div id="boot" class="boot">
-    <span class="boot__mark">DigiStore</span>
-    <div class="progress boot__bar"></div>
+<body class="bg-slate-50 text-slate-900 flex flex-col min-h-screen selection:bg-orange-500 selection:text-white">
+  <!-- Initial Instant Page Loader -->
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
+    </div>
   </div>
 
-  <a class="skip-link" href="#main">Skip to content</a>
-  <header id="site-header"></header>
+  <header id="site-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur shadow-sm"></header>
 
-  <main id="main" class="container page__body">
-    <div class="section__head">
+  <main class="shell py-10 lg:py-14 flex-1">
+    <!-- Header Banner -->
+    <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
       <div>
-        <span class="eyebrow">Catalog</span>
-        <h1 id="catalog-heading" class="section__title mt-1" style="font-size: var(--t-32)">All products</h1>
-        <p id="catalog-sub" class="section__sub">Every published product, filterable by category, price, and keyword.</p>
+        <span class="eyebrow">EXPLORE STOREFRONT</span>
+        <h1 id="store-heading" class="text-3xl sm:text-4xl font-black tracking-tight text-[#142c55]">All Products</h1>
+        <p id="store-subtitle" class="text-sm text-slate-500 mt-1">Browse our complete collection of verified digital assets, ebooks, and tools.</p>
       </div>
-      <p id="catalog-count" class="t-13 muted num" aria-live="polite"></p>
+      <p id="product-count" class="text-sm font-bold text-slate-500"></p>
     </div>
 
-    <div class="sidebar-layout sidebar-layout--left" style="--aside-w: 236px">
-      <!-- Filters -->
-      <aside class="stack-6" aria-label="Filters">
-        <section class="panel">
-          <div class="panel__head"><h2 class="panel__title">Category</h2></div>
-          <div class="panel__body stack-2" id="facet-categories">
-            <p class="t-12 subtle">Loading…</p>
-          </div>
-        </section>
+    <!-- Unified Top Filter Bar -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 mb-8">
+      <!-- Top Category Filter Pills -->
+      <div id="catalog-category-pills" class="flex flex-wrap gap-2"></div>
 
-        <section class="panel">
-          <div class="panel__head"><h2 class="panel__title">Price</h2></div>
-          <div class="panel__body stack-3">
-            <div class="row row-2">
-              <label class="field fill">
-                <span class="field__label" for="price-min">Min</span>
-                <input class="input" id="price-min" type="number" min="0" step="1" inputmode="numeric" placeholder="0">
-              </label>
-              <label class="field fill">
-                <span class="field__label" for="price-max">Max</span>
-                <input class="input" id="price-max" type="number" min="0" step="1" inputmode="numeric" placeholder="Any">
-              </label>
-            </div>
-            <button class="btn btn--sm btn--block" id="apply-price" type="button">Apply price range</button>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel__head"><h2 class="panel__title">Tags</h2></div>
-          <div class="panel__body row row--wrap row-2" id="facet-tags">
-            <p class="t-12 subtle">Loading…</p>
-          </div>
-        </section>
-
-        <button class="btn btn--sm btn--block" id="reset-filters" type="button">Reset all filters</button>
-      </aside>
-
-      <!-- Results -->
-      <div>
-        <div class="toolbar">
-          <label class="input-affix toolbar__search">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
-                 stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.4 15.4 4.1 4.1"/></svg>
-            <input class="input" id="catalog-search" type="search" autocomplete="off"
-                   placeholder="Search titles, descriptions, and tags" aria-label="Search the catalog">
-          </label>
-          <label class="row row-2 t-12 muted nowrap">
-            <span for="catalog-sort">Sort</span>
-            <select class="select" id="catalog-sort" style="width:auto" aria-label="Sort results">
-              <option value="relevance">Relevance</option>
-              <option value="newest">Newest first</option>
-              <option value="best-selling">Best selling</option>
-              <option value="price-asc">Price, low to high</option>
-              <option value="price-desc">Price, high to low</option>
-              <option value="title">Title A–Z</option>
-            </select>
-          </label>
+      <!-- Search & Sorting Row -->
+      <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+        <div class="relative flex-1 min-w-[260px]">
+          <i data-lucide="search" width="16" height="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+          <input id="store-search-input" type="text" placeholder="Search by title, description, keywords, or topics…" class="field !mt-0 !py-2.5 !pl-10 text-xs w-full bg-slate-50 border-slate-200">
         </div>
-
-        <div id="active-filters" class="row row--wrap row-2 mt-4" hidden></div>
-
-        <div id="catalog-grid" class="cards mt-5"></div>
-
-        <div id="catalog-more" class="center mt-8" hidden>
-          <button class="btn" id="load-more" type="button">Load more</button>
+        <div class="flex items-center gap-2">
+          <label for="store-sort-select" class="text-xs font-bold text-slate-500 whitespace-nowrap">Sort by:</label>
+          <select id="store-sort-select" class="field !mt-0 !py-2 text-xs bg-slate-50 border-slate-200">
+            <option value="newest">Newest First</option>
+            <option value="price-low">Price: Low to High</option>
+            <option value="price-high">Price: High to Low</option>
+            <option value="title">Alphabetical (A-Z)</option>
+          </select>
         </div>
       </div>
+    </div>
+
+    <!-- Product Grid (Full Width) -->
+    <div id="product-grid" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"></div>
+
+    <!-- Load More Button Container -->
+    <div id="load-more-container" class="mt-10 text-center hidden">
+      <button id="load-more-btn" type="button" class="button !py-3 !px-8 text-sm font-bold shadow-md hover:shadow-lg transition">
+        Load more products
+      </button>
+    </div>
+
+    <!-- Product Loading State -->
+    <div id="product-loading" class="mt-8 hidden">
+      <div class="progress-track max-w-xs mx-auto"></div>
+      <p class="mt-3 text-center text-sm font-semibold text-slate-500">Loading catalog items…</p>
     </div>
   </main>
 
