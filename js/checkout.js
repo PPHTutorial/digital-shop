@@ -206,13 +206,9 @@ async function load() {
   await mountHeader();
   mountFooter();
   const { user } = await getAccount();
-  if (!user) {
-    const nextUrl = `checkout.html?product=${encodeURIComponent(productId || '')}`;
-    finishPageLoader();
-    location.replace(`./auth.html?mode=signin&next=${encodeURIComponent(nextUrl)}`);
-    return;
-  }
-  document.querySelector('#checkout-status').textContent = `Signed in as ${user.email} (Encrypted session).`;
+  document.querySelector('#checkout-status').textContent = user
+    ? `Signed in as ${user.email} (Encrypted session).`
+    : 'Browsing as a guest — you will sign in when you pay.';
 
   if (!productId) {
     document.querySelector('#product-title').textContent = 'No product selected';
@@ -485,17 +481,11 @@ document.querySelector('#checkout-form').addEventListener('submit', async (event
     : 'https://digistore.codeinktechnologies.com';
 
   if (selectedProvider === 'nowpayments') {
-    // Cryptocurrency uses product base amount and currency
-    const { data: order, error } = await supabase.from('orders').insert({
-      user_id: user.id,
-      product_id: product.id,
-      customer_email: user.email,
-      amount: baseTotal,
-      currency: product.currency || 'USD',
-      status: 'pending',
-      promo_code: promotion?.code || null,
-      discount_amount: Number(promotion?.discount_amount || 0),
-    }).select('id').single();
+    // The database prices the order — the client only ever sends what was picked.
+    const { data: order, error } = await supabase.rpc('create_order', {
+      p_items: [{ product_id: product.id, quantity: 1 }],
+      p_promo_code: promotion?.code || null,
+    });
 
     if (error) {
       setButtonLoading(submitBtn, false);
@@ -527,16 +517,10 @@ document.querySelector('#checkout-form').addEventListener('submit', async (event
     // Flutterwave uses converted amount and selected currency
     const paymentOption = document.querySelector('#flw-method-select')?.value || 'all';
 
-    const { data: order, error } = await supabase.from('orders').insert({
-      user_id: user.id,
-      product_id: product.id,
-      customer_email: user.email,
-      amount: convTotal,
-      currency: activeCurrency,
-      status: 'pending',
-      promo_code: promotion?.code || null,
-      discount_amount: Number(promotion?.discount_amount || 0),
-    }).select('id').single();
+    const { data: order, error } = await supabase.rpc('create_order', {
+      p_items: [{ product_id: product.id, quantity: 1 }],
+      p_promo_code: promotion?.code || null,
+    });
 
     if (error) {
       setButtonLoading(submitBtn, false);

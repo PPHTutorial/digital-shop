@@ -432,7 +432,12 @@ function renderRankList(items, valueKey, meta) {
 // ============================================================
 async function load() {
   account = await getAccount();
-  if (!account.user || account.profile?.role !== 'admin') {
+  if (!account.user) {
+    const nextUrl = `admin.html${location.search}${location.hash}`;
+    location.replace(`./auth.html?mode=signin&next=${encodeURIComponent(nextUrl)}`);
+    return;
+  }
+  if (account.profile?.role !== 'admin') {
     location.replace('./account.html');
     return;
   }

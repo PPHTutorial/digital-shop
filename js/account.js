@@ -38,6 +38,10 @@ const statusIcons = {
   refunded: `${icon('rotate-ccw', 11)} <span>Refunded</span>`,
 };
 
+const ORDERS_PAGE_SIZE = 8;
+let ordersPage = 1;
+let ordersAll = [];
+
 function renderOrdersList(orders) {
   if (!orders.length) {
     return '<p class="py-4 text-sm text-slate-500">No purchases yet. Browse the catalog to find your first digital product!</p>';
@@ -63,13 +67,48 @@ function renderOrdersList(orders) {
     .join('');
 }
 
+function renderOrdersPagination(total) {
+  const pageCount = Math.max(1, Math.ceil(total / ORDERS_PAGE_SIZE));
+  ordersPage = Math.min(ordersPage, pageCount);
+  const el = document.querySelector('#orders-pagination');
+  if (!el) return;
+
+  if (pageCount <= 1) {
+    el.innerHTML = '';
+    return;
+  }
+
+  el.innerHTML = `
+    <button type="button" id="orders-prev" class="button !min-h-8 !px-3" ${ordersPage <= 1 ? 'disabled' : ''}>Previous</button>
+    <span class="text-slate-500">Page ${ordersPage} of ${pageCount}</span>
+    <button type="button" id="orders-next" class="button !min-h-8 !px-3" ${ordersPage >= pageCount ? 'disabled' : ''}>Next</button>
+  `;
+
+  document.querySelector('#orders-prev')?.addEventListener('click', () => {
+    ordersPage -= 1;
+    paintOrdersPage();
+  });
+  document.querySelector('#orders-next')?.addEventListener('click', () => {
+    ordersPage += 1;
+    paintOrdersPage();
+  });
+}
+
+function paintOrdersPage() {
+  const start = (ordersPage - 1) * ORDERS_PAGE_SIZE;
+  const pageItems = ordersAll.slice(start, start + ORDERS_PAGE_SIZE);
+  document.querySelector('#orders-list').innerHTML = renderOrdersList(pageItems);
+  renderOrdersPagination(ordersAll.length);
+}
+
 async function load() {
   mountHeader();
   mountFooter();
   account = await getAccount();
 
   if (!account.user) {
-    location.replace('./auth.html?mode=signin');
+    const nextUrl = `account.html${location.search}${location.hash}`;
+    location.replace(`./auth.html?mode=signin&next=${encodeURIComponent(nextUrl)}`);
     return;
   }
 
@@ -97,9 +136,14 @@ async function load() {
     : '—';
 
   document.querySelector('#activity-chart').innerHTML = activityChart(all);
-  document.querySelector('#orders-list').innerHTML = error
-    ? '<p class="text-red-700">Orders are unavailable right now.</p>'
-    : renderOrdersList(all);
+  ordersAll = all;
+  ordersPage = 1;
+  if (error) {
+    document.querySelector('#orders-list').innerHTML = '<p class="text-red-700">Orders are unavailable right now.</p>';
+    document.querySelector('#orders-pagination').innerHTML = '';
+  } else {
+    paintOrdersPage();
+  }
 
   // Profile form prefill
   const form = document.querySelector('#profile-form');

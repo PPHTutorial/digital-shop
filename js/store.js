@@ -20,41 +20,39 @@ function createCardHtml(p) {
   const hasDiscount = p.original_price && Number(p.original_price) > Number(p.price);
   const discountPct = hasDiscount ? Math.round((1 - Number(p.price) / Number(p.original_price)) * 100) : 0;
   const priceHtml = hasDiscount
-    ? `<div class="flex items-baseline gap-1.5">
+    ? `<div>
          <span class="price-original text-xs">${p.currency} ${Number(p.original_price).toFixed(2)}</span>
-         <strong class="text-base sm:text-lg text-[#142c55] font-black">${p.currency} ${Number(p.price).toFixed(2)}</strong>
+         <strong class="block text-lg sm:text-xl text-[#142c55] font-black leading-tight">${p.currency} ${Number(p.price).toFixed(2)}</strong>
        </div>`
-    : `<strong class="text-base sm:text-lg text-[#142c55] font-black">${p.currency} ${Number(p.price).toFixed(2)}</strong>`;
+    : `<strong class="block text-lg sm:text-xl text-[#142c55] font-black leading-tight">${p.currency} ${Number(p.price).toFixed(2)}</strong>`;
 
   return `
-    <article class="catalog-card flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 bg-white border border-slate-200/80 rounded-2xl">
+    <article class="catalog-card flex flex-col justify-between">
       <div>
-        <a href="./checkout.html?product=${encodeURIComponent(p.slug || p.id)}" class="block relative overflow-hidden bg-slate-100 group aspect-[1.4]">
+        <a href="./checkout.html?product=${encodeURIComponent(p.slug || p.id)}" class="block relative overflow-hidden bg-slate-100 group">
           ${
             p.cover_url
               ? `<img src="${escapeHtml(p.cover_url)}" alt="${escapeHtml(p.title)}" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy">`
-              : `<div class="w-full h-full flex items-center justify-center text-slate-400 bg-slate-100 font-semibold text-xs">Digital Product</div>`
+              : `<div class="w-full h-full aspect-[4/3] flex items-center justify-center text-slate-400 bg-slate-100 font-semibold text-xs">Digital Product</div>`
           }
           <div class="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
             <span class="tag !text-[10px] !py-0.5 !px-2 font-bold shadow-sm">${escapeHtml(p.category || 'General')}</span>
             ${hasDiscount ? `<span class="discount-pill shadow-sm">${discountPct}% OFF</span>` : ''}
           </div>
         </a>
-        <div class="p-4 sm:p-5">
+        <button type="button" class="catalog-card__wish share-product-btn" data-share-url="${encodeURIComponent(p.slug || p.id)}" title="Share product link" aria-label="Share this product">
+          <i data-lucide="share-2" width="14" height="14"></i>
+        </button>
+        <div class="card-body">
           <h3 class="text-base font-black text-[#142c55] leading-snug line-clamp-2 hover:text-orange-600 transition">
             <a href="./checkout.html?product=${encodeURIComponent(p.slug || p.id)}">${escapeHtml(p.title)}</a>
           </h3>
           <p class="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">${escapeHtml(p.description || '')}</p>
         </div>
       </div>
-      <div class="p-4 sm:p-5 pt-0 mt-auto border-t border-slate-100 flex items-center justify-between gap-2">
+      <div class="catalog-card__foot">
         ${priceHtml}
-        <div class="flex items-center gap-1.5">
-          <button type="button" class="button !min-h-8 !px-2.5 text-xs share-product-btn" data-share-url="${encodeURIComponent(p.slug || p.id)}" title="Share product link">
-            <i data-lucide="share-2" width="13" height="13"></i>
-          </button>
-          <a class="button button-primary !min-h-8 !px-3.5 !text-xs font-bold whitespace-nowrap" href="./checkout.html?product=${encodeURIComponent(p.slug || p.id)}">Get product</a>
-        </div>
+        <a class="button button-primary !min-h-9 !px-4 !text-xs font-bold whitespace-nowrap" href="./checkout.html?product=${encodeURIComponent(p.slug || p.id)}">Get product</a>
       </div>
     </article>`;
 }
