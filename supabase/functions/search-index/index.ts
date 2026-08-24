@@ -96,9 +96,14 @@ Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   // Auth: either the cron secret, or a signed-in admin.
+  //
+  // The cron secret travels in `x-cron-secret`, NOT in Authorization: the API
+  // gateway parses Authorization as a JWT and rejects a raw secret with
+  // UNAUTHORIZED_INVALID_JWT_FORMAT before this code runs.
   const token = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
   const cronSecret = Deno.env.get('CRON_SECRET');
-  const cronAuthorized = Boolean(cronSecret) && token === cronSecret;
+  const presentedSecret = request.headers.get('x-cron-secret') ?? '';
+  const cronAuthorized = Boolean(cronSecret) && presentedSecret === cronSecret;
 
   if (!cronAuthorized) {
     if (!token) return json({ error: 'Unauthorized' }, { status: 401 });
