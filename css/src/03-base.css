@@ -1,0 +1,124 @@
+/* ==========================================================================
+   03 — Base
+   Element defaults: typography, prose, forms, tables.
+   ========================================================================== */
+
+html {
+  background: var(--page);
+}
+
+body {
+  min-height: 100vh;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--t-15);
+  font-weight: var(--w-regular);
+  line-height: var(--lh-normal);
+  letter-spacing: var(--ls-body);
+  font-feature-settings: 'cv05' 1, 'cv08' 1, 'ss03' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-strong);
+  font-weight: var(--w-semibold);
+  letter-spacing: var(--ls-heading);
+  line-height: var(--lh-snug);
+  text-wrap: balance;
+}
+
+h1 { font-size: var(--t-32); letter-spacing: var(--ls-display); line-height: var(--lh-tight); }
+h2 { font-size: var(--t-26); }
+h3 { font-size: var(--t-21); }
+h4 { font-size: var(--t-18); }
+h5 { font-size: var(--t-15); }
+h6 { font-size: var(--t-13); }
+
+p { text-wrap: pretty; }
+
+strong, b { font-weight: var(--w-semibold); color: var(--text-strong); }
+
+small { font-size: var(--t-12); }
+
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  font-feature-settings: 'zero' 1;
+}
+
+code:not(pre code) {
+  padding: 0.1em 0.34em;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-1);
+  background: var(--surface-sunken);
+  color: var(--text-strong);
+}
+
+pre {
+  overflow-x: auto;
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-2);
+  background: var(--surface-sunken);
+  line-height: var(--lh-normal);
+}
+
+a:where(:not([class])) {
+  color: var(--accent-700);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+a:where(:not([class])):hover {
+  color: var(--accent-800);
+}
+
+/* --- Numerals ------------------------------------------------------------
+   Every number that sits in a column, metric, or price aligns on the digit. */
+.num,
+.metric-value,
+td.num,
+.money,
+.table td,
+input[type='number'] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+}
+
+/* --- Editorial prose ----------------------------------------------------- */
+.prose {
+  max-width: var(--container-prose);
+  font-size: var(--t-16);
+  line-height: var(--lh-relaxed);
+  color: var(--text);
+}
+
+.prose > * + * { margin-top: var(--s-4); }
+.prose h2 { margin-top: var(--s-8); font-family: var(--font-serif); font-size: var(--t-26); font-weight: var(--w-semibold); letter-spacing: -0.008em; }
+.prose h3 { margin-top: var(--s-7); font-size: var(--t-18); }
+.prose ul, .prose ol { padding-left: 1.35em; }
+.prose li + li { margin-top: var(--s-2); }
+.prose blockquote {
+  padding-left: var(--s-5);
+  border-left: 2px solid var(--accent);
+  font-family: var(--font-serif);
+  font-size: var(--t-18);
+  line-height: var(--lh-relaxed);
+  color: var(--text-strong);
+}
+.prose img { border: 1px solid var(--line); border-radius: var(--radius-2); }
+.prose figcaption { margin-top: var(--s-2); font-size: var(--t-13); color: var(--text-muted); }
+.prose hr { margin-block: var(--s-8); }
+
+/* --- Editorial display ----------------------------------------------------
+   The serif is reserved for narrative pages. It never appears in dense UI. */
+.display {
+  font-family: var(--font-serif);
+  font-weight: var(--w-semibold);
+  letter-spacing: -0.012em;
+  line-height: var(--lh-tight);
+}

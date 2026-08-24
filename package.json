@@ -1,0 +1,22 @@
+{
+  "name": "digistore",
+  "version": "2.0.0",
+  "private": true,
+  "description": "DigiStore — digital commerce storefront, admin console, and content studio for Codeink Technologies.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "build:watch": "node tools/build.mjs --watch",
+    "config": "node tools/generate-config.mjs",
+    "dev": "node tools/dev-server.mjs",
+    "check": "node tools/check.mjs",
+    "check:sql": "node tools/check.mjs --only=sql",
+    "test": "node --test tests/unit",
+    "test:integration": "node tests/integration/run.mjs",
+    "verify": "npm run check && npm run test"
+  },
+  "devDependencies": {}
+}

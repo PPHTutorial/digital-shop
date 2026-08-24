@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Content Studio · DigiStore</title>
+  <script>
+    // Applied before first paint so the console never flashes the wrong theme.
+    try {
+      var t = localStorage.getItem('digistore.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+    } catch (e) { /* private mode */ }
+  </script>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+  <link rel="stylesheet" href="./css/app.css?v=a4e69dd6">
+</head>
+
+<body>
+  <div id="boot" class="boot">
+    <span class="boot__mark">DigiStore Studio</span>
+    <div class="progress boot__bar"></div>
+  </div>
+
+  <div class="studio">
+    <header class="studio__topbar">
+      <span class="wordmark hide-md">
+        <span class="wordmark__mark">D</span>
+        <span>
+          <span class="wordmark__name">Studio</span>
+          <span class="wordmark__by">Content</span>
+        </span>
+      </span>
+      <button id="desk-back" class="btn btn--sm btn--ghost btn--icon hide-md" type="button" aria-label="Show structure">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M9.5 4v16"/></svg>
+      </button>
+      <nav class="console__crumbs" aria-label="Breadcrumb">
+        <strong>Content Studio</strong>
+      </nav>
+      <div class="ml-auto row row-2">
+        <button id="studio-palette" class="btn btn--sm" type="button" title="Search  (Ctrl+K)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.4 15.4 4.1 4.1"/></svg>
+          <span class="hide-sm">Search</span>
+          <kbd class="hide-sm">Ctrl K</kbd>
+        </button>
+        <button id="studio-theme" class="btn btn--sm btn--ghost btn--icon" type="button"
+                aria-label="Switch colour theme"></button>
+        <a class="btn btn--sm" href="./admin.html">Admin</a>
+        <a class="btn btn--sm btn--ghost" href="./index.html" title="Open the storefront">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+               stroke-linejoin="round" aria-hidden="true"><path d="M13 4h7v7"/><path d="m20 4-9 9"/><path d="M18 14v5a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19V7.5A1.5 1.5 0 0 1 5 6h5"/></svg>
+        </a>
+        <span id="studio-user" class="t-12 muted hide-sm"></span>
+      </div>
+    </header>
+
+    <div id="desk" class="desk" data-focus="list">
+      <!-- Pane 1: structure -->
+      <section class="pane pane--structure" aria-label="Content types">
+          <div class="pane__head">
+            <span class="pane__title">Content</span>
+          </div>
+          <div id="desk-body" class="pane__body"></div>
+          <div class="pane__foot">
+            <span>DigiStore CMS</span>
+          </div>
+        </section>
+
+      <!-- Pane 2: documents -->
+      <section id="list-pane" class="pane pane--list" aria-label="Documents">
+          <div class="pane__head">
+            <button id="list-back" class="btn btn--xs btn--ghost btn--icon pane__back" type="button" aria-label="Back">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                   stroke-linejoin="round" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg>
+            </button>
+            <span id="list-title" class="pane__title">Documents</span>
+            <button id="list-new" class="btn btn--xs btn--primary" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                   stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              <span>New</span>
+            </button>
+          </div>
+          <div id="list-toolbar" class="p-3 border-b"></div>
+          <div id="list-body" class="pane__body"></div>
+          <div class="pane__foot">
+            <span id="list-count"></span>
+          </div>
+        </section>
+
+      <!-- Pane 3: editor -->
+      <section id="editor-pane" class="pane pane--editor" aria-label="Editor"></section>
+    </div>
+  </div>
+
+  <script type="module" src="./js/studio/index.js"></script>
+</body>
+
+</html>

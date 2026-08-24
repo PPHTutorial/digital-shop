@@ -1,227 +1,330 @@
+/**
+ * Catalog page.
+ *
+ * Search, filtering, sorting, and pagination all happen in Postgres via
+ * `search_products`. The page holds only the query state, which is mirrored
+ * into the URL so a filtered view can be shared or bookmarked.
+ */
+
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, toast } from './ui.js';
+import { CONFIG } from './config.js';
+import { $, html, raw, esc, debounce, query } from './dom.js';
+import { icon } from './icons.js';
+import { formatNumber, formatMoney } from './format.js';
+import { initTheme, mountHeader, mountFooter, bootDone, toast } from './ui.js';
+import { productCard, productSkeleton, wireShareButtons } from './product-card.js';
 
-let allProducts = [];
-let managedCategories = [];
-const params = new URLSearchParams(window.location.search);
-let activeCategory = params.get('category') || 'all';
-let activeSearchQuery = params.get('search') || '';
-let activeSort = 'newest';
-const PAGE_SIZE = 12;
-let visibleCount = PAGE_SIZE;
+initTheme();
 
-const grid = document.querySelector('#product-grid');
-const loadMoreContainer = document.querySelector('#load-more-container');
-const loadMoreBtn = document.querySelector('#load-more-btn');
-const searchInput = document.querySelector('#store-search-input');
-const sortSelect = document.querySelector('#store-sort-select');
+const state = {
+  search: query.get('search', ''),
+  category: query.get('category', 'all') || 'all',
+  tags: (query.get('tags', '') || '').split(',').filter(Boolean),
+  minPrice: query.get('min') ? Number(query.get('min')) : null,
+  maxPrice: query.get('max') ? Number(query.get('max')) : null,
+  sort: query.get('sort', 'relevance'),
+  offset: 0,
+  total: 0,
+  items: [],
+  facets: { categories: [], tags: [], price: {}, total: 0 },
+  loading: false,
+};
 
-function createCardHtml(p) {
-  const hasDiscount = p.original_price && Number(p.original_price) > Number(p.price);
-  const discountPct = hasDiscount ? Math.round((1 - Number(p.price) / Number(p.original_price)) * 100) : 0;
-  const priceHtml = hasDiscount
-    ? `<div class="flex items-baseline gap-1.5">
-         <span class="price-original text-xs">${p.currency} ${Number(p.original_price).toFixed(2)}</span>
-         <strong class="text-base sm:text-lg text-[#142c55] font-black">${p.currency} ${Number(p.price).toFixed(2)}</strong>
-       </div>`
-    : `<strong class="text-base sm:text-lg text-[#142c55] font-black">${p.currency} ${Number(p.price).toFixed(2)}</strong>`;
+const dom = {};
 
-  return `
-    <article class="catalog-card flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 bg-white border border-slate-200/80 rounded-2xl">
-      <div>
-        <a href="./checkout.html?product=${encodeURIComponent(p.slug || p.id)}" class="block relative overflow-hidden bg-slate-100 group aspect-[1.4]">
-          ${
-            p.cover_url
-              ? `<img src="${escapeHtml(p.cover_url)}" alt="${escapeHtml(p.title)}" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy">`
-              : `<div class="w-full h-full flex items-center justify-center text-slate-400 bg-slate-100 font-semibold text-xs">Digital Product</div>`
-          }
-          <div class="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
-            <span class="tag !text-[10px] !py-0.5 !px-2 font-bold shadow-sm">${escapeHtml(p.category || 'General')}</span>
-            ${hasDiscount ? `<span class="discount-pill shadow-sm">${discountPct}% OFF</span>` : ''}
-          </div>
-        </a>
-        <div class="p-4 sm:p-5">
-          <h3 class="text-base font-black text-[#142c55] leading-snug line-clamp-2 hover:text-orange-600 transition">
-            <a href="./checkout.html?product=${encodeURIComponent(p.slug || p.id)}">${escapeHtml(p.title)}</a>
-          </h3>
-          <p class="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">${escapeHtml(p.description || '')}</p>
-        </div>
-      </div>
-      <div class="p-4 sm:p-5 pt-0 mt-auto border-t border-slate-100 flex items-center justify-between gap-2">
-        ${priceHtml}
-        <div class="flex items-center gap-1.5">
-          <button type="button" class="button !min-h-8 !px-2.5 text-xs share-product-btn" data-share-url="${encodeURIComponent(p.slug || p.id)}" title="Share product link">
-            <i data-lucide="share-2" width="13" height="13"></i>
-          </button>
-          <a class="button button-primary !min-h-8 !px-3.5 !text-xs font-bold whitespace-nowrap" href="./checkout.html?product=${encodeURIComponent(p.slug || p.id)}">Get product</a>
-        </div>
-      </div>
-    </article>`;
-}
+/* ==========================================================================
+   Query
+   ========================================================================== */
 
-function getFilteredList() {
-  let list = [...allProducts];
+async function fetchPage({ append = false } = {}) {
+  if (state.loading) return;
+  state.loading = true;
 
-  if (activeCategory !== 'all') {
-    list = list.filter((p) => (p.category || 'General').toLowerCase() === activeCategory.toLowerCase());
+  if (!append) {
+    state.offset = 0;
+    dom.grid.innerHTML = productSkeleton(8);
   }
 
-  if (activeSearchQuery.trim()) {
-    const q = activeSearchQuery.toLowerCase().trim();
-    list = list.filter((p) => (p.title || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
-  }
-
-  if (activeSort === 'newest') {
-    list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-  } else if (activeSort === 'price-low') {
-    list.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
-  } else if (activeSort === 'price-high') {
-    list.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
-  } else if (activeSort === 'title') {
-    list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-  }
-
-  return list;
-}
-
-function renderCatalog() {
-  if (!grid) return;
-  const filtered = getFilteredList();
-
-  document.querySelector('#product-count').textContent = `${filtered.length} product${filtered.length === 1 ? '' : 's'} available`;
-
-  const headingEl = document.querySelector('#store-heading');
-  if (headingEl) {
-    headingEl.textContent = activeCategory === 'all' ? 'All Products' : activeCategory;
-  }
-
-  if (!filtered.length) {
-    grid.innerHTML = `
-      <div class="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200 p-8 space-y-3">
-        <div class="text-4xl">🔍</div>
-        <h3 class="font-black text-xl text-[#142c55]">No products found</h3>
-        <p class="text-xs text-slate-500 max-w-sm mx-auto">No products matched your selected criteria. Try adjusting your filters or search keywords.</p>
-        <button type="button" id="reset-filters-btn" class="button button-primary !min-h-9 !px-4 text-xs font-bold">Clear All Filters</button>
-      </div>`;
-    document.querySelector('#reset-filters-btn')?.addEventListener('click', () => {
-      activeCategory = 'all';
-      activeSearchQuery = '';
-      if (searchInput) searchInput.value = '';
-      renderPills();
-      renderCatalog();
-    });
-    loadMoreContainer?.classList.add('hidden');
-    return;
-  }
-
-  const subset = filtered.slice(0, visibleCount);
-  grid.innerHTML = subset.map(createCardHtml).join('');
-
-  if (loadMoreContainer && loadMoreBtn) {
-    if (visibleCount < filtered.length) {
-      loadMoreContainer.classList.remove('hidden');
-      loadMoreBtn.textContent = `Load more products (${filtered.length - visibleCount} remaining)`;
-    } else {
-      loadMoreContainer.classList.add('hidden');
-    }
-  }
-
-  renderIcons();
-  wireShareButtons();
-}
-
-function renderPills() {
-  const container = document.querySelector('#catalog-category-pills');
-  if (!container) return;
-
-  const fallbackCategories = ['Ebooks & Guides', 'Software & Tools', 'Templates & Themes', 'Online Courses', 'Audio & Media', 'Design & Graphics'];
-  const categories = ['all', ...new Set([...managedCategories.map((category) => category.name), ...fallbackCategories, ...allProducts.map((product) => product.category || 'General')])];
-
-  container.innerHTML = categories
-    .map((cat) => {
-      const isActive = cat.toLowerCase() === activeCategory.toLowerCase();
-      const count = cat === 'all' ? allProducts.length : allProducts.filter((p) => (p.category || 'General').toLowerCase() === cat.toLowerCase()).length;
-      return `
-        <button type="button" class="rounded-full px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 ${
-          isActive ? 'bg-orange-500 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-        }" data-cat="${escapeHtml(cat)}">
-          <span>${cat === 'all' ? 'All Products' : escapeHtml(cat)}</span>
-          <span class="text-[10px] ${isActive ? 'text-orange-100' : 'text-slate-400'}">(${count})</span>
-        </button>`;
-    })
-    .join('');
-
-  container.querySelectorAll('[data-cat]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      activeCategory = btn.dataset.cat;
-      visibleCount = PAGE_SIZE;
-      renderPills();
-      renderCatalog();
-    });
-  });
-}
-
-function wireShareButtons() {
-  document.querySelectorAll('.share-product-btn').forEach((btn) => {
-    btn.onclick = async (e) => {
-      e.preventDefault();
-      const slugOrId = decodeURIComponent(btn.dataset.shareUrl);
-      const shareUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(slugOrId)}`;
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: 'DigiStore Product', url: shareUrl });
-          return;
-        } catch {}
-      }
-      navigator.clipboard.writeText(shareUrl);
-      toast('Product checkout link copied to clipboard!');
-    };
-  });
-}
-
-async function init() {
-  mountHeader();
-  mountFooter();
-
-  if (searchInput && activeSearchQuery) searchInput.value = activeSearchQuery;
-
-  searchInput?.addEventListener('input', (e) => {
-    activeSearchQuery = e.target.value;
-    visibleCount = PAGE_SIZE;
-    renderCatalog();
+  const { data, error } = await supabase.rpc('search_products', {
+    p_query: state.search || null,
+    p_category: state.category === 'all' ? null : state.category,
+    p_tags: state.tags.length ? state.tags : null,
+    p_min_price: Number.isFinite(state.minPrice) ? state.minPrice : null,
+    p_max_price: Number.isFinite(state.maxPrice) ? state.maxPrice : null,
+    p_sort: state.sort,
+    p_limit: CONFIG.PAGE_SIZE,
+    p_offset: state.offset,
   });
 
-  sortSelect?.addEventListener('change', (e) => {
-    activeSort = e.target.value;
-    renderCatalog();
-  });
-
-  loadMoreBtn?.addEventListener('click', () => {
-    visibleCount += PAGE_SIZE;
-    renderCatalog();
-  });
-
-  document.querySelector('#product-loading')?.classList.remove('hidden');
-
-  const [productsResult, categoriesResult] = await Promise.all([
-    supabase.from('products').select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published,created_at').eq('is_published', true).order('created_at', { ascending: false }),
-    supabase.from('categories').select('name,slug,description,sort_order').eq('is_active', true).order('sort_order').order('name'),
-  ]);
-  const { data, error } = productsResult;
-  managedCategories = categoriesResult.data || [];
-
-  document.querySelector('#product-loading')?.classList.add('hidden');
+  state.loading = false;
 
   if (error) {
-    grid.innerHTML = '<div class="soft-panel p-8 text-slate-600 col-span-full">The catalog is temporarily unavailable.</div>';
-    finishPageLoader();
+    dom.grid.innerHTML = html`
+      <div class="alert alert--danger" style="grid-column: 1 / -1">
+        ${raw(icon('alertCircle'))}
+        <span><span class="alert__title">The catalog is unavailable</span>${esc(error.message)}</span>
+      </div>
+    `;
     return;
   }
 
-  allProducts = data || [];
-  renderPills();
-  renderCatalog();
-  finishPageLoader();
+  state.total = data.total ?? 0;
+  state.items = append ? [...state.items, ...(data.items || [])] : data.items || [];
+  paintResults();
 }
 
-init();
+/* ==========================================================================
+   Rendering
+   ========================================================================== */
+
+function paintResults() {
+  dom.count.textContent = `${formatNumber(state.total)} product${state.total === 1 ? '' : 's'}`;
+  dom.heading.textContent = state.category === 'all' ? 'All products' : state.category;
+
+  if (!state.items.length) {
+    dom.grid.innerHTML = html`
+      <div class="empty" style="grid-column: 1 / -1">
+        ${raw(icon('search'))}
+        <p class="empty__title">Nothing matched</p>
+        <p class="empty__body">
+          ${state.search
+            ? `No product matches “${state.search}”. Try a broader term, or clear the filters.`
+            : 'No product matches the current filters.'}
+        </p>
+        <button class="btn btn--sm mt-2" type="button" data-reset>Clear filters</button>
+      </div>
+    `;
+    dom.more.hidden = true;
+    return;
+  }
+
+  dom.grid.innerHTML = state.items.map((item) => productCard(item)).join('');
+  dom.more.hidden = state.items.length >= state.total;
+  dom.loadMore.textContent = `Load ${Math.min(CONFIG.PAGE_SIZE, state.total - state.items.length)} more`;
+}
+
+function paintFacets() {
+  const { categories, tags, price } = state.facets;
+
+  dom.facetCategories.innerHTML = html`
+    <button class="chip" type="button" data-category="all" aria-pressed="${String(state.category === 'all')}">
+      <span class="fill">All categories</span>
+      <span class="chip__count">${formatNumber(state.facets.total)}</span>
+    </button>
+    ${raw(
+      categories
+        .map(
+          (entry) => html`
+            <button class="chip" type="button" data-category="${entry.name}"
+                    aria-pressed="${String(state.category.toLowerCase() === entry.name.toLowerCase())}">
+              <span class="fill truncate">${entry.name}</span>
+              <span class="chip__count">${formatNumber(entry.count)}</span>
+            </button>
+          `,
+        )
+        .join(''),
+    )}
+  `;
+  // Chips stack vertically in the sidebar.
+  dom.facetCategories.querySelectorAll('.chip').forEach((chip) => {
+    chip.style.width = '100%';
+    chip.style.justifyContent = 'space-between';
+  });
+
+  dom.facetTags.innerHTML = tags.length
+    ? tags
+        .slice(0, 18)
+        .map(
+          (entry) => html`
+            <button class="chip" type="button" data-tag="${entry.name}"
+                    aria-pressed="${String(state.tags.includes(entry.name))}">
+              ${entry.name}<span class="chip__count">${formatNumber(entry.count)}</span>
+            </button>
+          `,
+        )
+        .join('')
+    : html`<p class="t-12 subtle">No tags yet.</p>`;
+
+  if (price?.min != null) {
+    dom.priceMin.placeholder = String(Math.floor(price.min));
+    dom.priceMax.placeholder = String(Math.ceil(price.max));
+    dom.priceMin.value = state.minPrice ?? '';
+    dom.priceMax.value = state.maxPrice ?? '';
+  }
+}
+
+function paintActiveFilters() {
+  const chips = [];
+
+  if (state.search) chips.push({ label: `“${state.search}”`, clear: () => (state.search = '') });
+  if (state.category !== 'all') chips.push({ label: state.category, clear: () => (state.category = 'all') });
+  for (const tag of state.tags) {
+    chips.push({ label: `#${tag}`, clear: () => (state.tags = state.tags.filter((t) => t !== tag)) });
+  }
+  if (state.minPrice != null || state.maxPrice != null) {
+    const from = state.minPrice != null ? formatMoney(state.minPrice) : 'any';
+    const to = state.maxPrice != null ? formatMoney(state.maxPrice) : 'any';
+    chips.push({
+      label: `${from} – ${to}`,
+      clear: () => {
+        state.minPrice = null;
+        state.maxPrice = null;
+      },
+    });
+  }
+
+  dom.activeFilters.hidden = chips.length === 0;
+  dom.activeFilters.innerHTML = chips.length
+    ? html`
+        <span class="t-12 subtle">Filtering by</span>
+        ${raw(
+          chips
+            .map(
+              (chip, index) => html`
+                <button class="chip" type="button" data-clear="${String(index)}">
+                  ${chip.label}${raw(icon('x', 12))}
+                </button>
+              `,
+            )
+            .join(''),
+        )}
+        <button class="btn btn--xs btn--link" type="button" data-reset>Clear all</button>
+      `
+    : '';
+
+  dom.activeFilters._chips = chips;
+}
+
+/* ==========================================================================
+   State plumbing
+   ========================================================================== */
+
+function syncUrl() {
+  query.set({
+    search: state.search || null,
+    category: state.category === 'all' ? null : state.category,
+    tags: state.tags.length ? state.tags.join(',') : null,
+    min: state.minPrice ?? null,
+    max: state.maxPrice ?? null,
+    sort: state.sort === 'relevance' ? null : state.sort,
+  });
+}
+
+function refresh() {
+  syncUrl();
+  paintFacets();
+  paintActiveFilters();
+  fetchPage();
+}
+
+function resetFilters() {
+  state.search = '';
+  state.category = 'all';
+  state.tags = [];
+  state.minPrice = null;
+  state.maxPrice = null;
+  dom.search.value = '';
+  refresh();
+}
+
+/* ==========================================================================
+   Boot
+   ========================================================================== */
+
+async function main() {
+  dom.grid = $('#catalog-grid');
+  dom.count = $('#catalog-count');
+  dom.heading = $('#catalog-heading');
+  dom.search = $('#catalog-search');
+  dom.sort = $('#catalog-sort');
+  dom.more = $('#catalog-more');
+  dom.loadMore = $('#load-more');
+  dom.facetCategories = $('#facet-categories');
+  dom.facetTags = $('#facet-tags');
+  dom.activeFilters = $('#active-filters');
+  dom.priceMin = $('#price-min');
+  dom.priceMax = $('#price-max');
+
+  dom.search.value = state.search;
+  dom.sort.value = state.sort;
+
+  mountFooter();
+  wireShareButtons(document);
+
+  dom.search.addEventListener(
+    'input',
+    debounce(() => {
+      state.search = dom.search.value.trim();
+      refresh();
+    }, CONFIG.SEARCH_DEBOUNCE_MS),
+  );
+
+  dom.sort.addEventListener('change', () => {
+    state.sort = dom.sort.value;
+    refresh();
+  });
+
+  dom.facetCategories.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-category]');
+    if (!button) return;
+    state.category = button.dataset.category;
+    refresh();
+  });
+
+  dom.facetTags.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-tag]');
+    if (!button) return;
+    const tag = button.dataset.tag;
+    state.tags = state.tags.includes(tag) ? state.tags.filter((t) => t !== tag) : [...state.tags, tag];
+    refresh();
+  });
+
+  $('#apply-price').addEventListener('click', () => {
+    state.minPrice = dom.priceMin.value === '' ? null : Number(dom.priceMin.value);
+    state.maxPrice = dom.priceMax.value === '' ? null : Number(dom.priceMax.value);
+    if (state.minPrice != null && state.maxPrice != null && state.minPrice > state.maxPrice) {
+      toast('The minimum price is above the maximum.', 'error');
+      return;
+    }
+    refresh();
+  });
+
+  $('#reset-filters').addEventListener('click', resetFilters);
+
+  dom.activeFilters.addEventListener('click', (event) => {
+    if (event.target.closest('[data-reset]')) {
+      resetFilters();
+      return;
+    }
+    const chip = event.target.closest('[data-clear]');
+    if (!chip) return;
+    dom.activeFilters._chips?.[Number(chip.dataset.clear)]?.clear();
+    if (!state.search) dom.search.value = '';
+    refresh();
+  });
+
+  dom.grid.addEventListener('click', (event) => {
+    if (event.target.closest('[data-reset]')) resetFilters();
+  });
+
+  dom.loadMore.addEventListener('click', () => {
+    state.offset += CONFIG.PAGE_SIZE;
+    fetchPage({ append: true });
+  });
+
+  window.addEventListener('popstate', () => window.location.reload());
+
+  const [{ data: facets }] = await Promise.all([supabase.rpc('catalog_facets'), fetchPage()]);
+  state.facets = facets || state.facets;
+
+  await mountHeader({ categories: state.facets.categories || [] });
+  paintFacets();
+  paintActiveFilters();
+  bootDone();
+}
+
+main().catch((error) => {
+  console.error(error);
+  toast('The catalog could not be loaded.', 'error');
+  bootDone();
+});

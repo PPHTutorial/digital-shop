@@ -1,325 +1,114 @@
 <!doctype html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="DigiStore by Codeink Technologies — Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
-  <title>DigiStore | Premium Digital Catalog</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="./css/app.css">
+  <meta name="description"
+        content="DigiStore by Codeink Technologies — reviewed digital products: ebooks, software, templates, courses, and media, delivered the moment payment clears.">
+  <title>DigiStore — Digital products, delivered instantly</title>
+  <link rel="canonical" href="https://digistore.codeinktechnologies.com/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="DigiStore — Digital products, delivered instantly">
+  <meta property="og:description" content="Reviewed ebooks, software, templates, courses, and media from Codeink Technologies.">
+  <script>
+    try {
+      var t = localStorage.getItem('digistore.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+    } catch (e) { /* private mode */ }
+  </script>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+  <link rel="stylesheet" href="./css/app.css?v=a4e69dd6">
 </head>
 
-<body class="bg-slate-50 text-slate-900 flex flex-col min-h-screen selection:bg-orange-500 selection:text-white">
-  <!-- Initial Instant Page Loader -->
-  <div id="page-loader" class="page-loader">
-    <div class="loader-card">
-      <div class="shimmer logo"></div>
-      <div class="shimmer hero"></div>
-      <div class="shimmer short"></div>
-    </div>
+<body class="page">
+  <div id="boot" class="boot">
+    <span class="boot__mark">DigiStore</span>
+    <div class="progress boot__bar"></div>
   </div>
 
-  <header id="site-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur shadow-sm"></header>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header id="site-header"></header>
 
-  <!-- Quick Category Bar -->
-  <nav class="border-b border-slate-200 bg-white py-3 overflow-x-auto shadow-xs">
-    <div class="shell flex items-center gap-2 text-xs font-semibold whitespace-nowrap" id="quick-category-nav">
-      <a href="./store.html" class="quick-nav-pill rounded-full bg-[#142c55] text-white px-4 py-1.5 transition">All Products</a>
-      <a href="./store.html?category=Ebooks%20%26%20Guides" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Ebooks &amp; Guides</a>
-      <a href="./store.html?category=Software%20%26%20Tools" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Software &amp; Tools</a>
-      <a href="./store.html?category=Templates%20%26%20Themes" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Templates &amp; Themes</a>
-      <a href="./store.html?category=Online%20Courses" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Online Courses</a>
-      <a href="./store.html?category=Audio%20%26%20Media" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Audio &amp; Media</a>
-      <a href="./store.html?category=Design%20%26%20Graphics" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">Design &amp; Graphics</a>
-      <a href="./store.html" class="ml-auto text-orange-600 font-bold hover:underline inline-flex items-center gap-1">
-        <span>Explore Full Catalog</span>
-        <i data-lucide="arrow-right" width="13" height="13"></i>
-      </a>
+  <!-- Hero: copy comes from the CMS "Home page" document. -->
+  <section class="hero" id="hero" hidden>
+    <div class="container hero__inner">
+      <div>
+        <span class="eyebrow" data-hero-eyebrow></span>
+        <h1 class="hero__title mt-3" data-hero-title></h1>
+        <p class="hero__lede" data-hero-body></p>
+        <div class="hero__actions">
+          <a class="btn btn--lg btn--primary" data-hero-primary href="./store.html"></a>
+          <a class="btn btn--lg" data-hero-secondary href="./support.html"></a>
+        </div>
+        <dl class="hero__facts">
+          <div class="hero__fact">
+            <dt>In the catalog</dt>
+            <dd data-fact-products>—</dd>
+          </div>
+          <div class="hero__fact">
+            <dt>Delivered</dt>
+            <dd data-fact-orders>—</dd>
+          </div>
+          <div class="hero__fact">
+            <dt>Access</dt>
+            <dd>Lifetime</dd>
+          </div>
+        </dl>
+      </div>
+      <div class="hero__aside" data-hero-aside></div>
     </div>
-  </nav>
+  </section>
 
-  <main class="py-8 space-y-12 flex-1">
-
-    <!-- 1. FEATURED RELEASES SECTION -->
-    <section id="section-featured" class="shell">
-      <div class="section-nav-header">
-        <div>
-          <span class="eyebrow !text-orange-600">HANDPICKED SPOTLIGHT</span>
-          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Featured Releases</h2>
-        </div>
-        <div class="flex items-center gap-3">
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-left="scroll-featured" aria-label="Scroll left">
-            <i data-lucide="chevron-left" width="16" height="16"></i>
-          </button>
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-right="scroll-featured" aria-label="Scroll right">
-            <i data-lucide="chevron-right" width="16" height="16"></i>
-          </button>
-          <a href="./store.html" class="button !min-h-9 !py-1 !px-3 text-xs font-bold inline-flex items-center gap-1.5">
-            <span>See all (<span class="count-featured">0</span>)</span>
-            <i data-lucide="arrow-right" width="12" height="12"></i>
-          </a>
-        </div>
-      </div>
-      <div id="scroll-featured" class="horizontal-scroll-container"></div>
-    </section>
-
-    <!-- 2. NEW ARRIVALS SECTION -->
-    <section id="section-new" class="shell">
-      <div class="section-nav-header">
-        <div>
-          <span class="eyebrow !text-blue-600">FRESH IN STORE</span>
-          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">New Arrivals</h2>
-        </div>
-        <div class="flex items-center gap-3">
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-left="scroll-new" aria-label="Scroll left">
-            <i data-lucide="chevron-left" width="16" height="16"></i>
-          </button>
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-right="scroll-new" aria-label="Scroll right">
-            <i data-lucide="chevron-right" width="16" height="16"></i>
-          </button>
-          <a href="./store.html?sort=newest" class="button !min-h-9 !py-1 !px-3 text-xs font-bold inline-flex items-center gap-1.5">
-            <span>See all (<span class="count-new">0</span>)</span>
-            <i data-lucide="arrow-right" width="12" height="12"></i>
-          </a>
-        </div>
-      </div>
-      <div id="scroll-new" class="horizontal-scroll-container"></div>
-    </section>
-
-    <!-- 3. BEST SELLERS / MOST PURCHASED -->
-    <section id="section-bestsellers" class="shell">
-      <div class="section-nav-header">
-        <div>
-          <span class="eyebrow !text-amber-600">COMMUNITY FAVORITES</span>
-          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Most Purchased &amp; Best Sellers</h2>
-        </div>
-        <div class="flex items-center gap-3">
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-left="scroll-bestsellers" aria-label="Scroll left">
-            <i data-lucide="chevron-left" width="16" height="16"></i>
-          </button>
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-right="scroll-bestsellers" aria-label="Scroll right">
-            <i data-lucide="chevron-right" width="16" height="16"></i>
-          </button>
-          <a href="./store.html" class="button !min-h-9 !py-1 !px-3 text-xs font-bold inline-flex items-center gap-1.5">
-            <span>See all (<span class="count-bestsellers">0</span>)</span>
-            <i data-lucide="arrow-right" width="12" height="12"></i>
-          </a>
-        </div>
-      </div>
-      <div id="scroll-bestsellers" class="horizontal-scroll-container"></div>
-    </section>
-
-    <!-- 4. TRENDING NOW -->
-    <section id="section-trending" class="shell">
-      <div class="section-nav-header">
-        <div>
-          <span class="eyebrow !text-purple-600">HIGH DEMAND</span>
-          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Trending Now</h2>
-        </div>
-        <div class="flex items-center gap-3">
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-left="scroll-trending" aria-label="Scroll left">
-            <i data-lucide="chevron-left" width="16" height="16"></i>
-          </button>
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-right="scroll-trending" aria-label="Scroll right">
-            <i data-lucide="chevron-right" width="16" height="16"></i>
-          </button>
-          <a href="./store.html" class="button !min-h-9 !py-1 !px-3 text-xs font-bold inline-flex items-center gap-1.5">
-            <span>See all (<span class="count-trending">0</span>)</span>
-            <i data-lucide="arrow-right" width="12" height="12"></i>
-          </a>
-        </div>
-      </div>
-      <div id="scroll-trending" class="horizontal-scroll-container"></div>
-    </section>
-
-    <!-- 5. SPECIAL DEALS & DISCOUNTS -->
-    <section id="section-deals" class="shell">
-      <div class="section-nav-header">
-        <div>
-          <span class="eyebrow !text-red-600">LIMITED-TIME SAVINGS</span>
-          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Special Deals &amp; Discounts</h2>
-        </div>
-        <div class="flex items-center gap-3">
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-left="scroll-deals" aria-label="Scroll left">
-            <i data-lucide="chevron-left" width="16" height="16"></i>
-          </button>
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-right="scroll-deals" aria-label="Scroll right">
-            <i data-lucide="chevron-right" width="16" height="16"></i>
-          </button>
-          <a href="./store.html" class="button !min-h-9 !py-1 !px-3 text-xs font-bold inline-flex items-center gap-1.5">
-            <span>See all (<span class="count-deals">0</span>)</span>
-            <i data-lucide="arrow-right" width="12" height="12"></i>
-          </a>
-        </div>
-      </div>
-      <div id="scroll-deals" class="horizontal-scroll-container"></div>
-    </section>
-
-    <!-- 6. EBOOKS & GUIDES -->
-    <section id="section-ebooks" class="shell">
-      <div class="section-nav-header">
-        <div>
-          <span class="eyebrow">DIGITAL PUBLICATIONS</span>
-          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Ebooks &amp; Comprehensive Guides</h2>
-        </div>
-        <div class="flex items-center gap-3">
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-left="scroll-ebooks" aria-label="Scroll left">
-            <i data-lucide="chevron-left" width="16" height="16"></i>
-          </button>
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-right="scroll-ebooks" aria-label="Scroll right">
-            <i data-lucide="chevron-right" width="16" height="16"></i>
-          </button>
-          <a href="./store.html?category=Ebooks%20%26%20Guides" class="button !min-h-9 !py-1 !px-3 text-xs font-bold inline-flex items-center gap-1.5">
-            <span>See all (<span class="count-ebooks">0</span>)</span>
-            <i data-lucide="arrow-right" width="12" height="12"></i>
-          </a>
-        </div>
-      </div>
-      <div id="scroll-ebooks" class="horizontal-scroll-container"></div>
-    </section>
-
-    <!-- 7. SOFTWARE, TOOLS & SCRIPTS -->
-    <section id="section-software" class="shell">
-      <div class="section-nav-header">
-        <div>
-          <span class="eyebrow">ENGINEERING &amp; TOOLS</span>
-          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Software, Tools &amp; Scripts</h2>
-        </div>
-        <div class="flex items-center gap-3">
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-left="scroll-software" aria-label="Scroll left">
-            <i data-lucide="chevron-left" width="16" height="16"></i>
-          </button>
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-right="scroll-software" aria-label="Scroll right">
-            <i data-lucide="chevron-right" width="16" height="16"></i>
-          </button>
-          <a href="./store.html?category=Software%20%26%20Tools" class="button !min-h-9 !py-1 !px-3 text-xs font-bold inline-flex items-center gap-1.5">
-            <span>See all (<span class="count-software">0</span>)</span>
-            <i data-lucide="arrow-right" width="12" height="12"></i>
-          </a>
-        </div>
-      </div>
-      <div id="scroll-software" class="horizontal-scroll-container"></div>
-    </section>
-
-    <!-- 8. TEMPLATES, THEMES & UI KITS -->
-    <section id="section-templates" class="shell">
-      <div class="section-nav-header">
-        <div>
-          <span class="eyebrow">DESIGN &amp; THEMES</span>
-          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Templates, Themes &amp; UI Kits</h2>
-        </div>
-        <div class="flex items-center gap-3">
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-left="scroll-templates" aria-label="Scroll left">
-            <i data-lucide="chevron-left" width="16" height="16"></i>
-          </button>
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-right="scroll-templates" aria-label="Scroll right">
-            <i data-lucide="chevron-right" width="16" height="16"></i>
-          </button>
-          <a href="./store.html?category=Templates%20%26%20Themes" class="button !min-h-9 !py-1 !px-3 text-xs font-bold inline-flex items-center gap-1.5">
-            <span>See all (<span class="count-templates">0</span>)</span>
-            <i data-lucide="arrow-right" width="12" height="12"></i>
-          </a>
-        </div>
-      </div>
-      <div id="scroll-templates" class="horizontal-scroll-container"></div>
-    </section>
-
-    <!-- 9. ONLINE COURSES & MASTERCLASSES -->
-    <section id="section-courses" class="shell">
-      <div class="section-nav-header">
-        <div>
-          <span class="eyebrow">LEARNING &amp; MASTERY</span>
-          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Online Courses &amp; Masterclasses</h2>
-        </div>
-        <div class="flex items-center gap-3">
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-left="scroll-courses" aria-label="Scroll left">
-            <i data-lucide="chevron-left" width="16" height="16"></i>
-          </button>
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-right="scroll-courses" aria-label="Scroll right">
-            <i data-lucide="chevron-right" width="16" height="16"></i>
-          </button>
-          <a href="./store.html?category=Online%20Courses" class="button !min-h-9 !py-1 !px-3 text-xs font-bold inline-flex items-center gap-1.5">
-            <span>See all (<span class="count-courses">0</span>)</span>
-            <i data-lucide="arrow-right" width="12" height="12"></i>
-          </a>
-        </div>
-      </div>
-      <div id="scroll-courses" class="horizontal-scroll-container"></div>
-    </section>
-
-    <!-- 10. AUDIO & MEDIA ASSETS -->
-    <section id="section-audio" class="shell">
-      <div class="section-nav-header">
-        <div>
-          <span class="eyebrow">CREATIVE MEDIA</span>
-          <h2 class="text-2xl sm:text-3xl font-black text-[#142c55]">Audio &amp; Media Assets</h2>
-        </div>
-        <div class="flex items-center gap-3">
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-left="scroll-audio" aria-label="Scroll left">
-            <i data-lucide="chevron-left" width="16" height="16"></i>
-          </button>
-          <button type="button" class="scroll-arrow-btn inline-flex items-center justify-center" data-scroll-right="scroll-audio" aria-label="Scroll right">
-            <i data-lucide="chevron-right" width="16" height="16"></i>
-          </button>
-          <a href="./store.html?category=Audio%20%26%20Media" class="button !min-h-9 !py-1 !px-3 text-xs font-bold inline-flex items-center gap-1.5">
-            <span>See all (<span class="count-audio">0</span>)</span>
-            <i data-lucide="arrow-right" width="12" height="12"></i>
-          </a>
-        </div>
-      </div>
-      <div id="scroll-audio" class="horizontal-scroll-container"></div>
-    </section>
-
-    <!-- HIGH-CONVERTING CTA BANNER -->
-    <section class="shell my-12">
-      <div class="rounded-3xl bg-gradient-to-br from-[#142c55] via-[#1a386b] to-[#0f2344] p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
-        <div class="absolute -right-10 -bottom-10 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="relative z-10 max-w-2xl space-y-4">
-          <span class="tag !bg-orange-500 !text-white !border-0 text-xs font-bold tracking-wider inline-flex items-center gap-1">
-            <i data-lucide="zap" width="13" height="13"></i>
-            <span>INSTANT DELIVERY SYSTEM</span>
-          </span>
-          <h2 class="text-3xl sm:text-4xl font-black tracking-tight leading-tight">Instant Digital Downloads Delivered Securely to Your Vault</h2>
-          <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
-            Gain immediate lifetime access to software licenses, high-resolution media, development kits, and professional ebooks with multi-currency payment support.
-          </p>
-          <div class="pt-3 flex flex-wrap gap-3 items-center">
-            <a href="./store.html" class="inline-flex items-center gap-2 rounded-full bg-orange-500 px-7 py-3 font-bold text-white hover:bg-orange-400 shadow-lg shadow-orange-500/30 transition-all hover:scale-105">
-              <span>Explore Complete Catalog</span>
-              <i data-lucide="arrow-right" width="16" height="16"></i>
-            </a>
-            <a href="./support.html" class="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-6 py-3 font-bold text-white transition-colors">
-              <i data-lucide="life-buoy" width="15" height="15"></i>
-              <span>Customer Support</span>
-            </a>
+  <main id="main" class="container page__body">
+    <div id="rails">
+      <section class="section">
+        <div class="section__head">
+          <div>
+            <span class="eyebrow">Loading</span>
+            <h2 class="section__title mt-1">Fetching the catalog</h2>
           </div>
         </div>
+        <div class="rail" id="rail-boot"></div>
+      </section>
+    </div>
+
+    <!-- Closing band -->
+    <section class="section band" id="band" hidden>
+      <h2 data-band-title></h2>
+      <p data-band-body></p>
+      <div class="row row-3 mt-7 wrap">
+        <a class="btn btn--lg btn--accent" href="./store.html">Browse the catalog</a>
+        <a class="btn btn--lg" href="./support.html">How delivery works</a>
       </div>
     </section>
 
-    <!-- NEWSLETTER SUBSCRIPTION -->
-    <section id="collections" class="shell pb-6">
-      <div class="soft-panel grid gap-7 p-8 sm:p-10 sm:grid-cols-[1fr_auto] sm:items-center rounded-3xl">
-        <div>
-          <span class="eyebrow !text-orange-600">STAY INFORMED</span>
-          <h2 class="mt-2 text-2xl sm:text-3xl font-black text-[#142c55]">New releases, tools, and digital insights.</h2>
-          <p class="mt-2 text-sm leading-relaxed text-slate-600 max-w-xl">
-            Subscribe to receive occasional product launch discounts, newly curated digital assets, and developer resources directly to your inbox.
-          </p>
+    <!-- Newsletter -->
+    <section class="section" id="subscribe">
+      <div class="panel">
+        <div class="panel__body sidebar-layout" style="--aside-w: 380px">
+          <div>
+            <span class="eyebrow">Release notes</span>
+            <h2 class="section__title mt-2">New products, occasional discounts, nothing else.</h2>
+            <p class="lede mt-3 max-56">
+              A short note when something worth your attention is published. No drip sequences,
+              and one click to leave.
+            </p>
+          </div>
+          <form id="subscribe-form" class="stack-3" novalidate>
+            <label class="field">
+              <span class="field__label" for="subscribe-email">Email address</span>
+              <input class="input" id="subscribe-email" name="email" type="email" required
+                     autocomplete="email" placeholder="you@example.com">
+            </label>
+            <button class="btn btn--primary btn--block" type="submit">Subscribe</button>
+            <p id="subscribe-status" class="status" aria-live="polite"></p>
+          </form>
         </div>
-        <form id="subscribe-form" class="flex w-full max-w-md gap-2">
-          <input name="email" required type="email" placeholder="Enter your email address…" class="field !mt-0">
-          <button class="button button-primary shrink-0 inline-flex items-center gap-1.5" type="submit">
-            <span>Subscribe</span>
-            <i data-lucide="send" width="14" height="14"></i>
-          </button>
-        </form>
-        <p id="subscribe-status" class="status-line sm:col-span-2" aria-live="polite"></p>
       </div>
     </section>
-
   </main>
 
   <footer id="site-footer"></footer>

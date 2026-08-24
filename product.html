@@ -4,9 +4,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="robots" content="noindex">
-  <meta name="description" content="Complete your DigiStore purchase.">
-  <title>Checkout · DigiStore</title>
+  <meta name="description" content="Product details, licence terms, and delivery information.">
+  <title>Product · DigiStore</title>
   <script>
     try {
       var t = localStorage.getItem('digistore.theme');
@@ -29,26 +28,14 @@
   <header id="site-header"></header>
 
   <main id="main" class="container page__body">
-    <div class="section__head">
-      <div>
-        <span class="eyebrow">Secure checkout</span>
-        <h1 class="section__title mt-1" style="font-size: var(--t-32)">Complete your order</h1>
-        <p class="section__sub">
-          Payment is verified on our server before any file is released. A redirect alone never unlocks a download.
-        </p>
-      </div>
-    </div>
-
-    <div id="checkout-root" class="sidebar-layout" style="--aside-w: 400px">
-      <div class="stack-6">
-        <div class="panel"><div class="panel__body"><div class="progress"></div></div></div>
-      </div>
-    </div>
+    <nav class="row row-2 t-12 muted" aria-label="Breadcrumb" id="breadcrumb"></nav>
+    <div id="product-root" class="mt-5"></div>
+    <div id="related-root"></div>
   </main>
 
   <footer id="site-footer"></footer>
 
-  <script type="module" src="./js/checkout.js"></script>
+  <script type="module" src="./js/product.js"></script>
 </body>
 
 </html>
