@@ -624,22 +624,23 @@ a:hover {
 /* --------------------------------------------------------------------------
    Selling call-to-action
    -------------------------------------------------------------------------- */
-.button-sell {
-  background: #fff3ed;
-  border-color: #fed7aa;
-  color: #c2410c;
+/* Selling lives in the account popover, not the navbar — one route, not two.
+   Separated from the browsing links above it by a rule. */
+.popover-sell {
+  margin-top: 4px;
+  padding-top: 10px !important;
+  border-top: 1px solid #eef2f7;
+  color: #c2410c !important;
+  font-weight: 800 !important;
 }
-.button-sell:hover { background: #ffe4d3; border-color: #fdba74; color: #9a3412; }
+.popover-sell:hover { background: #fff3ed !important; }
 
-.nav-sell { color: #f97316 !important; }
-
+/* The popover is hidden below 1024px, so the drawer carries the route there. */
 .drawer-sell {
   margin-top: 6px;
   background: #fff3ed !important;
   color: #c2410c !important;
 }
-
-@media (max-width: 767px) { .hide-below-md { display: none !important; } }
 
 /* Footer strip */
 .seller-strip {

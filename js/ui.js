@@ -40,6 +40,20 @@ export async function mountHeader() {
     const { user, profile } = await getAccount();
     const name = profile?.full_name || 'My account';
 
+    // Existing sellers get a route to their centre rather than a pitch to
+    // become one. Single indexed lookup on a unique column; if it fails we just
+    // show the invitation, which still lands on the right page either way.
+    let isSeller = false;
+    if (user) {
+      try {
+        const { data: vendorRow } = await supabase
+          .from('vendors').select('status').eq('user_id', user.id).maybeSingle();
+        isSeller = Boolean(vendorRow);
+      } catch {
+        /* non-fatal */
+      }
+    }
+
     const path = window.location.pathname.toLowerCase().split('/').pop() || 'index.html';
     const hash = window.location.hash.toLowerCase();
 
@@ -62,7 +76,7 @@ export async function mountHeader() {
     // Selling is a headline route, not a buried one: a signed-in seller goes
     // straight to their centre, everyone else to the pitch.
     const sellHref = './vendor.html';
-    const sellLabel = 'Sell on DigiStore';
+    const sellLabel = isSeller ? 'Seller centre' : 'Start selling';
     target.innerHTML = `
       <div class="utility-bar">
         <div class="shell utility-content">
@@ -76,13 +90,8 @@ export async function mountHeader() {
             <span class="brand-mark">D</span>
             <span>DigiStore<small>powered by codeinktechnologies</small></span>
           </a>
-          <nav class="nav-links" aria-label="Main navigation">${links}
-            <a href="${sellHref}" class="nav-sell">${icon('store')}<span>Sell</span></a>
-          </nav>
+          <nav class="nav-links" aria-label="Main navigation">${links}</nav>
           <div class="nav-actions">
-            <a href="${sellHref}" class="button button-sell hide-below-md" title="${sellLabel}">
-              ${icon('store', 15)}<span>Start selling</span>
-            </a>
             ${
               user
                 ? `<details class="account-popover">
@@ -96,6 +105,7 @@ export async function mountHeader() {
                       <a href="./account.html">${icon('layout-dashboard', 16)} Overview</a>
                       <a href="./account.html#orders-list">${icon('package', 16)} Orders</a>
                       <a href="./checkout.html">${icon('shopping-cart', 16)} Cart / checkout</a>
+                      <a href="${sellHref}" class="popover-sell">${icon('store', 16)} ${sellLabel}</a>
                       ${profile?.role === 'admin' ? `<a href="./admin.html">${icon('shield-check', 16)} Admin centre</a>` : ''}
                       <button id="sign-out">${icon('log-out', 16)} Log out</button>
                     </div>
