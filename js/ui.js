@@ -96,40 +96,69 @@ export async function mountHeader() {
           </div>
         </div>
       </div>
-      <aside id="mobile-drawer" class="mobile-drawer" aria-hidden="true">
-        <div class="mobile-drawer-head">
-          <strong>DigiStore</strong>
-          <button id="mobile-menu-close" aria-label="Close menu">${icon('x', 22)}</button>
-        </div>
-        <nav>
-          ${links}
-          ${
-            user
-              ? `<a href="./account.html">${icon('user-round')} ${escapeHtml(name)}</a>
-                 ${profile?.role === 'admin' ? `<a href="./admin.html">${icon('shield-check')} Admin centre</a>` : ''}
-                 <button id="mobile-sign-out">${icon('log-out')} Log out</button>`
-              : ''
-          }
-        </nav>
-      </aside>
     `;
+
+    // The drawer lives on <body>, never inside #site-header. The header carries
+    // `backdrop-blur`, and backdrop-filter creates a containing block for
+    // position:fixed descendants — nested here the drawer would be positioned
+    // and clipped against the header box instead of the viewport, and its
+    // z-index would be trapped inside the header's stacking context.
+    document.querySelector('#mobile-drawer')?.remove();
+    document.querySelector('#mobile-scrim')?.remove();
+
+    const scrim = document.createElement('div');
+    scrim.id = 'mobile-scrim';
+    scrim.className = 'mobile-scrim';
+
+    const drawer = document.createElement('aside');
+    drawer.id = 'mobile-drawer';
+    drawer.className = 'mobile-drawer';
+    drawer.setAttribute('aria-label', 'Menu');
+    drawer.innerHTML = `
+      <div class="mobile-drawer-head">
+        <strong>DigiStore</strong>
+        <button id="mobile-menu-close" aria-label="Close menu">${icon('x', 22)}</button>
+      </div>
+      <nav>
+        ${links}
+        ${
+          user
+            ? `<a href="./account.html">${icon('user-round')} ${escapeHtml(name)}</a>
+               ${profile?.role === 'admin' ? `<a href="./admin.html">${icon('shield-check')} Admin centre</a>` : ''}
+               <button id="mobile-sign-out">${icon('log-out')} Log out</button>`
+            : `<a href="./auth.html">${icon('log-in')} Log in</a>
+               <a href="./auth.html?mode=signup">${icon('user-plus')} Create account</a>`
+        }
+      </nav>`;
+
+    document.body.append(scrim, drawer);
+
+    const setDrawer = (open) => {
+      drawer.classList.toggle('open', open);
+      scrim.classList.toggle('open', open);
+      // Body scroll lock, so the page behind does not scroll under the drawer.
+      document.body.style.overflow = open ? 'hidden' : '';
+      if (open) drawer.querySelector('a, button')?.focus();
+    };
+
+    target.querySelector('#mobile-menu-button').onclick = () => setDrawer(true);
+    drawer.querySelector('#mobile-menu-close').onclick = () => setDrawer(false);
+    scrim.onclick = () => setDrawer(false);
+    // Any destination closes it — in-page links would otherwise leave it open.
+    drawer.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setDrawer(false)));
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') setDrawer(false);
+    });
+
     renderIcons();
     finishPageLoader();
-    const drawer = target.querySelector('#mobile-drawer');
-    target.querySelector('#mobile-menu-button').onclick = () => {
-      drawer.classList.add('open');
-      drawer.setAttribute('aria-hidden', 'false');
-    };
-    target.querySelector('#mobile-menu-close').onclick = () => {
-      drawer.classList.remove('open');
-      drawer.setAttribute('aria-hidden', 'true');
-    };
+
     const logout = async () => {
       await supabase.auth.signOut();
       location.href = './index.html';
     };
     target.querySelector('#sign-out')?.addEventListener('click', logout);
-    target.querySelector('#mobile-sign-out')?.addEventListener('click', logout);
+    drawer.querySelector('#mobile-sign-out')?.addEventListener('click', logout);
   };
   await render();
   supabase.auth.onAuthStateChange(() => render());

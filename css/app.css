@@ -167,7 +167,10 @@ body {
 .account-popover-panel { position: absolute; right: 0; top: calc(100% + 12px); display: grid; min-width: 210px; gap: 4px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 14px; background: #fff; box-shadow: 0 18px 45px rgba(20,44,85,.15); }
 .account-popover-panel strong,.account-popover-panel a,.account-popover-panel button { padding: 8px; text-align: left; font-size: 13px; color: #334155; background: transparent; border: 0; border-radius: 8px; }
 .account-popover-panel a:hover,.account-popover-panel button:hover { background: #fff3ed; opacity: 1; }
-.account-popover-panel a,.account-popover-panel button{display:flex;align-items:center;gap:8px}.mobile-menu-button{display:none;border:0;background:transparent;color:#142c55}.mobile-drawer{position:fixed;z-index:200;inset:0 0 0 auto;width:min(86vw,360px);padding:22px;background:#fff;box-shadow:-18px 0 45px #142c5533;transform:translateX(105%);transition:transform .25s ease}.mobile-drawer.open{transform:translateX(0)}.mobile-drawer-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e7eb;padding-bottom:17px;color:#142c55}.mobile-drawer-head button{border:0;background:transparent}.mobile-drawer nav{display:grid;gap:5px;margin-top:18px}.mobile-drawer nav a,.mobile-drawer nav button{display:flex;align-items:center;gap:12px;padding:13px;border:0;border-radius:10px;background:transparent;text-align:left;color:#334155;font-weight:700}.mobile-drawer nav a:hover,.mobile-drawer nav button:hover{background:#fff3ed;opacity:1}
+.account-popover-panel a,.account-popover-panel button{display:flex;align-items:center;gap:8px}.mobile-menu-button{display:none;border:0;background:transparent;color:#142c55}.mobile-scrim{position:fixed;inset:0;z-index:290;background:rgba(15,23,42,.5);opacity:0;visibility:hidden;transition:opacity .25s ease,visibility .25s ease}
+.mobile-scrim.open{opacity:1;visibility:visible}
+.mobile-drawer{position:fixed;z-index:300;inset:0 0 0 auto;display:flex;flex-direction:column;width:min(86vw,360px);padding:22px;background:#fff;box-shadow:-18px 0 45px rgba(20,44,85,.28);overflow-y:auto;overscroll-behavior:contain;transform:translateX(105%);visibility:hidden;transition:transform .25s ease,visibility .25s ease}
+.mobile-drawer.open{transform:translateX(0);visibility:visible}.mobile-drawer-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e7eb;padding-bottom:17px;color:#142c55}.mobile-drawer-head button{border:0;background:transparent}.mobile-drawer nav{display:grid;gap:5px;margin-top:18px}.mobile-drawer nav a,.mobile-drawer nav button{display:flex;align-items:center;gap:12px;padding:13px;border:0;border-radius:10px;background:transparent;text-align:left;color:#334155;font-weight:700}.mobile-drawer nav a:hover,.mobile-drawer nav button:hover{background:#fff3ed;opacity:1}
 .avatar {
   display: grid;
   place-items: center;
@@ -617,6 +620,67 @@ a:hover {
   transition: background-color .18s ease, gap .18s ease;
 }
 .catalog-card__cta:hover { background: #f97316; gap: 9px; opacity: 1; }
+
+/* --------------------------------------------------------------------------
+   Category filter
+   A wrapping pill row is fine at desktop widths, but with a full taxonomy it
+   becomes a wall of buttons on a phone. Small screens get a native select —
+   one line, familiar, and properly accessible — instead of a scroll strip
+   whose off-screen options are easy to miss entirely.
+   -------------------------------------------------------------------------- */
+.catfilter__compact { display: none; }
+
+.catfilter__label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.catfilter__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.catpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 8px 15px;
+  border: 1px solid #e6eaf0;
+  background: #fff;
+  color: #47566b;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color .16s ease, color .16s ease, border-color .16s ease;
+}
+
+.catpill:hover { border-color: #cbd5e1; color: #142c55; opacity: 1; }
+
+.catpill__count {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #a3aec0;
+  font-variant-numeric: tabular-nums;
+}
+
+.catpill.is-active {
+  background: #142c55;
+  border-color: #142c55;
+  color: #fff;
+}
+
+.catpill.is-active .catpill__count { color: rgba(255, 255, 255, 0.6); }
+
+@media (max-width: 767px) {
+  .catfilter__compact { display: block; }
+  .catfilter__pills { display: none; }
+}
 
 /* Paid placement must be disclosed, quietly but unmistakably. */
 .sponsored-flag {

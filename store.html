@@ -52,8 +52,15 @@
 
     <!-- Unified Top Filter Bar -->
     <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 mb-8">
-      <!-- Top Category Filter Pills -->
-      <div id="catalog-category-pills" class="flex flex-wrap gap-2"></div>
+      <!-- Categories: a dropdown on small screens, pills from md up. With 20+
+           categories a wrapping pill row swallows the whole first screen. -->
+      <div class="catfilter">
+        <label class="catfilter__compact">
+          <span class="catfilter__label">Browse category</span>
+          <select id="catalog-category-select" class="field !mt-1 !py-2.5 text-sm"></select>
+        </label>
+        <div id="catalog-category-pills" class="catfilter__pills"></div>
+      </div>
 
       <!-- Search & Sorting Row -->
       <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">

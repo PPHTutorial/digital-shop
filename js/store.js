@@ -184,34 +184,58 @@ function renderCatalog() {
 
 function renderPills() {
   const container = document.querySelector('#catalog-category-pills');
+  const select = document.querySelector('#catalog-category-select');
   if (!container) return;
 
-  const fallbackCategories = ['Ebooks & Guides', 'Software & Tools', 'Templates & Themes', 'Online Courses', 'Audio & Media', 'Design & Graphics'];
-  const categories = ['all', ...new Set([...managedCategories.map((category) => category.name), ...fallbackCategories, ...allProducts.map((product) => product.category || 'General')])];
+  // Only offer categories that actually have something in them, plus whatever
+  // is currently selected — a list of empty categories is noise, and with a
+  // full taxonomy seeded most of them will be empty early on.
+  const counts = new Map();
+  for (const product of allProducts) {
+    const key = product.category || 'General';
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+
+  const named = managedCategories.map((category) => category.name);
+  const categories = ['all', ...new Set([...named, ...counts.keys()])]
+    .filter((cat) => cat === 'all' || counts.get(cat) > 0 || cat.toLowerCase() === activeCategory.toLowerCase());
+
+  const labelFor = (cat) => (cat === 'all' ? 'All products' : cat);
+  const countFor = (cat) => (cat === 'all' ? allProducts.length : counts.get(cat) || 0);
+  const isActive = (cat) => cat.toLowerCase() === activeCategory.toLowerCase();
 
   container.innerHTML = categories
-    .map((cat) => {
-      const isActive = cat.toLowerCase() === activeCategory.toLowerCase();
-      const count = cat === 'all' ? allProducts.length : allProducts.filter((p) => (p.category || 'General').toLowerCase() === cat.toLowerCase()).length;
-      return `
-        <button type="button" class="rounded-full px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 ${
-          isActive ? 'bg-orange-500 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-        }" data-cat="${escapeHtml(cat)}">
-          <span>${cat === 'all' ? 'All Products' : escapeHtml(cat)}</span>
-          <span class="text-[10px] ${isActive ? 'text-orange-100' : 'text-slate-400'}">(${count})</span>
-        </button>`;
-    })
+    .map((cat) => `
+      <button type="button" class="catpill ${isActive(cat) ? 'is-active' : ''}" data-cat="${escapeHtml(cat)}">
+        <span>${escapeHtml(labelFor(cat))}</span>
+        <span class="catpill__count">${countFor(cat)}</span>
+      </button>`)
     .join('');
 
+  if (select) {
+    select.innerHTML = categories
+      .map((cat) => `
+        <option value="${escapeHtml(cat)}" ${isActive(cat) ? 'selected' : ''}>
+          ${escapeHtml(labelFor(cat))} (${countFor(cat)})
+        </option>`)
+      .join('');
+  }
+
   container.querySelectorAll('[data-cat]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      activeCategory = btn.dataset.cat;
-      visibleCount = PAGE_SIZE;
-      renderPills();
-      renderCatalog();
-    });
+    btn.addEventListener('click', () => selectCategory(btn.dataset.cat));
   });
 }
+
+/** Single entry point so the pills and the dropdown can never disagree. */
+function selectCategory(category) {
+  activeCategory = category;
+  visibleCount = PAGE_SIZE;
+  renderPills();
+  renderCatalog();
+}
+
+document.querySelector('#catalog-category-select')
+  ?.addEventListener('change', (event) => selectCategory(event.target.value));
 
 /**
  * Renders one seller's public store. Returns false when the slug does not
