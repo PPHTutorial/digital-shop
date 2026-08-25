@@ -2,6 +2,7 @@ import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, toast } from './ui.js';
 import { loadServableCampaigns, attachAdTracking, promoteSponsored } from './ads.js';
 import { enhanceSelect } from './select.js';
+import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
 
 let adCampaigns = new Map();
 let categorySelect = null;
@@ -69,9 +70,12 @@ function createCardHtml(p) {
   const href = `./checkout.html?product=${encodeURIComponent(p.slug || p.id)}`;
   const blurb = p.short_description || p.description || '';
 
+  // The whole card is the link. A single stretched anchor covers it, so the
+  // title, image, price and empty space all lead to checkout without nesting
+  // interactive elements inside one another.
   return `
-    <article class="catalog-card" data-product-id="${p.id}">
-      <a href="${href}" class="catalog-card__media" aria-label="${escapeHtml(p.title)}">
+    <article class="catalog-card is-clickable" data-product-id="${p.id}">
+      <span class="catalog-card__media">
         ${
           p.cover_url
             ? `<img src="${escapeHtml(p.cover_url)}" alt="${escapeHtml(p.title)}" loading="lazy">`
@@ -81,28 +85,28 @@ function createCardHtml(p) {
           ${p.is_featured ? `<span class="catalog-card__badge catalog-card__badge--featured">Featured</span>` : ''}
           ${hasDiscount ? `<span class="catalog-card__badge catalog-card__badge--sale">−${discountPct}%</span>` : ''}
         </span>
-      </a>
+      </span>
 
-      <button type="button" class="catalog-card__share share-product-btn" data-share-url="${encodeURIComponent(p.slug || p.id)}" title="Share product link" aria-label="Share this product">
-        <i data-lucide="share-2" width="14" height="14"></i>
-      </button>
+      ${wishlistButton(p.id, p.title)}
 
-      <div class="catalog-card__body">
+      <span class="catalog-card__body">
         <span class="catalog-card__cat">${escapeHtml(p.category || 'General')}</span>
-        <h3 class="catalog-card__title"><a href="${href}">${escapeHtml(p.title)}</a></h3>
-        ${blurb ? `<p class="catalog-card__blurb">${escapeHtml(blurb)}</p>` : ''}
+        <h3 class="catalog-card__title">${escapeHtml(p.title)}</h3>
+        ${blurb ? `<span class="catalog-card__blurb">${escapeHtml(blurb)}</span>` : ''}
         ${cardMetaHtml(p)}
-      </div>
+      </span>
 
-      <div class="catalog-card__foot">
-        <div class="catalog-card__price">
+      <span class="catalog-card__foot">
+        <span class="catalog-card__price">
           ${hasDiscount ? `<span class="price-original">${p.currency} ${Number(p.original_price).toFixed(2)}</span>` : ''}
           <strong>${p.currency} ${Number(p.price).toFixed(2)}</strong>
-        </div>
-        <a class="catalog-card__cta" href="${href}">
-          Get product<i data-lucide="arrow-right" width="14" height="14"></i>
-        </a>
-      </div>
+        </span>
+        <span class="catalog-card__go">${icon('arrow-right', 15)}</span>
+      </span>
+
+      <a class="catalog-card__link" href="${href}">
+        <span class="sr-only">${escapeHtml(p.title)}</span>
+      </a>
     </article>`;
 }
 
@@ -181,7 +185,7 @@ function renderCatalog() {
   }
 
   renderIcons();
-  wireShareButtons();
+  paintWishlist(grid);
   attachAdTracking(grid, adCampaigns);
 }
 
@@ -248,6 +252,8 @@ document.querySelector('#catalog-category-select')
  * resolve, so the caller can fall back to the normal catalog.
  */
 async function renderVendorStore(slug) {
+  await loadWishlist();
+  wireWishlist(grid);
   const { data, error } = await supabase.rpc('vendor_storefront', { p_slug: slug });
   const vendor = data?.vendor;
 
@@ -301,28 +307,11 @@ async function renderVendorStore(slug) {
   if (count) count.textContent = `${products.length} product${products.length === 1 ? '' : 's'}`;
 
   renderIcons();
-  wireShareButtons();
+  paintWishlist(grid);
   finishPageLoader();
   return true;
 }
 
-function wireShareButtons() {
-  document.querySelectorAll('.share-product-btn').forEach((btn) => {
-    btn.onclick = async (e) => {
-      e.preventDefault();
-      const slugOrId = decodeURIComponent(btn.dataset.shareUrl);
-      const shareUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(slugOrId)}`;
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: 'DigiStore Product', url: shareUrl });
-          return;
-        } catch {}
-      }
-      navigator.clipboard.writeText(shareUrl);
-      toast('Product checkout link copied to clipboard!');
-    };
-  });
-}
 
 async function init() {
   mountHeader();
@@ -372,6 +361,8 @@ async function init() {
 
   allProducts = data || [];
   adCampaigns = await loadServableCampaigns();
+  await loadWishlist();
+  wireWishlist(grid);
   renderPills();
   renderCatalog();
   finishPageLoader();

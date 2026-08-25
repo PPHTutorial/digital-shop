@@ -1,22 +1,10 @@
 import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 import { renderCategoryJumbotron, categoryLook } from './categories.js';
+import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
 
 let allProducts = [];
 let managedCategories = [];
-
-function renderQuickCategories() {
-  const nav = document.querySelector('#quick-category-nav');
-  if (!nav) return;
-  const categories = managedCategories.length ? managedCategories : [
-    { name: 'Ebooks & Guides' }, { name: 'Software & Tools' }, { name: 'Templates & Themes' },
-    { name: 'Online Courses' }, { name: 'Audio & Media' }, { name: 'Design & Graphics' },
-  ];
-  nav.innerHTML = `
-    <a href="./store.html" class="quick-nav-pill rounded-full bg-[#142c55] text-white px-4 py-1.5 transition">All Products</a>
-    ${categories.slice(0, 7).map((category) => `<a href="./store.html?category=${encodeURIComponent(category.name)}" class="quick-nav-pill rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3.5 py-1.5 transition">${escapeHtml(category.name)}</a>`).join('')}
-    <a href="./store.html" class="ml-auto text-orange-600 font-bold hover:underline inline-flex items-center gap-1"><span>Explore Full Catalog</span><i data-lucide="arrow-right" width="13" height="13"></i></a>`;
-}
 
 // ============================================================
 // Single Product Card HTML Generator
@@ -34,35 +22,37 @@ function createProductCardHtml(p) {
   const canonicalSlug = p.slug || p.id;
 
   return `
-    <article class="scroll-card-item catalog-card flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 bg-white border border-slate-200/80 rounded-2xl">
-      <div>
-        <a href="./checkout.html?product=${encodeURIComponent(canonicalSlug)}" class="block relative overflow-hidden bg-slate-100 group aspect-[1.4]">
-          ${
-            p.cover_url
-              ? `<img src="${escapeHtml(p.cover_url)}" alt="${escapeHtml(p.title)}" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy">`
-              : `<div class="w-full h-full flex items-center justify-center text-slate-400 bg-slate-100 font-semibold text-xs">Digital Product</div>`
-          }
-          <div class="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
-            <span class="tag !text-[10px] !py-0.5 !px-2 font-bold shadow-sm">${escapeHtml(p.category || 'General')}</span>
-            ${hasDiscount ? `<span class="discount-pill shadow-sm">${discountPct}% OFF</span>` : ''}
-          </div>
-        </a>
-        <div class="p-4 sm:p-5">
-          <h3 class="text-base font-black text-[#142c55] leading-snug line-clamp-2 hover:text-orange-600 transition">
-            <a href="./checkout.html?product=${encodeURIComponent(canonicalSlug)}">${escapeHtml(p.title)}</a>
-          </h3>
-          <p class="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">${escapeHtml(p.description || '')}</p>
-        </div>
-      </div>
-      <div class="p-4 sm:p-5 pt-0 mt-auto border-t border-slate-100 flex items-center justify-between gap-2">
-        ${priceHtml}
-        <div class="flex items-center gap-1.5">
-          <button type="button" class="button !min-h-8 !px-2.5 text-xs share-product-btn" data-share-url="${encodeURIComponent(canonicalSlug)}" title="Share product link">
-            <i data-lucide="share-2" width="13" height="13"></i>
-          </button>
-          <a class="button button-primary !min-h-8 !px-3.5 !text-xs font-bold whitespace-nowrap" href="./checkout.html?product=${encodeURIComponent(canonicalSlug)}">Get product</a>
-        </div>
-      </div>
+    <article class="scroll-card-item catalog-card is-clickable" data-product-id="${p.id}">
+      <span class="catalog-card__media">
+        ${
+          p.cover_url
+            ? `<img src="${escapeHtml(p.cover_url)}" alt="${escapeHtml(p.title)}" loading="lazy">`
+            : `<span class="catalog-card__placeholder"><i data-lucide="file-text" width="26" height="26"></i></span>`
+        }
+        <span class="catalog-card__badges">
+          ${hasDiscount ? `<span class="catalog-card__badge catalog-card__badge--sale">−${discountPct}%</span>` : ''}
+        </span>
+      </span>
+
+      ${wishlistButton(p.id, p.title)}
+
+      <span class="catalog-card__body">
+        <span class="catalog-card__cat">${escapeHtml(p.category || 'General')}</span>
+        <h3 class="catalog-card__title">${escapeHtml(p.title)}</h3>
+        ${p.description ? `<span class="catalog-card__blurb">${escapeHtml(p.description)}</span>` : ''}
+      </span>
+
+      <span class="catalog-card__foot">
+        <span class="catalog-card__price">
+          ${hasDiscount ? `<span class="price-original">${p.currency || 'USD'} ${Number(p.original_price).toFixed(2)}</span>` : ''}
+          <strong>${p.currency || 'USD'} ${Number(p.price).toFixed(2)}</strong>
+        </span>
+        <span class="catalog-card__go">${icon('arrow-right', 15)}</span>
+      </span>
+
+      <a class="catalog-card__link" href="./checkout.html?product=${encodeURIComponent(canonicalSlug)}">
+        <span class="sr-only">${escapeHtml(p.title)}</span>
+      </a>
     </article>`;
 }
 
@@ -138,7 +128,7 @@ function renderShowcaseSections() {
   });
 
   wireHorizontalScrollButtons();
-  wireShareButtons();
+  paintWishlist(document);
   renderIcons();
 }
 
@@ -165,26 +155,6 @@ function wireHorizontalScrollButtons() {
   });
 }
 
-// ============================================================
-// Share Buttons
-// ============================================================
-function wireShareButtons() {
-  document.querySelectorAll('.share-product-btn').forEach((btn) => {
-    btn.onclick = async (e) => {
-      e.preventDefault();
-      const slugOrId = decodeURIComponent(btn.dataset.shareUrl);
-      const shareUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(slugOrId)}`;
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: 'DigiStore Product', url: shareUrl });
-          return;
-        } catch {}
-      }
-      navigator.clipboard.writeText(shareUrl);
-      toast('Product checkout link copied to clipboard!');
-    };
-  });
-}
 
 // ============================================================
 // Main Storefront Load
@@ -210,7 +180,6 @@ async function load() {
     console.error('Fetch error:', err);
   }
 
-  renderQuickCategories();
 
   // Category jumbotron — counts come from the same product list already loaded.
   try {
@@ -229,6 +198,8 @@ async function load() {
     console.error('Category jumbotron failed:', error);
   }
 
+  await loadWishlist();
+  wireWishlist(document.body);
   renderShowcaseSections();
   renderIcons();
   finishPageLoader();

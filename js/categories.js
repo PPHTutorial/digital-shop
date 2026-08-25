@@ -73,10 +73,25 @@ export function categoryCard(category) {
 }
 
 /**
- * The home-page jumbotron. Capped, because twenty tiles is a wall — the rest
- * live behind "View all".
+ * Compact tile: just an icon and a name. The description and arrow are what
+ * made the full card tall, and a row of tall cards pushed the actual products
+ * off the first screen — worse on a phone, where they stacked one per row.
  */
-export function renderCategoryJumbotron(host, categories, cap = 8) {
+export function categoryTile(category) {
+  const href = `./store.html?category=${encodeURIComponent(category.name)}`;
+  return `
+    <a class="cattile cattile--${escapeHtml(category.accent)}" href="${href}" title="${escapeHtml(category.name)}">
+      <span class="cattile__icon">${icon(category.icon, 20)}</span>
+      <span class="cattile__name">${escapeHtml(category.name)}</span>
+      <span class="cattile__count">${category.count}</span>
+    </a>`;
+}
+
+/**
+ * The home-page strip. Compact tiles rather than cards, capped, with the rest
+ * behind "View all".
+ */
+export function renderCategoryJumbotron(host, categories, cap = 10) {
   if (!host) return;
   // Busiest first: an empty category is a poor advert for the marketplace.
   const ranked = [...categories].sort((a, b) => b.count - a.count).slice(0, cap);
@@ -87,14 +102,12 @@ export function renderCategoryJumbotron(host, categories, cap = 8) {
         <div>
           <span class="eyebrow">BROWSE BY CATEGORY</span>
           <h2 class="catjumbo__title">Find exactly what you need</h2>
-          <p class="catjumbo__sub">Verified digital products across ${categories.length} categories, delivered instantly.</p>
         </div>
-        <a class="button" href="./categories.html">View all categories</a>
+        <a class="catjumbo__all" href="./categories.html">
+          <span>All ${categories.length}</span>${icon('arrow-right', 14)}
+        </a>
       </div>
-      <div class="catgrid">${ranked.map(categoryCard).join('')}</div>
-      <a class="catjumbo__foot" href="./categories.html">
-        <span>See all ${categories.length} categories</span>${icon('arrow-right', 15)}
-      </a>
+      <div class="cattiles">${ranked.map(categoryTile).join('')}</div>
     </div>`;
   renderIcons();
 }

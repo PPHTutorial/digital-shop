@@ -180,6 +180,22 @@ export async function mountHeader() {
     };
     target.querySelector('#sign-out')?.addEventListener('click', logout);
     drawer.querySelector('#mobile-sign-out')?.addEventListener('click', logout);
+
+    // <details> has no dismiss-on-outside-click of its own, so it would stay
+    // open until clicked again. Bound once, guarded by a flag, because
+    // mountHeader re-renders on every auth state change.
+    if (!document.body.dataset.popoverWired) {
+      document.body.dataset.popoverWired = 'true';
+      document.addEventListener('click', (event) => {
+        document.querySelectorAll('details.account-popover[open]').forEach((details) => {
+          if (!details.contains(event.target)) details.open = false;
+        });
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        document.querySelectorAll('details.account-popover[open]').forEach((d) => { d.open = false; });
+      });
+    }
   };
   await render();
   supabase.auth.onAuthStateChange(() => render());

@@ -710,38 +710,120 @@ a:hover {
    Category jumbotron + cards
    -------------------------------------------------------------------------- */
 .catjumbo {
-  padding: 32px;
+  padding: 22px 24px 24px;
   border: 1px solid #e9edf3;
-  border-radius: 26px;
-  background: linear-gradient(180deg, #fff, #fbfcfe);
-  box-shadow: 0 18px 50px rgba(17, 24, 39, 0.05);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 10px 34px rgba(17, 24, 39, 0.04);
 }
 
 .catjumbo__head {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 26px;
-}
-.catjumbo__title { margin-top: 6px; color: #142c55; font-size: 1.75rem; font-weight: 900; letter-spacing: -0.03em; }
-.catjumbo__sub { margin-top: 6px; color: #64748b; font-size: 0.86rem; }
-
-.catjumbo__foot {
-  display: none;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 20px;
-  padding: 13px;
-  border-radius: 14px;
-  background: #f6f8fb;
-  color: #142c55;
-  font-size: 0.82rem;
-  font-weight: 800;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
 }
-.catjumbo__foot:hover { background: #eef2f7; opacity: 1; }
+.catjumbo__title { margin-top: 4px; color: #142c55; font-size: 1.25rem; font-weight: 900; letter-spacing: -0.025em; }
+
+.catjumbo__all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #f4f7fb;
+  color: #142c55;
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: background-color .16s ease, gap .16s ease;
+}
+.catjumbo__all:hover { background: #e8eef6; gap: 9px; opacity: 1; }
+
+/* --- Compact tiles: icon + name, nothing else ---------------------------- */
+.cattiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+}
+
+.cattile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 10px;
+  border: 1px solid #eef1f6;
+  border-radius: 14px;
+  background: #fff;
+  color: #142c55;
+  text-align: center;
+  transition: transform .22s cubic-bezier(.2, .8, .2, 1), border-color .22s ease, box-shadow .22s ease, background-color .22s ease;
+}
+
+.cattile:hover {
+  transform: translateY(-3px);
+  border-color: var(--cat-line, #fed7aa);
+  background: var(--cat-wash, rgba(249, 115, 22, .05));
+  box-shadow: 0 12px 24px rgba(20, 44, 85, 0.1);
+  opacity: 1;
+}
+
+.cattile__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--cat-bg, #fff3ed);
+  color: var(--cat-fg, #ea580c);
+  transition: transform .26s cubic-bezier(.2, .8, .2, 1);
+}
+.cattile:hover .cattile__icon { transform: scale(1.08) rotate(-5deg); }
+
+.cattile__name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+/* The count is a quiet corner badge, revealed on hover rather than always on. */
+.cattile__count {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  color: #b6c0ce;
+  font-size: 0.62rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity .2s ease, color .2s ease;
+}
+.cattile:hover .cattile__count { opacity: 1; color: var(--cat-fg, #ea580c); }
+
+@media (max-width: 767px) {
+  .catjumbo { padding: 16px; border-radius: 18px; }
+  .catjumbo__title { font-size: 1.05rem; }
+  .cattiles { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+  .cattile { padding: 11px 7px; gap: 6px; border-radius: 12px; }
+  .cattile__icon { width: 34px; height: 34px; border-radius: 10px; }
+  .cattile__name { font-size: 0.66rem; }
+  .cattile__count { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cattile, .cattile__icon { transition: none; }
+  .cattile:hover { transform: none; }
+  .cattile:hover .cattile__icon { transform: none; }
+}
 
 .catgrid {
   display: grid;
@@ -848,26 +930,26 @@ a:hover {
 }
 
 /* Per-category accents, driven by one custom-property set each. */
-.catcard--amber   { --cat-bg:#fef3c7; --cat-fg:#b45309; --cat-line:#fcd34d; --cat-wash:rgba(245,158,11,.06); }
-.catcard--violet  { --cat-bg:#ede9fe; --cat-fg:#6d28d9; --cat-line:#c4b5fd; --cat-wash:rgba(139,92,246,.06); }
-.catcard--sky     { --cat-bg:#e0f2fe; --cat-fg:#0369a1; --cat-line:#7dd3fc; --cat-wash:rgba(14,165,233,.06); }
-.catcard--indigo  { --cat-bg:#e0e7ff; --cat-fg:#4338ca; --cat-line:#a5b4fc; --cat-wash:rgba(99,102,241,.06); }
-.catcard--rose    { --cat-bg:#ffe4e6; --cat-fg:#be123c; --cat-line:#fda4af; --cat-wash:rgba(244,63,94,.06); }
-.catcard--teal    { --cat-bg:#ccfbf1; --cat-fg:#0f766e; --cat-line:#5eead4; --cat-wash:rgba(20,184,166,.06); }
-.catcard--fuchsia { --cat-bg:#fae8ff; --cat-fg:#a21caf; --cat-line:#f0abfc; --cat-wash:rgba(217,70,239,.06); }
-.catcard--red     { --cat-bg:#fee2e2; --cat-fg:#b91c1c; --cat-line:#fca5a5; --cat-wash:rgba(239,68,68,.06); }
-.catcard--slate   { --cat-bg:#e2e8f0; --cat-fg:#334155; --cat-line:#cbd5e1; --cat-wash:rgba(100,116,139,.06); }
-.catcard--cyan    { --cat-bg:#cffafe; --cat-fg:#0e7490; --cat-line:#67e8f9; --cat-wash:rgba(6,182,212,.06); }
-.catcard--emerald { --cat-bg:#d1fae5; --cat-fg:#047857; --cat-line:#6ee7b7; --cat-wash:rgba(16,185,129,.06); }
-.catcard--orange  { --cat-bg:#ffedd5; --cat-fg:#c2410c; --cat-line:#fdba74; --cat-wash:rgba(249,115,22,.06); }
-.catcard--lime    { --cat-bg:#ecfccb; --cat-fg:#4d7c0f; --cat-line:#bef264; --cat-wash:rgba(132,204,22,.06); }
-.catcard--purple  { --cat-bg:#f3e8ff; --cat-fg:#7e22ce; --cat-line:#d8b4fe; --cat-wash:rgba(168,85,247,.06); }
-.catcard--blue    { --cat-bg:#dbeafe; --cat-fg:#1d4ed8; --cat-line:#93c5fd; --cat-wash:rgba(59,130,246,.06); }
-.catcard--pink    { --cat-bg:#fce7f3; --cat-fg:#be185d; --cat-line:#f9a8d4; --cat-wash:rgba(236,72,153,.06); }
-.catcard--stone   { --cat-bg:#e7e5e4; --cat-fg:#57534e; --cat-line:#d6d3d1; --cat-wash:rgba(120,113,108,.06); }
-.catcard--green   { --cat-bg:#dcfce7; --cat-fg:#15803d; --cat-line:#86efac; --cat-wash:rgba(34,197,94,.06); }
-.catcard--yellow  { --cat-bg:#fef9c3; --cat-fg:#a16207; --cat-line:#fde047; --cat-wash:rgba(234,179,8,.06); }
-.catcard--brand   { --cat-bg:#dbe5ef; --cat-fg:#142c55; --cat-line:#9db4cc; --cat-wash:rgba(20,44,85,.06); }
+.catcard--amber, .cattile--amber { --cat-bg:#fef3c7; --cat-fg:#b45309; --cat-line:#fcd34d; --cat-wash:rgba(245,158,11,.06); }
+.catcard--violet, .cattile--violet { --cat-bg:#ede9fe; --cat-fg:#6d28d9; --cat-line:#c4b5fd; --cat-wash:rgba(139,92,246,.06); }
+.catcard--sky, .cattile--sky { --cat-bg:#e0f2fe; --cat-fg:#0369a1; --cat-line:#7dd3fc; --cat-wash:rgba(14,165,233,.06); }
+.catcard--indigo, .cattile--indigo { --cat-bg:#e0e7ff; --cat-fg:#4338ca; --cat-line:#a5b4fc; --cat-wash:rgba(99,102,241,.06); }
+.catcard--rose, .cattile--rose { --cat-bg:#ffe4e6; --cat-fg:#be123c; --cat-line:#fda4af; --cat-wash:rgba(244,63,94,.06); }
+.catcard--teal, .cattile--teal { --cat-bg:#ccfbf1; --cat-fg:#0f766e; --cat-line:#5eead4; --cat-wash:rgba(20,184,166,.06); }
+.catcard--fuchsia, .cattile--fuchsia { --cat-bg:#fae8ff; --cat-fg:#a21caf; --cat-line:#f0abfc; --cat-wash:rgba(217,70,239,.06); }
+.catcard--red, .cattile--red { --cat-bg:#fee2e2; --cat-fg:#b91c1c; --cat-line:#fca5a5; --cat-wash:rgba(239,68,68,.06); }
+.catcard--slate, .cattile--slate { --cat-bg:#e2e8f0; --cat-fg:#334155; --cat-line:#cbd5e1; --cat-wash:rgba(100,116,139,.06); }
+.catcard--cyan, .cattile--cyan { --cat-bg:#cffafe; --cat-fg:#0e7490; --cat-line:#67e8f9; --cat-wash:rgba(6,182,212,.06); }
+.catcard--emerald, .cattile--emerald { --cat-bg:#d1fae5; --cat-fg:#047857; --cat-line:#6ee7b7; --cat-wash:rgba(16,185,129,.06); }
+.catcard--orange, .cattile--orange { --cat-bg:#ffedd5; --cat-fg:#c2410c; --cat-line:#fdba74; --cat-wash:rgba(249,115,22,.06); }
+.catcard--lime, .cattile--lime { --cat-bg:#ecfccb; --cat-fg:#4d7c0f; --cat-line:#bef264; --cat-wash:rgba(132,204,22,.06); }
+.catcard--purple, .cattile--purple { --cat-bg:#f3e8ff; --cat-fg:#7e22ce; --cat-line:#d8b4fe; --cat-wash:rgba(168,85,247,.06); }
+.catcard--blue, .cattile--blue { --cat-bg:#dbeafe; --cat-fg:#1d4ed8; --cat-line:#93c5fd; --cat-wash:rgba(59,130,246,.06); }
+.catcard--pink, .cattile--pink { --cat-bg:#fce7f3; --cat-fg:#be185d; --cat-line:#f9a8d4; --cat-wash:rgba(236,72,153,.06); }
+.catcard--stone, .cattile--stone { --cat-bg:#e7e5e4; --cat-fg:#57534e; --cat-line:#d6d3d1; --cat-wash:rgba(120,113,108,.06); }
+.catcard--green, .cattile--green { --cat-bg:#dcfce7; --cat-fg:#15803d; --cat-line:#86efac; --cat-wash:rgba(34,197,94,.06); }
+.catcard--yellow, .cattile--yellow { --cat-bg:#fef9c3; --cat-fg:#a16207; --cat-line:#fde047; --cat-wash:rgba(234,179,8,.06); }
+.catcard--brand, .cattile--brand { --cat-bg:#dbe5ef; --cat-fg:#142c55; --cat-line:#9db4cc; --cat-wash:rgba(20,44,85,.06); }
 
 /* Categories page hero */
 .cathero { max-width: 62rem; }
@@ -1142,6 +1224,88 @@ body.xselect-locked { overflow: hidden; }
 @media (max-width: 767px) {
   .catfilter__compact { display: block; }
   .catfilter__pills { display: none; }
+}
+
+/* --------------------------------------------------------------------------
+   Clickable card + wishlist
+   The whole card is the link, via one stretched anchor. The heart is the only
+   other control, so it sits above that anchor.
+   -------------------------------------------------------------------------- */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.catalog-card.is-clickable { cursor: pointer; }
+
+.catalog-card__link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+.catalog-card__link:focus-visible {
+  outline: 2px solid #f97316;
+  outline-offset: 3px;
+}
+
+.wishbtn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  /* Above the stretched link, so the heart stays clickable. */
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .94);
+  color: #64748b;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, .16);
+  cursor: pointer;
+  transition: color .18s ease, transform .18s ease, background-color .18s ease;
+}
+.wishbtn svg { width: 17px; height: 17px; transition: fill .18s ease, transform .22s ease; fill: transparent; }
+.wishbtn:hover { color: #e11d48; transform: scale(1.08); }
+.wishbtn:disabled { opacity: .6; cursor: default; }
+
+.wishbtn.is-saved { color: #e11d48; }
+.wishbtn.is-saved svg { fill: currentColor; }
+.wishbtn.is-saved:hover { color: #be123c; }
+
+.wishbtn:focus-visible { outline: 2px solid #f97316; outline-offset: 2px; }
+
+/* Arrow in the card footer, replacing the old CTA button. */
+.catalog-card__go {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #142c55;
+  color: #fff;
+  transition: background-color .2s ease, transform .2s ease;
+}
+.catalog-card.is-clickable:hover .catalog-card__go { background: #f97316; transform: translateX(2px); }
+
+/* The body is now spans, not block elements — restore the layout. */
+.catalog-card__body { display: flex; flex-direction: column; }
+.catalog-card__blurb { display: -webkit-box; }
+.catalog-card__foot { display: flex; }
+.catalog-card__price { display: flex; flex-direction: column; }
+.catalog-card__media { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wishbtn, .catalog-card__go { transition: none; }
+  .wishbtn:hover { transform: none; }
 }
 
 /* Paid placement must be disclosed, quietly but unmistakably. */
