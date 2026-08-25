@@ -18,6 +18,9 @@ let vendor = null;
 let categories = [];
 let myProducts = [];
 
+/** Mirrors the minimum enforced by create_ad_funding() in the database. */
+const MIN_TOPUP = 25;
+
 /* ==========================================================================
    Jurisdiction — which payout rails exist where
    ========================================================================== */
@@ -446,14 +449,17 @@ async function loadWallet() {
     ? `${money(wallet.lifetime_spend, wallet.currency)} spent on ads so far.`
     : 'Top up before your campaigns can run.';
 
-  const { data: pending } = await supabase
-    .from('ad_topup_requests').select('amount,currency,created_at')
-    .eq('vendor_id', vendor.id).eq('status', 'pending');
+  // A crypto payment can sit unconfirmed for a while; surface it so the seller
+  // is not left wondering where their money went.
+  const { data: inFlight } = await supabase
+    .from('ad_funding_payments').select('amount,currency,provider,created_at')
+    .eq('vendor_id', vendor.id).eq('status', 'pending')
+    .gt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-  if (pending?.length) {
-    const total = pending.reduce((sum, r) => sum + Number(r.amount), 0);
+  if (inFlight?.length) {
+    const total = inFlight.reduce((sum, r) => sum + Number(r.amount), 0);
     document.querySelector('#wallet-note').textContent +=
-      ` ${money(total, wallet.currency)} awaiting confirmation.`;
+      ` ${money(total, wallet.currency)} awaiting payment confirmation.`;
   }
 }
 
@@ -493,28 +499,72 @@ document.querySelector('#topup-btn')?.addEventListener('click', () => {
 document.querySelector('#cancel-topup')?.addEventListener('click', () =>
   document.querySelector('#topup-modal').close());
 
+// Preset buttons just fill the field; the field remains the source of truth.
+document.querySelector('#topup-presets')?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-amount]');
+  if (!button) return;
+  document.querySelector('#topup-form').elements.amount.value = button.dataset.amount;
+});
+
 document.querySelector('#topup-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
   const feedback = document.querySelector('#topup-feedback');
   const button = form.querySelector('button[type="submit"]');
+  const amount = Number(form.elements.amount.value);
 
-  setBusy(button, true, 'Submitting…');
-  const { error } = await supabase.rpc('request_ad_topup', {
-    p_amount: Number(form.elements.amount.value),
-    p_note: form.elements.note.value.trim() || null,
-  });
-  setBusy(button, false);
-
-  if (error) {
-    feedback.textContent = error.message;
+  if (!Number.isFinite(amount) || amount < MIN_TOPUP) {
+    feedback.textContent = `The minimum top-up is $${MIN_TOPUP}.`;
     feedback.className = 'status-line error mt-3 text-xs';
     return;
   }
-  document.querySelector('#topup-modal').close();
-  toast('Top-up requested — we will credit your wallet once payment is confirmed.');
-  await loadWallet();
+
+  const provider = form.querySelector('input[name="provider"]:checked')?.value || 'flutterwave';
+
+  setBusy(button, true, 'Opening payment…');
+  feedback.textContent = 'Preparing a secure payment page…';
+  feedback.className = 'status-line mt-3 text-xs';
+
+  const siteUrl = /localhost|127\.0\.0\.1/.test(window.location.origin)
+    ? window.location.origin
+    : 'https://digistore.codeinktechnologies.com';
+
+  const { data, error } = await supabase.functions.invoke('create-ad-funding-payment', {
+    body: { amount, provider, site_url: siteUrl },
+  });
+
+  if (error || !data?.payment_url) {
+    setBusy(button, false);
+    feedback.textContent = data?.error || error?.message || 'The payment page could not be opened.';
+    feedback.className = 'status-line error mt-3 text-xs';
+    return;
+  }
+
+  window.location.href = data.payment_url;
 });
+
+/**
+ * The funding callback returns here with ?funding=<state>. The wallet is
+ * credited server-side, so this only reports the outcome and cleans the URL.
+ */
+function reportFundingOutcome() {
+  const state = new URLSearchParams(window.location.search).get('funding');
+  if (!state) return;
+
+  const messages = {
+    success: ['Payment received — your wallet has been credited.', 'success'],
+    cancelled: ['Top-up cancelled. Nothing was charged.', 'info'],
+    failed: ['That payment did not go through. Nothing was charged.', 'error'],
+    unknown: ['We could not match that payment. Contact support if you were charged.', 'error'],
+    error: ['Something went wrong confirming the payment.', 'error'],
+  };
+  const [message, kind] = messages[state] || messages.error;
+  toast(message, kind === 'success' ? 'success' : kind === 'info' ? 'info' : 'error');
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete('funding');
+  history.replaceState(null, '', url.toString());
+}
 
 async function loadCampaigns() {
   const { data, error } = await supabase
@@ -1121,6 +1171,7 @@ async function boot() {
   fillSettings();
 
   await loadWallet();
+  reportFundingOutcome();
   await Promise.all([loadProducts(), loadSales(), loadPayouts(), loadCampaigns()]);
 
   renderIcons();
