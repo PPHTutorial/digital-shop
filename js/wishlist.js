@@ -73,8 +73,8 @@ export function wireWishlist(root = document) {
 
     const { user } = await getAccount();
     if (!user) {
-      const next = `${window.location.pathname.split('/').pop() || 'index.html'}${window.location.search}`;
-      window.location.href = `./auth.html?mode=signin&next=${encodeURIComponent(next)}`;
+      const next = `${window.location.pathname.split('/').pop() || 'index'}${window.location.search}`;
+      window.location.href = `./auth?mode=signin&next=${encodeURIComponent(next)}`;
       return;
     }
 

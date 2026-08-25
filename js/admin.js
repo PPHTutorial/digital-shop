@@ -636,12 +636,12 @@ function renderRankList(items, valueKey, meta) {
 async function load() {
   account = await getAccount();
   if (!account.user) {
-    const nextUrl = `admin.html${location.search}${location.hash}`;
-    location.replace(`./auth.html?mode=signin&next=${encodeURIComponent(nextUrl)}`);
+    const nextUrl = `admin${location.search}${location.hash}`;
+    location.replace(`./auth?mode=signin&next=${encodeURIComponent(nextUrl)}`);
     return;
   }
   if (account.profile?.role !== 'admin') {
-    location.replace('./account.html');
+    location.replace('./account');
     return;
   }
   document.querySelector('#admin-user').textContent = account.user.email;
@@ -867,7 +867,7 @@ async function load() {
       container.querySelectorAll('[data-copy-ad-link]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const slug = btn.dataset.copyAdLink;
-          const adUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(slug)}`;
+          const adUrl = `${window.location.origin}/checkout?product=${encodeURIComponent(slug)}`;
           navigator.clipboard.writeText(adUrl);
           toast('Advertising link copied to clipboard!');
         });
@@ -1175,7 +1175,7 @@ async function openEditor(type, existing = null) {
     const op = full.original_price ?? '';
     const currentCat = full.category || 'General';
     const initialSlug = full.slug || (full.title ? slugify(full.title) : '');
-    const liveAdUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(initialSlug || 'product-slug')}`;
+    const liveAdUrl = `${window.location.origin}/checkout?product=${encodeURIComponent(initialSlug || 'product-slug')}`;
 
     if (!isEdit) {
       // ============================================================
@@ -1455,7 +1455,7 @@ async function openEditor(type, existing = null) {
 
     function updateAdLink() {
       const s = slugInput?.value.trim() || 'product-slug';
-      const u = `${window.location.origin}/checkout.html?product=${encodeURIComponent(s)}`;
+      const u = `${window.location.origin}/checkout?product=${encodeURIComponent(s)}`;
       if (adPreview) adPreview.textContent = u;
     }
 
@@ -1471,7 +1471,7 @@ async function openEditor(type, existing = null) {
 
     copyAdBtn?.addEventListener('click', () => {
       const s = slugInput?.value.trim() || 'product-slug';
-      const u = `${window.location.origin}/checkout.html?product=${encodeURIComponent(s)}`;
+      const u = `${window.location.origin}/checkout?product=${encodeURIComponent(s)}`;
       navigator.clipboard.writeText(u);
       toast('Advertising link copied to clipboard!');
     });
@@ -1712,7 +1712,7 @@ function setupBackdropClose(dialog) {
 document.querySelectorAll('#admin-signout, #admin-header-signout').forEach((btn) => {
   btn.onclick = async () => {
     await supabase.auth.signOut();
-    location.href = './index.html';
+    location.href = './';
   };
 });
 

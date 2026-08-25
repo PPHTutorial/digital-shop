@@ -89,18 +89,18 @@ Deno.serve(async (req) => {
       if (ref) {
         await sb.from('orders').update({ status: 'cancelled' }).eq('provider_reference', ref).eq('status', 'pending');
       }
-      return Response.redirect(`${siteUrl}/success.html?status=cancelled`, 302);
+      return Response.redirect(`${siteUrl}/success?status=cancelled`, 302);
     }
 
     if (status !== 'successful' || !tx || !ref) {
       if (ref) {
         await sb.from('orders').update({ status: 'failed' }).eq('provider_reference', ref).eq('status', 'pending');
       }
-      return Response.redirect(`${siteUrl}/success.html?status=failed`, 302);
+      return Response.redirect(`${siteUrl}/success?status=failed`, 302);
     }
 
     if (!flwKey) {
-      return Response.redirect(`${siteUrl}/success.html?status=config_error`, 302);
+      return Response.redirect(`${siteUrl}/success?status=config_error`, 302);
     }
 
     const vr = await fetch(`https://api.flutterwave.com/v3/transactions/${encodeURIComponent(tx)}/verify`, {
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
     const v = await vr.json();
 
     if (!vr.ok || v.data?.status !== 'successful' || v.data?.tx_ref !== ref) {
-      return Response.redirect(`${siteUrl}/success.html?status=failed`, 302);
+      return Response.redirect(`${siteUrl}/success?status=failed`, 302);
     }
 
     const { data: o } = await sb.from('orders')
@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (!o) {
-      return Response.redirect(`${siteUrl}/success.html?status=order_not_found`, 302);
+      return Response.redirect(`${siteUrl}/success?status=order_not_found`, 302);
     }
 
     const rawToken = crypto.randomUUID() + crypto.randomUUID();
@@ -134,9 +134,9 @@ Deno.serve(async (req) => {
       download_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     }).eq('id', o.id);
 
-    return Response.redirect(`${siteUrl}/success.html?token=${encodeURIComponent(rawToken)}&order_id=${encodeURIComponent(o.id)}`, 302);
+    return Response.redirect(`${siteUrl}/success?token=${encodeURIComponent(rawToken)}&order_id=${encodeURIComponent(o.id)}`, 302);
   } catch (e) {
     const siteUrl = (Deno.env.get('PUBLIC_SITE_URL') || 'https://digistore.codeinktechnologies.com').replace(/\/$/, '');
-    return Response.redirect(`${siteUrl}/success.html?status=error`, 302);
+    return Response.redirect(`${siteUrl}/success?status=error`, 302);
   }
 });

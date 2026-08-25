@@ -54,10 +54,12 @@ export async function mountHeader() {
       }
     }
 
-    const path = window.location.pathname.toLowerCase().split('/').pop() || 'index.html';
+    // URLs are extensionless now, but a direct /index.html hit must still read
+    // as home, so both spellings are accepted below.
+    const path = window.location.pathname.toLowerCase().split('/').pop() || '';
     const hash = window.location.hash.toLowerCase();
 
-    const isHome = (path === 'index.html' || path === '' || path === '/');
+    const isHome = (path === '' || path === 'index' || path === 'index.html');
     const isStore = path.includes('store');
     const isBlog = path.includes('blog');
     const isAbout = path.includes('about');
@@ -65,17 +67,17 @@ export async function mountHeader() {
     const isSupport = path.includes('support');
 
     const links = `
-      <a href="./index.html" class="${isHome ? 'active' : ''}">${icon('house')}<span>Home</span></a>
-      <a href="./store.html" class="${isStore ? 'active' : ''}">${icon('shopping-bag')}<span>All Products</span></a>
-      <a href="./blog.html" class="${isBlog ? 'active' : ''}">${icon('newspaper')}<span>Blog</span></a>
-      <a href="./about.html" class="${isAbout ? 'active' : ''}">${icon('info')}<span>About</span></a>
-      <a href="./contact.html" class="${isContact ? 'active' : ''}">${icon('mail')}<span>Contact</span></a>
-      <a href="./support.html" class="${isSupport ? 'active' : ''}">${icon('circle-help')}<span>Support</span></a>
+      <a href="./" class="${isHome ? 'active' : ''}">${icon('house')}<span>Home</span></a>
+      <a href="./store" class="${isStore ? 'active' : ''}">${icon('shopping-bag')}<span>All Products</span></a>
+      <a href="./blog" class="${isBlog ? 'active' : ''}">${icon('newspaper')}<span>Blog</span></a>
+      <a href="./about" class="${isAbout ? 'active' : ''}">${icon('info')}<span>About</span></a>
+      <a href="./contact" class="${isContact ? 'active' : ''}">${icon('mail')}<span>Contact</span></a>
+      <a href="./support" class="${isSupport ? 'active' : ''}">${icon('circle-help')}<span>Support</span></a>
     `;
 
     // Selling is a headline route, not a buried one: a signed-in seller goes
     // straight to their centre, everyone else to the pitch.
-    const sellHref = './vendor.html';
+    const sellHref = './vendor';
     const sellLabel = isSeller ? 'Seller centre' : 'Start selling';
     target.innerHTML = `
       <div class="utility-bar">
@@ -86,7 +88,7 @@ export async function mountHeader() {
       </div>
       <div class="main-nav-container">
         <div class="main-nav">
-          <a href="./index.html" class="brand">
+          <a href="./" class="brand">
             <span class="brand-mark">D</span>
             <span>DigiStore<small>powered by codeinktechnologies</small></span>
           </a>
@@ -102,15 +104,15 @@ export async function mountHeader() {
                     </summary>
                     <div class="account-popover-panel">
                       <strong>${escapeHtml(name)}</strong>
-                      <a href="./account.html">${icon('layout-dashboard', 16)} Overview</a>
-                      <a href="./account.html#orders-list">${icon('package', 16)} Orders</a>
-                      <a href="./checkout.html">${icon('shopping-cart', 16)} Cart / checkout</a>
+                      <a href="./account">${icon('layout-dashboard', 16)} Overview</a>
+                      <a href="./account#orders-list">${icon('package', 16)} Orders</a>
+                      <a href="./checkout">${icon('shopping-cart', 16)} Cart / checkout</a>
                       <a href="${sellHref}" class="popover-sell">${icon('store', 16)} ${sellLabel}</a>
-                      ${profile?.role === 'admin' ? `<a href="./admin.html">${icon('shield-check', 16)} Admin centre</a>` : ''}
+                      ${profile?.role === 'admin' ? `<a href="./admin">${icon('shield-check', 16)} Admin centre</a>` : ''}
                       <button id="sign-out">${icon('log-out', 16)} Log out</button>
                     </div>
                   </details>`
-                : `<a class="text-action" href="./auth.html">Log in</a><a class="button button-primary" href="./auth.html?mode=signup">Get started</a>`
+                : `<a class="text-action" href="./auth">Log in</a><a class="button button-primary" href="./auth?mode=signup">Get started</a>`
             }
             <button id="mobile-menu-button" class="mobile-menu-button" aria-label="Open menu">${icon('menu', 22)}</button>
           </div>
@@ -144,11 +146,11 @@ export async function mountHeader() {
         <a href="${sellHref}" class="drawer-sell">${icon('store')} ${sellLabel}</a>
         ${
           user
-            ? `<a href="./account.html">${icon('user-round')} ${escapeHtml(name)}</a>
-               ${profile?.role === 'admin' ? `<a href="./admin.html">${icon('shield-check')} Admin centre</a>` : ''}
+            ? `<a href="./account">${icon('user-round')} ${escapeHtml(name)}</a>
+               ${profile?.role === 'admin' ? `<a href="./admin">${icon('shield-check')} Admin centre</a>` : ''}
                <button id="mobile-sign-out">${icon('log-out')} Log out</button>`
-            : `<a href="./auth.html">${icon('log-in')} Log in</a>
-               <a href="./auth.html?mode=signup">${icon('user-plus')} Create account</a>`
+            : `<a href="./auth">${icon('log-in')} Log in</a>
+               <a href="./auth?mode=signup">${icon('user-plus')} Create account</a>`
         }
       </nav>`;
 
@@ -176,7 +178,7 @@ export async function mountHeader() {
 
     const logout = async () => {
       await supabase.auth.signOut();
-      location.href = './index.html';
+      location.href = './';
     };
     target.querySelector('#sign-out')?.addEventListener('click', logout);
     drawer.querySelector('#mobile-sign-out')?.addEventListener('click', logout);
@@ -220,7 +222,7 @@ export function mountFooter() {
             verification and secure delivery — you get paid to your bank or mobile money.
           </p>
         </div>
-        <a class="seller-strip__cta" href="./vendor.html">
+        <a class="seller-strip__cta" href="./vendor">
           ${icon('store', 16)}<span>Open your store</span>
         </a>
       </div>
@@ -252,46 +254,46 @@ export function mountFooter() {
         <div class="space-y-3">
           <h3 class="font-bold text-white text-xs uppercase tracking-wider">Digital Catalog</h3>
           <ul class="space-y-2 text-xs text-slate-400">
-            <li><a href="./store.html?category=Ebooks%20%26%20Guides" class="hover:text-orange-400 transition">Ebooks &amp; Guides</a></li>
-            <li><a href="./store.html?category=Software%20%26%20Tools" class="hover:text-orange-400 transition">Software &amp; Tools</a></li>
-            <li><a href="./store.html?category=Templates%20%26%20Themes" class="hover:text-orange-400 transition">Templates &amp; Themes</a></li>
-            <li><a href="./store.html?category=Online%20Courses" class="hover:text-orange-400 transition">Online Courses</a></li>
-            <li><a href="./store.html?category=Audio%20%26%20Media" class="hover:text-orange-400 transition">Audio &amp; Media</a></li>
-            <li><a href="./store.html?category=Design%20%26%20Graphics" class="hover:text-orange-400 transition">Design &amp; Graphics</a></li>
+            <li><a href="./store?category=Ebooks%20%26%20Guides" class="hover:text-orange-400 transition">Ebooks &amp; Guides</a></li>
+            <li><a href="./store?category=Software%20%26%20Tools" class="hover:text-orange-400 transition">Software &amp; Tools</a></li>
+            <li><a href="./store?category=Templates%20%26%20Themes" class="hover:text-orange-400 transition">Templates &amp; Themes</a></li>
+            <li><a href="./store?category=Online%20Courses" class="hover:text-orange-400 transition">Online Courses</a></li>
+            <li><a href="./store?category=Audio%20%26%20Media" class="hover:text-orange-400 transition">Audio &amp; Media</a></li>
+            <li><a href="./store?category=Design%20%26%20Graphics" class="hover:text-orange-400 transition">Design &amp; Graphics</a></li>
           </ul>
         </div>
 
         <div class="space-y-3">
           <h3 class="font-bold text-white text-xs uppercase tracking-wider">Customer Hub</h3>
           <ul class="space-y-2 text-xs text-slate-400">
-            <li><a href="./account.html" class="hover:text-orange-400 transition">My Account &amp; Vault</a></li>
-            <li><a href="./account.html#orders-list" class="hover:text-orange-400 transition">Order History</a></li>
-            <li><a href="./support.html" class="hover:text-orange-400 transition">Customer Helpdesk</a></li>
-            <li><a href="./support.html" class="hover:text-orange-400 transition">Submit Support Ticket</a></li>
-            <li><a href="./blog.html" class="hover:text-orange-400 transition">Articles &amp; Updates</a></li>
-            <li><a href="./about.html" class="hover:text-orange-400 transition">About Codeink</a></li>
+            <li><a href="./account" class="hover:text-orange-400 transition">My Account &amp; Vault</a></li>
+            <li><a href="./account#orders-list" class="hover:text-orange-400 transition">Order History</a></li>
+            <li><a href="./support" class="hover:text-orange-400 transition">Customer Helpdesk</a></li>
+            <li><a href="./support" class="hover:text-orange-400 transition">Submit Support Ticket</a></li>
+            <li><a href="./blog" class="hover:text-orange-400 transition">Articles &amp; Updates</a></li>
+            <li><a href="./about" class="hover:text-orange-400 transition">About Codeink</a></li>
           </ul>
         </div>
 
         <div class="space-y-3">
           <h3 class="font-bold text-white text-xs uppercase tracking-wider">Sell With Us</h3>
           <ul class="space-y-2 text-xs text-slate-400">
-            <li><a href="./vendor.html" class="font-bold text-orange-400 hover:text-orange-300 transition">Start selling →</a></li>
-            <li><a href="./vendor.html" class="hover:text-orange-400 transition">Seller centre</a></li>
-            <li><a href="./categories.html" class="hover:text-orange-400 transition">What sells here</a></li>
-            <li><a href="./support.html" class="hover:text-orange-400 transition">Seller support</a></li>
+            <li><a href="./vendor" class="font-bold text-orange-400 hover:text-orange-300 transition">Start selling →</a></li>
+            <li><a href="./vendor" class="hover:text-orange-400 transition">Seller centre</a></li>
+            <li><a href="./categories" class="hover:text-orange-400 transition">What sells here</a></li>
+            <li><a href="./support" class="hover:text-orange-400 transition">Seller support</a></li>
           </ul>
         </div>
 
         <div class="space-y-3">
           <h3 class="font-bold text-white text-xs uppercase tracking-wider">Trust &amp; Legal</h3>
           <ul class="space-y-2 text-xs text-slate-400">
-            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Terms of Service</a></li>
-            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Privacy Policy</a></li>
-            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Refund &amp; Return Policy</a></li>
-            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Digital License Agreement</a></li>
-            <li><a href="./support.html#faq" class="hover:text-orange-400 transition">Security &amp; Compliance</a></li>
-            <li><a href="./contact.html" class="hover:text-orange-400 transition">Contact Legal Team</a></li>
+            <li><a href="./support#faq" class="hover:text-orange-400 transition">Terms of Service</a></li>
+            <li><a href="./support#faq" class="hover:text-orange-400 transition">Privacy Policy</a></li>
+            <li><a href="./support#faq" class="hover:text-orange-400 transition">Refund &amp; Return Policy</a></li>
+            <li><a href="./support#faq" class="hover:text-orange-400 transition">Digital License Agreement</a></li>
+            <li><a href="./support#faq" class="hover:text-orange-400 transition">Security &amp; Compliance</a></li>
+            <li><a href="./contact" class="hover:text-orange-400 transition">Contact Legal Team</a></li>
           </ul>
         </div>
       </div>

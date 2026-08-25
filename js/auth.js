@@ -29,7 +29,7 @@ async function redirectIfSignedIn() {
     if (next) {
       location.replace(next.startsWith('./') || next.startsWith('/') ? next : `./${next}`);
     } else {
-      location.replace('./account.html');
+      location.replace('./account');
     }
   }
 }
@@ -40,7 +40,7 @@ form.addEventListener('submit', async (event) => {
   const values = Object.fromEntries(new FormData(form).entries());
   setButtonLoading(submit, true, mode === 'signup' ? 'Creating account…' : 'Signing in…');
   notice.textContent = '';
-  const redirectTo = `${CONFIG.SITE_URL}${location.pathname.replace(/[^/]+$/, 'auth.html')}`;
+  const redirectTo = `${CONFIG.SITE_URL}${location.pathname.replace(/[^/]+$/, 'auth')}`;
   const result = mode === 'signup'
     ? await supabase.auth.signUp({ email: values.email, password: values.password, options: { data: { full_name: values.full_name }, emailRedirectTo: redirectTo } })
     : await supabase.auth.signInWithPassword({ email: values.email, password: values.password });
@@ -57,7 +57,7 @@ form.addEventListener('submit', async (event) => {
     return;
   }
   const next = new URLSearchParams(location.search).get('next');
-  location.href = next ? `./${next}` : './account.html';
+  location.href = next ? `./${next}` : './account';
 });
 
 setMode(mode);

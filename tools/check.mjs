@@ -194,14 +194,26 @@ async function checkHtml() {
     }
     if (/<img(?![^>]*\balt=)/.test(source)) fail(file, '<img> without an alt attribute');
 
-    // Local references must resolve.
+    // Local references must resolve. URLs are extensionless in the markup, so
+    // the same candidate list the dev server (and GitHub Pages) uses is tried
+    // here: the literal path, then `.html`, then a directory index.
     for (const match of source.matchAll(/(?:href|src)="(\.\/[^"#?]+)/g)) {
-      const target = path.join(ROOT, match[1]);
-      try {
-        await readFile(target);
-      } catch {
-        fail(file, `broken local reference: ${match[1]}`);
+      const base = path.join(ROOT, match[1]);
+      const candidates = match[1].endsWith('/')
+        ? [path.join(base, 'index.html')]
+        : [base, `${base}.html`, path.join(base, 'index.html')];
+
+      let resolved = false;
+      for (const candidate of candidates) {
+        try {
+          await readFile(candidate);
+          resolved = true;
+          break;
+        } catch {
+          /* try the next candidate */
+        }
       }
+      if (!resolved) fail(file, `broken local reference: ${match[1]}`);
     }
 
     // Every element id the page declares should be unique.

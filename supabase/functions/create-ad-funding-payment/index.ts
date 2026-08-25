@@ -98,8 +98,8 @@ Deno.serve(async (request) => {
       price_amount: Number(funding.amount),
       price_currency: String(funding.currency).toLowerCase(),
       ipn_callback_url: `${functionsBase}/ad-funding-ipn`,
-      success_url: `${siteUrl}/vendor.html#boost`,
-      cancel_url: `${siteUrl}/vendor.html#boost`,
+      success_url: `${siteUrl}/vendor#boost`,
+      cancel_url: `${siteUrl}/vendor#boost`,
       order_id: funding.reference,
       order_description: 'DigiStore advertising wallet top-up',
     };

@@ -67,7 +67,7 @@ function cardMetaHtml(p) {
 function createCardHtml(p) {
   const hasDiscount = p.original_price && Number(p.original_price) > Number(p.price);
   const discountPct = hasDiscount ? Math.round((1 - Number(p.price) / Number(p.original_price)) * 100) : 0;
-  const href = `./checkout.html?product=${encodeURIComponent(p.slug || p.id)}`;
+  const href = `./checkout?product=${encodeURIComponent(p.slug || p.id)}`;
   const blurb = p.short_description || p.description || '';
 
   // The whole card is the link. A single stretched anchor covers it, so the
@@ -263,7 +263,7 @@ async function renderVendorStore(slug) {
       <div class="soft-panel col-span-full p-10 text-center">
         <p class="font-bold text-[#142c55]">That store could not be found.</p>
         <p class="mt-1 text-sm text-slate-500">It may have been closed or renamed.</p>
-        <a class="button button-primary mt-4" href="./store.html">Browse all products</a>
+        <a class="button button-primary mt-4" href="./store">Browse all products</a>
       </div>`;
     finishPageLoader();
     return true;

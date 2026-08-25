@@ -32,11 +32,11 @@ function showState(type, data = {}) {
     if (area) {
       area.innerHTML = `
         <div class="flex flex-wrap justify-center gap-3">
-          <a href="./checkout.html" class="inline-flex items-center gap-2 rounded-full bg-orange-600 px-7 py-3 font-bold text-white hover:bg-orange-500 transition-colors">
+          <a href="./checkout" class="inline-flex items-center gap-2 rounded-full bg-orange-600 px-7 py-3 font-bold text-white hover:bg-orange-500 transition-colors">
             <i data-lucide="refresh-cw" width="16" height="16"></i>
             <span>Try Checkout Again</span>
           </a>
-          <a href="./store.html" class="inline-flex items-center gap-2 rounded-full bg-slate-950 px-7 py-3 font-bold text-white hover:bg-slate-800 transition-colors">
+          <a href="./store" class="inline-flex items-center gap-2 rounded-full bg-slate-950 px-7 py-3 font-bold text-white hover:bg-slate-800 transition-colors">
             <i data-lucide="arrow-left" width="16" height="16"></i>
             <span>Return to Catalog</span>
           </a>
@@ -51,11 +51,11 @@ function showState(type, data = {}) {
     if (area) {
       area.innerHTML = `
         <div class="flex flex-wrap justify-center gap-3">
-          <a href="./checkout.html" class="inline-flex items-center gap-2 rounded-full bg-orange-600 px-7 py-3 font-bold text-white hover:bg-orange-500 transition-colors">
+          <a href="./checkout" class="inline-flex items-center gap-2 rounded-full bg-orange-600 px-7 py-3 font-bold text-white hover:bg-orange-500 transition-colors">
             <i data-lucide="refresh-cw" width="16" height="16"></i>
             <span>Try Again</span>
           </a>
-          <a href="./support.html" class="inline-flex items-center gap-2 rounded-full bg-slate-950 px-7 py-3 font-bold text-white hover:bg-slate-800 transition-colors">
+          <a href="./support" class="inline-flex items-center gap-2 rounded-full bg-slate-950 px-7 py-3 font-bold text-white hover:bg-slate-800 transition-colors">
             <i data-lucide="life-buoy" width="16" height="16"></i>
             <span>Contact Support</span>
           </a>
@@ -76,7 +76,7 @@ function showState(type, data = {}) {
               <i data-lucide="refresh-cw" width="13" height="13"></i>
               <span>Check status now</span>
             </button>
-            <a href="./account.html" class="button !min-h-9 !px-4 text-xs inline-flex items-center gap-1.5">
+            <a href="./account" class="button !min-h-9 !px-4 text-xs inline-flex items-center gap-1.5">
               <i data-lucide="package" width="13" height="13"></i>
               <span>View Account Orders</span>
             </a>
@@ -99,7 +99,7 @@ function showState(type, data = {}) {
             <span>Download Your Product</span>
           </a>
           <div>
-            <a href="./account.html" class="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900 underline">
+            <a href="./account" class="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900 underline">
               <i data-lucide="archive" width="13" height="13"></i>
               <span>View in My Account Downloads</span>
             </a>
@@ -156,7 +156,7 @@ async function checkPaymentStatus() {
       if (pollTimer) clearInterval(pollTimer);
       const ready = await tryFetchDownload(token, order.id);
       if (!ready) {
-        showState('paid', { url: `./account.html` });
+        showState('paid', { url: `./account` });
       }
       return;
     }

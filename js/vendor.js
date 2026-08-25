@@ -1132,14 +1132,14 @@ function fillSettings() {
   document.querySelector('#vendor-avatar').innerHTML = avatarMarkup;
   document.querySelector('#vendor-name').textContent = vendor.display_name;
   const storeLink = document.querySelector('#vendor-view-store');
-  storeLink.href = `./store.html?vendor=${encodeURIComponent(vendor.slug)}`;
+  storeLink.href = `./store?vendor=${encodeURIComponent(vendor.slug)}`;
 }
 
 async function boot() {
   account = await getAccount();
 
   if (!account.user) {
-    location.replace(`./auth.html?mode=signin&next=${encodeURIComponent('vendor.html')}`);
+    location.replace(`./auth?mode=signin&next=${encodeURIComponent('vendor')}`);
     return;
   }
 

@@ -51,8 +51,8 @@ Deno.serve(async (request) => {
       price_amount: amount,
       price_currency: (product.currency || 'USD').toLowerCase(),
       ipn_callback_url: ipnCallbackUrl,
-      success_url: `${siteUrl}/success.html?order_id=${encodeURIComponent(order.id)}`,
-      cancel_url: `${siteUrl}/checkout.html?product=${encodeURIComponent(order.product_id)}`,
+      success_url: `${siteUrl}/success?order_id=${encodeURIComponent(order.id)}`,
+      cancel_url: `${siteUrl}/checkout?product=${encodeURIComponent(order.product_id)}`,
       order_id: order.id,
       order_description: product.title,
     };

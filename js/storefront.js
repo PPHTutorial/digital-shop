@@ -50,7 +50,7 @@ function createProductCardHtml(p) {
         <span class="catalog-card__go">${icon('arrow-right', 15)}</span>
       </span>
 
-      <a class="catalog-card__link" href="./checkout.html?product=${encodeURIComponent(canonicalSlug)}">
+      <a class="catalog-card__link" href="./checkout?product=${encodeURIComponent(canonicalSlug)}">
         <span class="sr-only">${escapeHtml(p.title)}</span>
       </a>
     </article>`;

@@ -81,7 +81,7 @@ Deno.serve(async (request) => {
     Deno.env.get('PUBLIC_SITE_URL') ||
     'https://digistore.codeinktechnologies.com').replace(/\/$/, '');
 
-  const back = (state: string) => Response.redirect(`${siteUrl}/vendor.html?funding=${state}#boost`, 302);
+  const back = (state: string) => Response.redirect(`${siteUrl}/vendor?funding=${state}#boost`, 302);
 
   try {
     const transactionId = requestUrl.searchParams.get('transaction_id');

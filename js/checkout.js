@@ -7,7 +7,7 @@ let productId = params.get('product') || params.get('id') || params.get('slug');
 
 /**
  * A promotion code may ride along on the product link
- * (checkout.html?product=slug&promo=CODE) so a campaign or affiliate link
+ * (checkout?product=slug&promo=CODE) so a campaign or affiliate link
  * lands with the discount already applied. `code` and `coupon` are accepted
  * as aliases because those are what people tend to hand-write.
  */
@@ -220,7 +220,7 @@ async function load() {
 
   if (!productId) {
     document.querySelector('#product-title').textContent = 'No product selected';
-    document.querySelector('#description-preview').innerHTML = '<p class="text-slate-500">Please choose a book from the <a href="./index.html#store" class="text-orange-600 underline font-bold">catalog</a> first.</p>';
+    document.querySelector('#description-preview').innerHTML = '<p class="text-slate-500">Please choose a book from the <a href="./#store" class="text-orange-600 underline font-bold">catalog</a> first.</p>';
     finishPageLoader();
     return;
   }
@@ -240,7 +240,7 @@ async function load() {
 
   if (error || !data) {
     document.querySelector('#product-title').textContent = 'Product unavailable';
-    document.querySelector('#description-preview').innerHTML = '<p class="text-red-600">This book could not be loaded or is not published yet. <a href="./index.html#store" class="text-orange-600 underline font-bold ml-1">Browse catalog</a></p>';
+    document.querySelector('#description-preview').innerHTML = '<p class="text-red-600">This book could not be loaded or is not published yet. <a href="./#store" class="text-orange-600 underline font-bold ml-1">Browse catalog</a></p>';
     finishPageLoader();
     return;
   }
@@ -254,7 +254,7 @@ async function load() {
   const canonicalKey = data.slug || data.id;
   const promoSuffix = linkPromoCode ? `&promo=${encodeURIComponent(linkPromoCode)}` : '';
   if (!location.search.includes(canonicalKey)) {
-    history.replaceState(null, '', `checkout.html?product=${encodeURIComponent(canonicalKey)}${promoSuffix}`);
+    history.replaceState(null, '', `checkout?product=${encodeURIComponent(canonicalKey)}${promoSuffix}`);
   }
 
   // Wire share button — shares whichever promotion is currently applied, so a
@@ -263,7 +263,7 @@ async function load() {
   if (shareBtn) {
     shareBtn.onclick = async () => {
       const activePromo = promotion?.code ? `&promo=${encodeURIComponent(promotion.code)}` : '';
-      const canonicalUrl = `${window.location.origin}/checkout.html?product=${encodeURIComponent(canonicalKey)}${activePromo}`;
+      const canonicalUrl = `${window.location.origin}/checkout?product=${encodeURIComponent(canonicalKey)}${activePromo}`;
       if (navigator.share) {
         try {
           await navigator.share({ title: data.title, url: canonicalUrl });
@@ -519,7 +519,7 @@ document.querySelector('#checkout-form').addEventListener('submit', async (event
   const { user } = await getAccount();
 
   if (!user) {
-    location.href = `./auth.html?mode=signin&next=${encodeURIComponent(`checkout.html?product=${product.id}`)}`;
+    location.href = `./auth?mode=signin&next=${encodeURIComponent(`checkout?product=${product.id}`)}`;
     return;
   }
 

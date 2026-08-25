@@ -20,21 +20,21 @@ Deno.serve(async () => {
 
   const staticUrls = [
     `<url><loc>${base}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>`,
-    `<url><loc>${base}/about.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
-    `<url><loc>${base}/contact.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
-    `<url><loc>${base}/support.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
-    `<url><loc>${base}/blog.html</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`,
+    `<url><loc>${base}/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
+    `<url><loc>${base}/contact</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
+    `<url><loc>${base}/support</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
+    `<url><loc>${base}/blog</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`,
   ];
 
   const productUrls = (products || []).map((item) => {
     const slug = item.slug || item.id;
     const lastmod = item.updated_at ? new Date(item.updated_at).toISOString() : new Date().toISOString();
-    return `<url><loc>${base}/checkout.html?product=${encodeURIComponent(slug)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`;
+    return `<url><loc>${base}/checkout?product=${encodeURIComponent(slug)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`;
   });
 
   const postUrls = (posts || []).map((post) => {
     const lastmod = post.updated_at ? new Date(post.updated_at).toISOString() : new Date().toISOString();
-    return `<url><loc>${base}/blog.html?post=${encodeURIComponent(post.slug)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`;
+    return `<url><loc>${base}/blog?post=${encodeURIComponent(post.slug)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`;
   });
 
   const urls = [...staticUrls, ...productUrls, ...postUrls].join('');

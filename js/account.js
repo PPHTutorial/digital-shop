@@ -107,8 +107,8 @@ async function load() {
   account = await getAccount();
 
   if (!account.user) {
-    const nextUrl = `account.html${location.search}${location.hash}`;
-    location.replace(`./auth.html?mode=signin&next=${encodeURIComponent(nextUrl)}`);
+    const nextUrl = `account${location.search}${location.hash}`;
+    location.replace(`./auth?mode=signin&next=${encodeURIComponent(nextUrl)}`);
     return;
   }
 

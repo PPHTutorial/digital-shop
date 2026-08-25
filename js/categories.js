@@ -59,7 +59,7 @@ export async function loadCategories() {
 }
 
 export function categoryCard(category) {
-  const href = `./store.html?category=${encodeURIComponent(category.name)}`;
+  const href = `./store?category=${encodeURIComponent(category.name)}`;
   return `
     <a class="catcard catcard--${escapeHtml(category.accent)}" href="${href}">
       <span class="catcard__icon">${icon(category.icon, 22)}</span>
@@ -73,41 +73,35 @@ export function categoryCard(category) {
 }
 
 /**
- * Compact tile: just an icon and a name. The description and arrow are what
- * made the full card tall, and a row of tall cards pushed the actual products
- * off the first screen — worse on a phone, where they stacked one per row.
+ * Bare icon, no tile. The name rides in a tooltip so the strip costs one row
+ * of icons rather than a grid of boxes — the tiles were still too heavy on
+ * small screens.
  */
-export function categoryTile(category) {
-  const href = `./store.html?category=${encodeURIComponent(category.name)}`;
+export function categoryIcon(category) {
+  const href = `./store?category=${encodeURIComponent(category.name)}`;
   return `
-    <a class="cattile cattile--${escapeHtml(category.accent)}" href="${href}" title="${escapeHtml(category.name)}">
-      <span class="cattile__icon">${icon(category.icon, 20)}</span>
-      <span class="cattile__name">${escapeHtml(category.name)}</span>
-      <span class="cattile__count">${category.count}</span>
+    <a class="caticon caticon--${escapeHtml(category.accent)}" href="${href}"
+       data-tip="${escapeHtml(category.name)}" aria-label="${escapeHtml(category.name)}">
+      ${icon(category.icon, 26)}
     </a>`;
 }
 
 /**
- * The home-page strip. Compact tiles rather than cards, capped, with the rest
- * behind "View all".
+ * The home-page strip: popular categories as icons on one scrollable line,
+ * with an arrow to the full list. Capped, because the point is compactness.
  */
-export function renderCategoryJumbotron(host, categories, cap = 10) {
+export function renderCategoryJumbotron(host, categories, cap = 12) {
   if (!host) return;
-  // Busiest first: an empty category is a poor advert for the marketplace.
+  // Busiest first — the strip should show what people actually buy.
   const ranked = [...categories].sort((a, b) => b.count - a.count).slice(0, cap);
 
   host.innerHTML = `
-    <div class="catjumbo">
-      <div class="catjumbo__head">
-        <div>
-          <span class="eyebrow">BROWSE BY CATEGORY</span>
-          <h2 class="catjumbo__title">Find exactly what you need</h2>
-        </div>
-        <a class="catjumbo__all" href="./categories.html">
-          <span>All ${categories.length}</span>${icon('arrow-right', 14)}
-        </a>
-      </div>
-      <div class="cattiles">${ranked.map(categoryTile).join('')}</div>
+    <div class="catstrip">
+      <span class="catstrip__label">Popular</span>
+      <div class="catstrip__scroll">${ranked.map(categoryIcon).join('')}</div>
+      <a class="catstrip__more" href="./categories" data-tip="All categories" aria-label="View all categories">
+        ${icon('arrow-right', 20)}
+      </a>
     </div>`;
   renderIcons();
 }
