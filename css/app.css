@@ -709,35 +709,30 @@ a:hover {
 /* --------------------------------------------------------------------------
    Category jumbotron + cards
    -------------------------------------------------------------------------- */
-/* --- Popular category strip: bare icons on one scrollable line ------------
-   No tiles, no backgrounds — just the coloured glyphs, with the name in a
-   tooltip. A grid of boxes was still eating the top of small screens. */
+/* --- Category strip: bare icons on one centred line -----------------------
+   No tiles, no backgrounds — just the coloured glyphs, name in a tooltip.
+   The whole set is rendered; at this size it fits a desktop row and only
+   scrolls when the viewport truly cannot hold it. */
 .catstrip {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 4px;
-}
-
-.catstrip__label {
-  flex: none;
-  color: #94a3b8;
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  justify-content: center;
+  padding: 2px 0;
 }
 
 .catstrip__scroll {
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
+  gap: 14px;
+  max-width: 100%;
   overflow-x: auto;
+  padding: 2px 4px;
   scrollbar-width: none;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
+  /* `safe` keeps the first icon reachable once the row overflows — plain
+     centring would push the leading items out of the scrollable area. */
+  justify-content: center;
+  justify-content: safe center;
 }
 .catstrip__scroll::-webkit-scrollbar { display: none; }
 
@@ -747,10 +742,10 @@ a:hover {
   display: grid;
   place-items: center;
   flex: none;
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  scroll-snap-align: start;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  scroll-snap-align: center;
   color: var(--cat-fg, #ea580c);
   transition: transform .2s cubic-bezier(.2, .8, .2, 1), background-color .2s ease;
 }
@@ -758,36 +753,33 @@ a:hover {
 .caticon:hover,
 .catstrip__more:hover {
   transform: translateY(-3px);
-  background: rgba(15, 23, 42, 0.04);
+  background: rgba(15, 23, 42, 0.05);
   opacity: 1;
 }
 
 .catstrip__more {
-  flex: none;
-  margin-left: 2px;
-  border-left: 1px solid #eef1f6;
-  border-radius: 0 12px 12px 0;
+  margin-left: 4px;
   padding-left: 10px;
-  width: 48px;
+  width: 40px;
+  border-left: 1px solid #e8edf3;
+  border-radius: 0 10px 10px 0;
   color: #142c55;
 }
 
-/* Tooltip: the only place the name appears, so it must not be clipped by the
-   scroller — hence position:fixed-like escape via a high z-index and
-   overflow-visible ancestors on the strip itself. */
+/* The tooltip is the only place the name appears. */
 .caticon::after,
 .catstrip__more::after {
   content: attr(data-tip);
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 5px);
   left: 50%;
   z-index: 20;
   transform: translate(-50%, 4px);
-  padding: 5px 9px;
+  padding: 4px 9px;
   border-radius: 7px;
   background: #142c55;
   color: #fff;
-  font-size: 0.66rem;
+  font-size: 0.65rem;
   font-weight: 700;
   white-space: nowrap;
   opacity: 0;
@@ -801,9 +793,8 @@ a:hover {
 .catstrip__more:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
 
 @media (max-width: 639px) {
-  .catstrip { gap: 8px; padding: 8px 0; }
-  .catstrip__label { display: none; }
-  .caticon, .catstrip__more { width: 42px; height: 42px; }
+  .catstrip__scroll { gap: 10px; }
+  .caticon, .catstrip__more { width: 34px; height: 34px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

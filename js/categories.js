@@ -82,26 +82,30 @@ export function categoryIcon(category) {
   return `
     <a class="caticon caticon--${escapeHtml(category.accent)}" href="${href}"
        data-tip="${escapeHtml(category.name)}" aria-label="${escapeHtml(category.name)}">
-      ${icon(category.icon, 26)}
+      ${icon(category.icon, 20)}
     </a>`;
 }
 
 /**
- * The home-page strip: popular categories as icons on one scrollable line,
- * with an arrow to the full list. Capped, because the point is compactness.
+ * The home-page strip: every category as one icon on a single centred line.
+ *
+ * Nothing is capped — at this size the full set fits a desktop row, and the
+ * line only scrolls when the viewport genuinely cannot hold it. Ordering is
+ * busiest-first so that when it does scroll, what people actually buy is the
+ * part already on screen.
  */
-export function renderCategoryJumbotron(host, categories, cap = 12) {
+export function renderCategoryJumbotron(host, categories) {
   if (!host) return;
-  // Busiest first — the strip should show what people actually buy.
-  const ranked = [...categories].sort((a, b) => b.count - a.count).slice(0, cap);
+  const ranked = [...categories].sort((a, b) => b.count - a.count);
 
   host.innerHTML = `
     <div class="catstrip">
-      <span class="catstrip__label">Popular</span>
-      <div class="catstrip__scroll">${ranked.map(categoryIcon).join('')}</div>
-      <a class="catstrip__more" href="./categories" data-tip="All categories" aria-label="View all categories">
-        ${icon('arrow-right', 20)}
-      </a>
+      <div class="catstrip__scroll">
+        ${ranked.map(categoryIcon).join('')}
+        <a class="catstrip__more" href="./categories" data-tip="All categories" aria-label="View all categories">
+          ${icon('arrow-right', 18)}
+        </a>
+      </div>
     </div>`;
   renderIcons();
 }
