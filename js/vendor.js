@@ -430,12 +430,119 @@ async function loadPayouts() {
 
 /* --- Campaigns ------------------------------------------------------------- */
 
+/* --- Ad wallet ------------------------------------------------------------- */
+
+let wallet = null;
+
+async function loadWallet() {
+  const { data } = await supabase
+    .from('ad_wallets').select('balance,currency,lifetime_topup,lifetime_spend')
+    .eq('vendor_id', vendor.id).maybeSingle();
+
+  wallet = data || { balance: 0, currency: vendor.payout_currency || 'USD', lifetime_spend: 0 };
+
+  document.querySelector('#wallet-balance').textContent = money(wallet.balance, wallet.currency);
+  document.querySelector('#wallet-note').textContent = Number(wallet.balance) > 0
+    ? `${money(wallet.lifetime_spend, wallet.currency)} spent on ads so far.`
+    : 'Top up before your campaigns can run.';
+
+  const { data: pending } = await supabase
+    .from('ad_topup_requests').select('amount,currency,created_at')
+    .eq('vendor_id', vendor.id).eq('status', 'pending');
+
+  if (pending?.length) {
+    const total = pending.reduce((sum, r) => sum + Number(r.amount), 0);
+    document.querySelector('#wallet-note').textContent +=
+      ` ${money(total, wallet.currency)} awaiting confirmation.`;
+  }
+}
+
+async function loadWalletHistory() {
+  const host = document.querySelector('#wallet-history');
+  const { data } = await supabase
+    .from('ad_wallet_transactions')
+    .select('type,amount,balance_after,currency,description,created_at')
+    .eq('vendor_id', vendor.id).order('created_at', { ascending: false }).limit(30);
+
+  host.innerHTML = data?.length
+    ? data.map((t) => `
+        <div class="flex items-center justify-between gap-3 border-t border-slate-100 py-2 text-xs first:border-t-0">
+          <div class="min-w-0">
+            <strong class="block truncate text-[#142c55]">${escapeHtml(t.description || t.type)}</strong>
+            <span class="text-slate-400">${escapeHtml(shortDate(t.created_at))}</span>
+          </div>
+          <span class="shrink-0 font-bold ${Number(t.amount) < 0 ? 'text-red-600' : 'text-green-700'}">
+            ${Number(t.amount) < 0 ? '' : '+'}${money(t.amount, t.currency)}
+          </span>
+        </div>`).join('')
+    : empty('No wallet activity yet.');
+}
+
+document.querySelector('#wallet-history-btn')?.addEventListener('click', async () => {
+  const host = document.querySelector('#wallet-history');
+  host.classList.toggle('hidden');
+  if (!host.classList.contains('hidden')) await loadWalletHistory();
+});
+
+document.querySelector('#topup-btn')?.addEventListener('click', () => {
+  document.querySelector('#topup-form').reset();
+  document.querySelector('#topup-feedback').textContent = '';
+  document.querySelector('#topup-modal').showModal();
+});
+
+document.querySelector('#cancel-topup')?.addEventListener('click', () =>
+  document.querySelector('#topup-modal').close());
+
+document.querySelector('#topup-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const feedback = document.querySelector('#topup-feedback');
+  const button = form.querySelector('button[type="submit"]');
+
+  setBusy(button, true, 'Submitting…');
+  const { error } = await supabase.rpc('request_ad_topup', {
+    p_amount: Number(form.elements.amount.value),
+    p_note: form.elements.note.value.trim() || null,
+  });
+  setBusy(button, false);
+
+  if (error) {
+    feedback.textContent = error.message;
+    feedback.className = 'status-line error mt-3 text-xs';
+    return;
+  }
+  document.querySelector('#topup-modal').close();
+  toast('Top-up requested — we will credit your wallet once payment is confirmed.');
+  await loadWallet();
+});
+
 async function loadCampaigns() {
   const { data, error } = await supabase
     .from('ad_campaigns')
-    .select('id,name,placement,budget,spend,currency,status,impressions,clicks,starts_at,ends_at,products(title)')
+    .select('id,name,placement,budget,spend,currency,status,review_status,review_note,impressions,clicks,conversions,cpm_rate,cpc_rate,cpa_percent,starts_at,ends_at,products(title)')
     .eq('vendor_id', vendor.id)
     .order('created_at', { ascending: false });
+
+  // Show the live rate card from whatever campaign exists, else the defaults.
+  const rates = data?.[0] || { cpm_rate: 2.5, cpc_rate: 0.35, cpa_percent: 3 };
+  const rateHost = document.querySelector('#rate-card');
+  if (rateHost) {
+    rateHost.innerHTML = `
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="rounded-xl bg-slate-50 p-3">
+          <strong class="block text-sm font-black text-[#142c55]">${money(rates.cpm_rate, wallet?.currency)}</strong>
+          <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">per 1,000 views</span>
+        </div>
+        <div class="rounded-xl bg-slate-50 p-3">
+          <strong class="block text-sm font-black text-[#142c55]">${money(rates.cpc_rate, wallet?.currency)}</strong>
+          <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">per click</span>
+        </div>
+        <div class="rounded-xl bg-slate-50 p-3">
+          <strong class="block text-sm font-black text-[#142c55]">${rates.cpa_percent}%</strong>
+          <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">per sale</span>
+        </div>
+      </div>`;
+  }
 
   const host = document.querySelector('#campaigns-table');
   if (error) return void (host.innerHTML = empty(error.message));
@@ -469,10 +576,17 @@ async function loadCampaigns() {
                   <span class="block h-full rounded-full bg-orange-500" style="width:${used}%"></span>
                 </span>
               </td>
-              <td class="py-3 pr-3">${c.clicks} <span class="text-[11px] text-slate-400">/ ${c.impressions} views</span></td>
-              <td class="py-3 pr-3">${pill(c.status)}</td>
+              <td class="py-3 pr-3">${c.clicks} <span class="text-[11px] text-slate-400">/ ${c.impressions} views · ${c.conversions} sold</span></td>
+              <td class="py-3 pr-3">
+                ${c.review_status === 'pending'
+                  ? '<span class="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">In review</span>'
+                  : c.review_status === 'rejected'
+                    ? `<span class="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-bold text-red-700">Rejected</span>
+                       ${c.review_note ? `<span class="mt-1 block text-[10px] text-slate-400">${escapeHtml(c.review_note)}</span>` : ''}`
+                    : pill(c.status)}
+              </td>
               <td class="py-3 text-right">
-                ${['active', 'paused'].includes(c.status)
+                ${c.review_status === 'approved' && ['active', 'paused'].includes(c.status)
                   ? `<button class="button !min-h-8 !px-3 text-xs" type="button" data-toggle-campaign="${c.id}" data-status="${c.status}">${c.status === 'active' ? 'Pause' : 'Resume'}</button>`
                   : ''}
               </td>
@@ -805,7 +919,7 @@ document.querySelector('#campaign-form')?.addEventListener('submit', async (even
     return;
   }
   campaignModal.close();
-  toast('Campaign created — it will go live after review.');
+  toast('Campaign submitted — it goes live once our team approves it.');
   await loadCampaigns();
 });
 
@@ -1006,6 +1120,7 @@ async function boot() {
   renderOverview();
   fillSettings();
 
+  await loadWallet();
   await Promise.all([loadProducts(), loadSales(), loadPayouts(), loadCampaigns()]);
 
   renderIcons();

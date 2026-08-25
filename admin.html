@@ -31,6 +31,7 @@
           <a class="admin-link flex items-center gap-2" href="#promotions"><i data-lucide="badge-percent" width="16" height="16"></i><span>Promotions</span></a>
           <a class="admin-link flex items-center gap-2" href="#content"><i data-lucide="file-text" width="16" height="16"></i><span>Content</span></a>
           <a class="admin-link flex items-center gap-2" href="#automation"><i data-lucide="workflow" width="16" height="16"></i><span>Operations</span></a>
+          <a class="admin-link flex items-center gap-2" href="#moderation"><i data-lucide="shield-check" width="16" height="16"></i><span class="flex-1">Sellers &amp; ads</span><span id="mod-badge" class="hidden rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-black text-white"></span></a>
           <a class="admin-link flex items-center gap-2" href="#tickets"><i data-lucide="life-buoy" width="16" height="16"></i><span>Support</span></a>
         </nav>
       </div>
@@ -196,6 +197,47 @@
           </div>
           <p id="automation-feedback" class="status-line mt-4"></p>
           <p class="mt-4 text-xs leading-5 text-slate-500">Schedules and run history are managed securely in <a class="font-bold text-[#e86f18] underline" href="https://supabase.com/dashboard/project/synnepvvxpluoydkmphb/integrations/cron" target="_blank" rel="noopener">Supabase Cron</a>. Store the schedule credential in Vault; never put it in this dashboard or the frontend.</p>
+          </div>
+        </section>
+
+        <!-- Marketplace moderation -->
+        <section id="moderation" class="admin-screen space-y-6">
+          <div class="admin-screen-heading">
+            <div>
+              <span class="eyebrow">MARKETPLACE</span>
+              <h2>Sellers &amp; advertising</h2>
+              <p>Approve who may sell, which ads run, and settle wallet top-ups and payouts.</p>
+            </div>
+            <button id="refresh-moderation" class="button">Refresh</button>
+          </div>
+
+          <div class="soft-panel p-6">
+            <div class="flex items-center justify-between gap-3">
+              <div><span class="eyebrow">SELLER APPLICATIONS</span><h3 class="mt-1 text-xl font-black text-[#142c55]">Awaiting approval</h3></div>
+            </div>
+            <div id="mod-vendors" class="mt-5"></div>
+          </div>
+
+          <div class="soft-panel p-6">
+            <span class="eyebrow">AD CAMPAIGNS</span>
+            <h3 class="mt-1 text-xl font-black text-[#142c55]">Awaiting review</h3>
+            <p class="mt-1 text-xs text-slate-500">Nothing runs on the storefront until it is approved here.</p>
+            <div id="mod-campaigns" class="mt-5"></div>
+          </div>
+
+          <div class="grid gap-6 xl:grid-cols-2">
+            <div class="soft-panel p-6">
+              <span class="eyebrow">WALLET TOP-UPS</span>
+              <h3 class="mt-1 text-lg font-black text-[#142c55]">Confirm payment received</h3>
+              <p class="mt-1 text-xs text-slate-500">Approving credits the seller's ad wallet immediately.</p>
+              <div id="mod-topups" class="mt-5"></div>
+            </div>
+            <div class="soft-panel p-6">
+              <span class="eyebrow">PAYOUT REQUESTS</span>
+              <h3 class="mt-1 text-lg font-black text-[#142c55]">Money going out</h3>
+              <p class="mt-1 text-xs text-slate-500">Mark as paid once the transfer has actually been sent.</p>
+              <div id="mod-payouts" class="mt-5"></div>
+            </div>
           </div>
         </section>
 

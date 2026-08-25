@@ -10,7 +10,8 @@ const cropCanvas = document.querySelector('#crop-canvas');
 
 const screenTitles = {
   overview: 'Store overview', products: 'Catalog', categories: 'Categories', transactions: 'Orders',
-  customers: 'Customers', promotions: 'Promotions', content: 'Content', automation: 'Operations', tickets: 'Support',
+  customers: 'Customers', promotions: 'Promotions', content: 'Content', automation: 'Operations',
+  moderation: 'Sellers & ads', tickets: 'Support',
 };
 
 function activateAdminScreen() {
@@ -52,6 +53,180 @@ document.addEventListener('keydown', (event) => {
 document.querySelectorAll('.admin-link').forEach((link) => {
   link.addEventListener('click', () => setAdminDrawer(false));
 });
+
+// ============================================================
+// Marketplace moderation
+// ============================================================
+const modMoney = (value, currency = 'USD') =>
+  `${currency} ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const modDate = (value) =>
+  new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+const modEmpty = (message) => `<p class="py-6 text-center text-sm text-slate-500">${escapeHtml(message)}</p>`;
+
+async function loadModeration() {
+  const { data, error } = await supabase.rpc('moderation_queue');
+  if (error) {
+    document.querySelector('#mod-vendors').innerHTML = modEmpty(error.message);
+    return;
+  }
+
+  const pendingTotal =
+    (data.vendors?.length || 0) + (data.campaigns?.length || 0) +
+    (data.topups?.length || 0) + (data.payouts?.length || 0);
+
+  const badge = document.querySelector('#mod-badge');
+  if (badge) {
+    badge.textContent = pendingTotal;
+    badge.classList.toggle('hidden', pendingTotal === 0);
+  }
+
+  // --- Seller applications --------------------------------------------------
+  document.querySelector('#mod-vendors').innerHTML = data.vendors?.length
+    ? data.vendors.map((v) => `
+        <div class="border-t border-slate-100 py-4 first:border-t-0">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="min-w-0">
+              <strong class="block text-[#142c55]">${escapeHtml(v.display_name)}</strong>
+              <span class="text-xs text-slate-500">${escapeHtml(v.country)} · ${escapeHtml(v.payout_currency)} · applied ${escapeHtml(modDate(v.applied_at))} · ${v.commission_rate}% commission</span>
+              ${v.bio ? `<p class="mt-2 max-w-2xl text-xs leading-relaxed text-slate-600">${escapeHtml(v.bio)}</p>` : ''}
+            </div>
+            <div class="flex shrink-0 gap-2">
+              <button class="button button-primary !min-h-8 !px-3 text-xs" data-approve-vendor="${v.id}">Approve</button>
+              <button class="button !min-h-8 !px-3 text-xs !text-red-600" data-reject-vendor="${v.id}">Reject</button>
+            </div>
+          </div>
+        </div>`).join('')
+    : modEmpty('No seller applications waiting.');
+
+  // --- Ad campaigns ---------------------------------------------------------
+  document.querySelector('#mod-campaigns').innerHTML = data.campaigns?.length
+    ? data.campaigns.map((c) => `
+        <div class="border-t border-slate-100 py-4 first:border-t-0">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="min-w-0">
+              <strong class="block text-[#142c55]">${escapeHtml(c.name)}</strong>
+              <span class="text-xs text-slate-500">
+                ${escapeHtml(c.vendor_name)} · ${escapeHtml(c.product_title || 'product removed')} ·
+                <span class="capitalize">${escapeHtml(c.placement)}</span> ·
+                budget ${modMoney(c.budget, c.currency)}
+              </span>
+              <span class="mt-1 block text-[11px] text-slate-400">
+                ${modMoney(c.cpm_rate, c.currency)}/1k views · ${modMoney(c.cpc_rate, c.currency)}/click · ${c.cpa_percent}%/sale
+                · wallet ${modMoney(c.wallet_balance || 0, c.currency)}
+              </span>
+              ${Number(c.wallet_balance || 0) <= 0
+                ? '<span class="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">Wallet empty — will not serve until topped up</span>'
+                : ''}
+            </div>
+            <div class="flex shrink-0 gap-2">
+              <button class="button button-primary !min-h-8 !px-3 text-xs" data-approve-campaign="${c.id}">Approve</button>
+              <button class="button !min-h-8 !px-3 text-xs !text-red-600" data-reject-campaign="${c.id}">Reject</button>
+            </div>
+          </div>
+        </div>`).join('')
+    : modEmpty('No campaigns waiting for review.');
+
+  // --- Wallet top-ups -------------------------------------------------------
+  document.querySelector('#mod-topups').innerHTML = data.topups?.length
+    ? data.topups.map((t) => `
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 py-3 first:border-t-0">
+          <div class="min-w-0">
+            <strong class="block text-sm text-[#142c55]">${modMoney(t.amount, t.currency)}</strong>
+            <span class="text-xs text-slate-500">${escapeHtml(t.vendor_name)} · ${escapeHtml(modDate(t.created_at))}</span>
+            ${t.note ? `<span class="block text-[11px] text-slate-400">Ref: ${escapeHtml(t.note)}</span>` : ''}
+          </div>
+          <div class="flex shrink-0 gap-2">
+            <button class="button button-primary !min-h-8 !px-3 text-xs" data-approve-topup="${t.id}">Credit</button>
+            <button class="button !min-h-8 !px-3 text-xs !text-red-600" data-reject-topup="${t.id}">Reject</button>
+          </div>
+        </div>`).join('')
+    : modEmpty('No top-ups waiting.');
+
+  // --- Payout requests ------------------------------------------------------
+  document.querySelector('#mod-payouts').innerHTML = data.payouts?.length
+    ? data.payouts.map((p) => {
+        const dest = p.method === 'mobile_money'
+          ? `${p.momo_provider || 'MoMo'} ····${p.account_last4 || ''}`
+          : p.method === 'bank_transfer'
+            ? `${p.bank_name || 'Bank'} ····${p.account_last4 || ''}`
+            : (p.method || 'account');
+        return `
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 py-3 first:border-t-0">
+          <div class="min-w-0">
+            <strong class="block text-sm text-[#142c55]">${modMoney(p.amount, p.currency)}</strong>
+            <span class="text-xs text-slate-500">${escapeHtml(p.vendor_name)} → ${escapeHtml(dest)}</span>
+            <span class="block text-[11px] text-slate-400">${escapeHtml(p.account_name || '')} · requested ${escapeHtml(modDate(p.requested_at))}</span>
+          </div>
+          <div class="flex shrink-0 gap-2">
+            <button class="button button-primary !min-h-8 !px-3 text-xs" data-pay-payout="${p.id}">Mark paid</button>
+            <button class="button !min-h-8 !px-3 text-xs !text-red-600" data-fail-payout="${p.id}">Fail</button>
+          </div>
+        </div>`;
+      }).join('')
+    : modEmpty('No payout requests waiting.');
+
+  renderIcons();
+}
+
+document.addEventListener('click', async (event) => {
+  const el = event.target.closest(
+    '[data-approve-vendor],[data-reject-vendor],[data-approve-campaign],[data-reject-campaign],' +
+    '[data-approve-topup],[data-reject-topup],[data-pay-payout],[data-fail-payout]'
+  );
+  if (!el) return;
+
+  const d = el.dataset;
+  let result;
+
+  if (d.approveVendor) {
+    result = await supabase.rpc('moderate_vendor', { p_vendor_id: d.approveVendor, p_status: 'approved' });
+  } else if (d.rejectVendor) {
+    const reason = window.prompt('Why is this application being rejected? (shown to the applicant)');
+    if (reason === null) return;
+    result = await supabase.rpc('moderate_vendor', { p_vendor_id: d.rejectVendor, p_status: 'rejected', p_reason: reason });
+  } else if (d.approveCampaign) {
+    result = await supabase.rpc('moderate_campaign', { p_campaign_id: d.approveCampaign, p_approve: true });
+  } else if (d.rejectCampaign) {
+    const note = window.prompt('Why is this campaign being rejected? (shown to the seller)');
+    if (note === null) return;
+    result = await supabase.rpc('moderate_campaign', { p_campaign_id: d.rejectCampaign, p_approve: false, p_note: note });
+  } else if (d.approveTopup) {
+    const reference = window.prompt('Payment reference for this top-up (optional):') ?? null;
+    result = await supabase.rpc('settle_ad_topup', { p_request_id: d.approveTopup, p_approve: true, p_reference: reference });
+  } else if (d.rejectTopup) {
+    result = await supabase.rpc('settle_ad_topup', { p_request_id: d.rejectTopup, p_approve: false });
+  } else if (d.payPayout) {
+    const reference = window.prompt('Transfer reference (optional):') ?? null;
+    result = await supabase.from('payouts')
+      .update({ status: 'paid', processed_at: new Date().toISOString(), reference })
+      .eq('id', d.payPayout);
+    if (!result.error) {
+      // Earnings attached to this payout are settled at the same time.
+      await supabase.from('vendor_earnings').update({ status: 'paid' }).eq('payout_id', d.payPayout);
+    }
+  } else if (d.failPayout) {
+    const reason = window.prompt('Why did this payout fail?');
+    if (reason === null) return;
+    result = await supabase.from('payouts')
+      .update({ status: 'failed', failure_reason: reason, processed_at: new Date().toISOString() })
+      .eq('id', d.failPayout);
+    if (!result.error) {
+      // Release the earnings so the seller can request again.
+      await supabase.from('vendor_earnings').update({ payout_id: null }).eq('payout_id', d.failPayout);
+    }
+  }
+
+  if (result?.error) {
+    toast(result.error.message, 'error');
+    return;
+  }
+  toast('Done.');
+  await loadModeration();
+});
+
+document.querySelector('#refresh-moderation')?.addEventListener('click', loadModeration);
 
 // ============================================================
 // Slugify Helper
@@ -470,6 +645,10 @@ async function load() {
     return;
   }
   document.querySelector('#admin-user').textContent = account.user.email;
+
+  // Marketplace queues come straight from the database, so they still render
+  // even if the dashboard function is unavailable.
+  loadModeration().catch(() => {});
 
   const { data, error } = await supabase.functions.invoke('admin-dashboard');
   if (error || data?.error) {

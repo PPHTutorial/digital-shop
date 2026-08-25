@@ -246,6 +246,44 @@
               </div>
               <button id="new-campaign" class="button button-primary">+ New campaign</button>
             </div>
+
+            <div class="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+              <div class="soft-panel p-6">
+                <span class="eyebrow">AD WALLET</span>
+                <strong id="wallet-balance" class="mt-1 block text-3xl font-black text-[#142c55]">—</strong>
+                <p id="wallet-note" class="mt-1 text-xs text-slate-500">Campaign spend is drawn from this balance.</p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <button id="topup-btn" class="button button-primary !min-h-9 !px-4 !text-xs">Top up wallet</button>
+                  <button id="wallet-history-btn" class="button !min-h-9 !px-4 !text-xs">History</button>
+                </div>
+                <div id="wallet-history" class="mt-5 hidden"></div>
+              </div>
+
+              <div class="soft-panel p-6">
+                <span class="eyebrow">WHAT YOU PAY FOR</span>
+                <h3 class="mt-1 text-lg font-black text-[#142c55]">How boosting is charged</h3>
+                <div class="mt-4 grid gap-3 text-sm">
+                  <div class="flex items-start gap-3">
+                    <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500"><i data-lucide="eye" width="13" height="13"></i></span>
+                    <span><strong class="text-[#142c55]">Views</strong> — charged per 1,000 times your product is actually seen on screen. Cards nobody scrolls to cost nothing.</span>
+                  </div>
+                  <div class="flex items-start gap-3">
+                    <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500"><i data-lucide="mouse-pointer-click" width="13" height="13"></i></span>
+                    <span><strong class="text-[#142c55]">Clicks</strong> — a flat rate when someone opens your product from a boosted card.</span>
+                  </div>
+                  <div class="flex items-start gap-3">
+                    <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500"><i data-lucide="shopping-bag" width="13" height="13"></i></span>
+                    <span><strong class="text-[#142c55]">Sales</strong> — a small percentage of the order value, charged only when a boosted product actually sells.</span>
+                  </div>
+                </div>
+                <p class="mt-4 text-xs leading-relaxed text-slate-500">
+                  The same viewer is only counted once per day per campaign. Spending stops automatically when
+                  the budget or the wallet runs out.
+                </p>
+                <div id="rate-card" class="mt-4"></div>
+              </div>
+            </div>
+
             <div class="soft-panel p-6"><div id="campaigns-table"></div></div>
           </section>
 
@@ -555,6 +593,31 @@
           <button type="button" id="cancel-campaign" class="button">Cancel</button>
           <button type="submit" class="button button-primary">Create campaign</button>
         </div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Wallet top-up -->
+  <dialog id="topup-modal" class="w-[min(94vw,460px)] rounded-2xl border-0 bg-white p-0 shadow-2xl" style="margin:auto">
+    <form id="topup-form" class="p-6">
+      <span class="eyebrow">AD WALLET</span>
+      <h2 class="mt-1 text-xl font-black text-[#142c55]">Top up your wallet</h2>
+      <p class="mt-2 text-sm leading-relaxed text-slate-500">
+        Tell us how much you want to add. Our team confirms your payment and credits the wallet — you will
+        see it here once it clears.
+      </p>
+      <label class="mt-5 block">
+        <span class="label">Amount</span>
+        <input class="field font-bold" name="amount" type="number" step="1" min="5" required placeholder="50">
+      </label>
+      <label class="mt-4 block">
+        <span class="label">Payment reference <span class="font-normal text-slate-400">(optional)</span></span>
+        <input class="field" name="note" placeholder="e.g. MoMo transaction id">
+      </label>
+      <p id="topup-feedback" class="status-line mt-3 text-xs"></p>
+      <div class="mt-5 flex justify-end gap-3">
+        <button type="button" id="cancel-topup" class="button">Cancel</button>
+        <button type="submit" class="button button-primary">Submit request</button>
       </div>
     </form>
   </dialog>

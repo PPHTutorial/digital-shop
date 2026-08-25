@@ -1,5 +1,8 @@
 import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, toast } from './ui.js';
+import { loadServableCampaigns, attachAdTracking, promoteSponsored } from './ads.js';
+
+let adCampaigns = new Map();
 
 let allProducts = [];
 let managedCategories = [];
@@ -64,7 +67,7 @@ function createCardHtml(p) {
   const blurb = p.short_description || p.description || '';
 
   return `
-    <article class="catalog-card">
+    <article class="catalog-card" data-product-id="${p.id}">
       <a href="${href}" class="catalog-card__media" aria-label="${escapeHtml(p.title)}">
         ${
           p.cover_url
@@ -122,6 +125,13 @@ function getFilteredList() {
     list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
   }
 
+  // Sponsored products lift to the front of the default view only. An explicit
+  // sort (price, title) is the shopper's instruction and paid placement must
+  // not override it.
+  if (activeSort === 'newest') {
+    list = promoteSponsored(list, adCampaigns);
+  }
+
   return list;
 }
 
@@ -169,6 +179,7 @@ function renderCatalog() {
 
   renderIcons();
   wireShareButtons();
+  attachAdTracking(grid, adCampaigns);
 }
 
 function renderPills() {
@@ -330,6 +341,7 @@ async function init() {
   }
 
   allProducts = data || [];
+  adCampaigns = await loadServableCampaigns();
   renderPills();
   renderCatalog();
   finishPageLoader();
