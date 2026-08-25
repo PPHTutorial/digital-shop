@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Browse every category of digital product on DigiStore — ebooks, courses, templates, software, design assets and more.">
+  <title>All Categories | DigiStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+<body class="bg-slate-50 text-slate-900 flex flex-col min-h-screen">
+
+  <header id="site-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur shadow-sm"></header>
+
+  <main class="shell py-10 lg:py-14 flex-1">
+    <div class="cathero">
+      <span class="eyebrow">EVERY CATEGORY</span>
+      <h1 class="cathero__title">Browse the whole catalogue</h1>
+      <p class="cathero__sub">
+        Every kind of digital product sold on DigiStore. Pick a category to see what's inside —
+        or open your own store and start selling into one.
+      </p>
+      <div class="cathero__actions">
+        <div class="cathero__search">
+          <i data-lucide="search" width="16" height="16"></i>
+          <input id="cat-search" type="search" placeholder="Search categories…" aria-label="Search categories">
+        </div>
+        <a class="button button-primary" href="./vendor.html">
+          <i data-lucide="store" width="15" height="15"></i><span>Sell in a category</span>
+        </a>
+      </div>
+      <p id="cat-count" class="cathero__count"></p>
+    </div>
+
+    <div id="all-categories" class="catgrid catgrid--page mt-9"></div>
+
+    <section class="seller-band mt-14">
+      <div>
+        <span class="seller-band__eyebrow">BECOME A SELLER</span>
+        <h2 class="seller-band__title">Your work belongs in one of these</h2>
+        <p class="seller-band__body">
+          Publish once and sell to buyers worldwide. We handle checkout, payment verification and
+          secure delivery — you keep the majority of every sale and withdraw to your bank or mobile money.
+        </p>
+      </div>
+      <a class="seller-band__cta" href="./vendor.html">
+        <i data-lucide="arrow-right" width="16" height="16"></i><span>Start selling</span>
+      </a>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module" src="./js/categories.js"></script>
+</body>
+</html>

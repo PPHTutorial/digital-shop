@@ -1,5 +1,6 @@
 import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
+import { renderCategoryJumbotron, categoryLook } from './categories.js';
 
 let allProducts = [];
 let managedCategories = [];
@@ -210,6 +211,24 @@ async function load() {
   }
 
   renderQuickCategories();
+
+  // Category jumbotron — counts come from the same product list already loaded.
+  try {
+    const counts = new Map();
+    for (const product of allProducts) {
+      const key = product.category || 'General';
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const withCounts = managedCategories.map((category) => ({
+      ...category,
+      count: counts.get(category.name) || 0,
+      ...categoryLook(category.slug),
+    }));
+    renderCategoryJumbotron(document.querySelector('#category-jumbotron'), withCounts);
+  } catch (error) {
+    console.error('Category jumbotron failed:', error);
+  }
+
   renderShowcaseSections();
   renderIcons();
   finishPageLoader();

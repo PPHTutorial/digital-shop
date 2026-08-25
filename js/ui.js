@@ -58,6 +58,11 @@ export async function mountHeader() {
       <a href="./contact.html" class="${isContact ? 'active' : ''}">${icon('mail')}<span>Contact</span></a>
       <a href="./support.html" class="${isSupport ? 'active' : ''}">${icon('circle-help')}<span>Support</span></a>
     `;
+
+    // Selling is a headline route, not a buried one: a signed-in seller goes
+    // straight to their centre, everyone else to the pitch.
+    const sellHref = './vendor.html';
+    const sellLabel = 'Sell on DigiStore';
     target.innerHTML = `
       <div class="utility-bar">
         <div class="shell utility-content">
@@ -71,8 +76,13 @@ export async function mountHeader() {
             <span class="brand-mark">D</span>
             <span>DigiStore<small>powered by codeinktechnologies</small></span>
           </a>
-          <nav class="nav-links" aria-label="Main navigation">${links}</nav>
+          <nav class="nav-links" aria-label="Main navigation">${links}
+            <a href="${sellHref}" class="nav-sell">${icon('store')}<span>Sell</span></a>
+          </nav>
           <div class="nav-actions">
+            <a href="${sellHref}" class="button button-sell hide-below-md" title="${sellLabel}">
+              ${icon('store', 15)}<span>Start selling</span>
+            </a>
             ${
               user
                 ? `<details class="account-popover">
@@ -121,6 +131,7 @@ export async function mountHeader() {
       </div>
       <nav>
         ${links}
+        <a href="${sellHref}" class="drawer-sell">${icon('store')} ${sellLabel}</a>
         ${
           user
             ? `<a href="./account.html">${icon('user-round')} ${escapeHtml(name)}</a>
@@ -174,7 +185,21 @@ export function mountFooter() {
   target.className = 'bg-[#0e1e38] text-slate-300 pt-16 pb-12 border-t border-slate-800 mt-auto';
   target.innerHTML = `
     <div class="shell space-y-12">
-      <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-5 text-sm">
+      <div class="seller-strip">
+        <div>
+          <span class="seller-strip__eyebrow">Sell on DigiStore</span>
+          <h3 class="seller-strip__title">Turn what you make into income</h3>
+          <p class="seller-strip__body">
+            Publish your templates, ebooks, courses or software. We handle checkout, payment
+            verification and secure delivery — you get paid to your bank or mobile money.
+          </p>
+        </div>
+        <a class="seller-strip__cta" href="./vendor.html">
+          ${icon('store', 16)}<span>Open your store</span>
+        </a>
+      </div>
+
+      <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-6 text-sm">
         <div class="lg:col-span-2 space-y-4 pr-4">
           <div class="flex items-center gap-3">
             <span class="brand-mark !bg-orange-500 !text-white font-black text-lg w-10 h-10 rounded-xl flex items-center justify-center">D</span>
@@ -219,6 +244,16 @@ export function mountFooter() {
             <li><a href="./support.html" class="hover:text-orange-400 transition">Submit Support Ticket</a></li>
             <li><a href="./blog.html" class="hover:text-orange-400 transition">Articles &amp; Updates</a></li>
             <li><a href="./about.html" class="hover:text-orange-400 transition">About Codeink</a></li>
+          </ul>
+        </div>
+
+        <div class="space-y-3">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Sell With Us</h3>
+          <ul class="space-y-2 text-xs text-slate-400">
+            <li><a href="./vendor.html" class="font-bold text-orange-400 hover:text-orange-300 transition">Start selling →</a></li>
+            <li><a href="./vendor.html" class="hover:text-orange-400 transition">Seller centre</a></li>
+            <li><a href="./categories.html" class="hover:text-orange-400 transition">What sells here</a></li>
+            <li><a href="./support.html" class="hover:text-orange-400 transition">Seller support</a></li>
           </ul>
         </div>
 

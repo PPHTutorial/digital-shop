@@ -1,8 +1,10 @@
 import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, toast } from './ui.js';
 import { loadServableCampaigns, attachAdTracking, promoteSponsored } from './ads.js';
+import { enhanceSelect } from './select.js';
 
 let adCampaigns = new Map();
+let categorySelect = null;
 
 let allProducts = [];
 let managedCategories = [];
@@ -18,6 +20,7 @@ const loadMoreContainer = document.querySelector('#load-more-container');
 const loadMoreBtn = document.querySelector('#load-more-btn');
 const searchInput = document.querySelector('#store-search-input');
 const sortSelect = document.querySelector('#store-sort-select');
+if (sortSelect) enhanceSelect(sortSelect, { label: 'Sort products by' });
 
 /** Human-readable file size, e.g. "2.4 MB". */
 function formatFileSize(bytes) {
@@ -219,6 +222,9 @@ function renderPills() {
           ${escapeHtml(labelFor(cat))} (${countFor(cat)})
         </option>`)
       .join('');
+    // Rebuild the custom list whenever the options change.
+    categorySelect = categorySelect || enhanceSelect(select, { label: 'Browse category' });
+    categorySelect?.refresh();
   }
 
   container.querySelectorAll('[data-cat]').forEach((btn) => {
