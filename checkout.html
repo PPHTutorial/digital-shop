@@ -8,8 +8,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="./css/app.css">
 </head>
-<body class="bg-slate-50 text-slate-900">
-  <!-- Instant Page Loader -->
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)]" style="background:var(--bg);color:var(--text)">
   <div id="page-loader" class="page-loader">
     <div class="loader-card">
       <div class="shimmer logo"></div>
@@ -18,290 +17,157 @@
     </div>
   </div>
 
-  <header id="site-header" class="sticky top-0 z-40"></header>
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
 
-  <main class="shell py-10 lg:py-14">
-    <div class="mb-8">
-      <span class="eyebrow">SECURE CHECKOUT</span>
-      <h1 class="mt-2 text-3xl font-black text-[#142c55]">Complete your purchase</h1>
-      <p id="checkout-status" class="mt-2 text-sm text-slate-600">Verifying secure session…</p>
+  <main class="pb-10">
+    <div id="checkout-progress" class="checkout-progress">
+      <div class="checkout-step is-done"><span class="checkout-step__badge"><i data-lucide="check" width="14" height="14"></i></span><span>Cart Review</span></div>
+      <div style="flex:1;height:1px;background:var(--border);min-width:24px"></div>
+      <div class="checkout-step is-active"><span class="checkout-step__badge">2</span><span>Billing Info</span></div>
+      <div style="flex:1;height:1px;background:var(--border);min-width:24px"></div>
+      <div class="checkout-step"><span class="checkout-step__badge">3</span><span>Secure Payment</span></div>
     </div>
 
-    <!-- Two column layout -->
-    <div class="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] items-start">
-      
-      <!-- LEFT COLUMN: Book Cover, Thumbnails Gallery, Description -->
-      <section class="soft-panel p-6 sm:p-8 space-y-6">
-        <div id="product-media-container" class="space-y-4">
-          <!-- Main Hero Image with Zoom Click -->
-          <div id="main-image-wrapper" class="overflow-hidden rounded-2xl bg-slate-100 flex items-center justify-center relative group cursor-pointer" title="Click to view full image">
-            <img id="main-book-img" src="" alt="Book Cover" class="checkout-main-img hidden transition-transform duration-300 group-hover:scale-[1.02]">
-            <div class="absolute bottom-3 right-3 bg-slate-900/70 hover:bg-slate-900 text-white text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              <i data-lucide="maximize-2" width="12" height="12"></i>
-              <span>Click to zoom</span>
+    <div id="checkout-empty" class="checkout-empty hidden">
+      <i data-lucide="shopping-cart" width="40" height="40" style="color:var(--text-muted);margin:0 auto 16px"></i>
+      <h1 class="text-xl font-black" style="color:var(--text)">Your cart is empty</h1>
+      <p id="checkout-empty-copy" class="mt-2 text-sm" style="color:var(--text-muted)">Add a digital product before checking out.</p>
+      <a href="./store" class="button button-primary mt-6 inline-flex">Browse the catalog</a>
+    </div>
+
+    <div id="checkout-grid" class="checkout-grid hidden">
+      <!-- LEFT: Billing + Payment method -->
+      <section class="checkout-panel">
+        <h2>Billing Information</h2>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div class="form-field sm:col-span-2"><label for="billing-name">Full name</label><input id="billing-name" form="checkout-form" class="field" required></div>
+          <div class="form-field"><label for="billing-email">Email</label><input id="billing-email" form="checkout-form" type="email" class="field" required></div>
+          <div class="form-field"><label for="billing-country">Country</label><input id="billing-country" form="checkout-form" class="field" required></div>
+        </div>
+
+        <h3>Payment Method</h3>
+        <div class="payment-selector-tabs">
+          <label id="provider-card-flutterwave" class="payment-tab-btn active">
+            <input type="radio" name="payment_provider" value="flutterwave" checked>
+            <div>
+              <strong class="block text-xs" style="color:var(--text)">Cards & Bank / Mobile</strong>
+              <span class="block text-[11px]" style="color:var(--text-muted)">Flutterwave</span>
             </div>
-            <div id="main-book-placeholder" class="h-64 w-full flex items-center justify-center text-slate-400">
-              <span>Loading product preview…</span>
+          </label>
+          <label id="provider-card-nowpayments" class="payment-tab-btn">
+            <input type="radio" name="payment_provider" value="nowpayments">
+            <div>
+              <strong class="block text-xs" style="color:var(--text)">Cryptocurrency</strong>
+              <span class="block text-[11px]" style="color:var(--text-muted)">NOWPayments</span>
             </div>
-          </div>
-
-          <!-- Thumbnails Strip (below main image) -->
-          <div id="thumbnail-strip" class="thumb-gallery hidden"></div>
+          </label>
         </div>
 
-        <!-- Product Title & Details (Flex-row on sm/md/lg) -->
-        <div class="border-t border-slate-100 pt-5">
-          <div class="flex flex-wrap items-center gap-2 mb-2">
-            <span id="product-category-tag" class="tag">Digital Edition</span>
-            <span id="discount-badge" class="discount-pill hidden">Sale</span>
-            <span class="text-xs text-slate-400 font-semibold inline-flex items-center gap-1">
-              <i data-lucide="zap" width="12" height="12" class="text-orange-500"></i>
-              <span>Instant Verified Download</span>
-            </span>
+        <div id="flutterwave-options-panel" class="rounded-xl p-4 space-y-3 mt-3" style="background:var(--surface-sunken);border:1px solid var(--border)">
+          <div>
+            <label class="label text-xs" for="flw-currency-select">Pay in your currency (Live converter)</label>
+            <select id="flw-currency-select" class="field !mt-1 !py-2 text-xs w-full">
+              <option value="USD">USD ($) — US Dollar (Base)</option>
+              <option value="NGN">NGN (₦) — Nigerian Naira</option>
+              <option value="GBP">GBP (£) — British Pound</option>
+              <option value="EUR">EUR (€) — Euro</option>
+              <option value="KES">KES (KSh) — Kenyan Shilling</option>
+              <option value="GHS">GHS (GH₵) — Ghanaian Cedi</option>
+              <option value="ZAR">ZAR (R) — South African Rand</option>
+              <option value="CAD">CAD (CA$) — Canadian Dollar</option>
+              <option value="UGX">UGX (USh) — Ugandan Shilling</option>
+              <option value="AUD">AUD (A$) — Australian Dollar</option>
+            </select>
           </div>
-          <div class="flex flex-row items-center justify-between gap-3 pt-1">
-            <h2 id="product-title" class="text-xl sm:text-2xl font-black text-[#142c55] leading-tight">Loading title…</h2>
-            <button id="share-checkout-btn" type="button" class="button !min-h-9 !px-3.5 !text-xs shrink-0 flex items-center gap-1.5 whitespace-nowrap" title="Share product checkout link">
-              <i data-lucide="share-2" width="14" height="14"></i>
-              <span>Share</span>
-            </button>
+          <div>
+            <label class="label text-xs" for="flw-method-select">Payment channel</label>
+            <select id="flw-method-select" class="field !mt-1 !py-2 text-xs w-full">
+              <option value="all">All payment channels (Card, Bank, MoMo, USSD)</option>
+              <option value="card">Debit / Credit Card (Visa, Mastercard, Verve)</option>
+              <option value="mobilemoney">Mobile Money / M-Pesa</option>
+              <option value="banktransfer">Direct Bank Transfer</option>
+              <option value="ussd">USSD Bank Code</option>
+            </select>
           </div>
         </div>
 
-        <!-- Description (5-10 lines max with Read More) -->
-        <div class="border-t border-slate-100 pt-5">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">About this book</h3>
-          <div id="description-preview" class="description-clamp text-sm leading-relaxed text-slate-600"></div>
-          <button id="read-more-btn" type="button" class="read-more-btn mt-2 hidden inline-flex items-center gap-1">
-            <span>Read full description</span>
-            <i data-lucide="chevron-down" width="13" height="13"></i>
-          </button>
+        <div id="nowpayments-options-panel" class="hidden rounded-xl p-4 space-y-3 mt-3" style="background:var(--surface-sunken);border:1px solid var(--border)">
+          <div>
+            <label class="label text-xs" for="crypto-currency-select">Select cryptocurrency</label>
+            <select id="crypto-currency-select" class="field !mt-1 !py-2 text-xs w-full">
+              <option value="any">Choose on payment screen (300+ coins)</option>
+              <optgroup label="Popular">
+                <option value="usdttrc20">USDT — TRC20 (Low fees)</option>
+                <option value="usdtbsc">USDT — BEP20 (BNB Chain)</option>
+                <option value="usdterc20">USDT — ERC20 (Ethereum)</option>
+                <option value="btc">Bitcoin (BTC)</option>
+                <option value="eth">Ethereum (ETH)</option>
+                <option value="sol">Solana (SOL)</option>
+                <option value="ltc">Litecoin (LTC)</option>
+              </optgroup>
+              <optgroup label="Other Cryptocurrencies">
+                <option value="trx">TRON (TRX)</option>
+                <option value="bnbbsc">BNB (BEP20)</option>
+                <option value="doge">Dogecoin (DOGE)</option>
+                <option value="ton">Toncoin (TON)</option>
+                <option value="xrp">Ripple (XRP)</option>
+                <option value="ada">Cardano (ADA)</option>
+                <option value="xmr">Monero (XMR)</option>
+                <option value="usdc">USD Coin (USDC)</option>
+              </optgroup>
+            </select>
+          </div>
         </div>
 
-        <!-- Guarantees & Features -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-slate-100 pt-5 text-xs text-slate-500">
-          <div class="flex items-center gap-2">
-            <i data-lucide="check" width="14" height="14" class="text-green-600"></i>
-            <span>Lifetime access</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <i data-lucide="check" width="14" height="14" class="text-green-600"></i>
-            <span>DRM-free files</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <i data-lucide="check" width="14" height="14" class="text-green-600"></i>
-            <span>100% Secure SSL</span>
-          </div>
-        </div>
+        <p class="mt-5 text-[11px] inline-flex items-center gap-1" style="color:var(--text-muted)">
+          <i data-lucide="lock" width="12" height="12"></i>
+          <span>256-bit encrypted checkout · Instant delivery upon completion</span>
+        </p>
       </section>
 
-      <!-- RIGHT COLUMN: Order Summary, Pricing, & Payment Method Container Below Total -->
-      <aside class="space-y-6">
-        
-        <!-- Order Summary & Price Breakdown Card -->
-        <div class="soft-panel p-6 sm:p-8">
-          <div class="flex items-center justify-between pb-4 border-b border-slate-100">
-            <span class="tag">Order summary</span>
-            <a href="./account" class="text-xs font-bold text-orange-600 hover:underline">Account details</a>
+      <!-- RIGHT: itemized order summary + promo + total + submit -->
+      <aside class="checkout-summary-col">
+        <h2>Order Summary</h2>
+        <div id="checkout-summary-items" class="checkout-summary-items"></div>
+
+        <div>
+          <div class="checkout-promo-row">
+            <input id="promo-code" class="field !mt-0 !py-2 text-sm uppercase" placeholder="Promo code" autocomplete="off">
+            <button id="apply-promo" type="button" class="button !min-h-9 !px-4 text-xs font-bold">Apply</button>
           </div>
+          <p id="promo-feedback" class="status-line mt-2 text-xs" aria-live="polite"></p>
+        </div>
 
-          <!-- Product Item in Summary -->
-          <div id="summary-product-row" class="py-4 flex gap-4 items-center">
-            <img id="summary-thumb" src="" alt="" class="h-16 w-16 rounded-xl object-cover bg-slate-100 hidden">
-            <div class="min-w-0 flex-1">
-              <h4 id="summary-title" class="font-bold text-sm text-[#142c55] truncate">Digital Book</h4>
-              <div class="flex items-baseline gap-2 mt-1">
-                <span id="summary-orig-price" class="price-original hidden">$0.00</span>
-                <span id="summary-price" class="font-black text-[#142c55] text-base">$0.00</span>
-              </div>
-            </div>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between" style="color:var(--text-muted)">
+            <span>Subtotal</span>
+            <strong id="subtotal" style="color:var(--text)">—</strong>
           </div>
-
-          <!-- Promo Code Section -->
-          <div class="border-t border-slate-200 pt-4">
-            <label class="label text-xs" for="promo-code">Have a discount promo code?</label>
-            <div class="mt-1.5 flex gap-2">
-              <input id="promo-code" class="field !mt-0 !py-2 text-sm uppercase" placeholder="e.g. DISCOUNT20" autocomplete="off">
-              <button id="apply-promo" type="button" class="button !min-h-9 !px-4 text-xs font-bold">Apply</button>
-            </div>
-            <p id="promo-feedback" class="status-line mt-2 text-xs" aria-live="polite"></p>
+          <div id="discount-row" class="hidden justify-between" style="color:#2dab66">
+            <span class="font-semibold">Discount applied</span>
+            <strong id="discount" class="font-bold">—</strong>
           </div>
-
-          <!-- Total Calculation Breakdown -->
-          <div class="mt-5 border-t border-slate-200 pt-4 space-y-2 text-sm">
-            <div class="flex justify-between text-slate-500">
-              <span>Subtotal</span>
-              <strong id="subtotal" class="font-semibold text-slate-700">—</strong>
+          <div class="flex justify-between items-baseline pt-3" style="border-top:1px solid var(--border)">
+            <div>
+              <span class="font-black text-lg" style="color:var(--text)">Total to Pay</span>
+              <span id="conversion-note" class="conversion-note hidden"></span>
             </div>
-            <div id="discount-row" class="hidden justify-between text-green-700">
-              <span class="font-semibold">Discount applied</span>
-              <strong id="discount" class="font-bold">—</strong>
-            </div>
-            <div class="flex justify-between items-baseline pt-3 border-t border-slate-100">
-              <div>
-                <span class="font-black text-[#142c55] text-lg">Total Due</span>
-                <span id="conversion-note" class="conversion-note hidden"></span>
-                <span class="block text-[11px] text-slate-400 font-medium">Includes all taxes</span>
-              </div>
-              <strong id="total" class="text-3xl font-black text-[#142c55]">—</strong>
-            </div>
-          </div>
-
-          <!-- PAYMENT METHOD CONTAINER -->
-          <div class="mt-6 border-t border-slate-200 pt-6">
-            <div class="flex items-center justify-between mb-3">
-              <span class="tag">Step 2: Payment method</span>
-              <span class="text-xs text-slate-400">Choose your preference</span>
-            </div>
-            
-            <form id="checkout-form" class="space-y-4">
-              <!-- Provider Selection Tabs -->
-              <div class="payment-selector-tabs">
-                <label id="provider-card-flutterwave" class="payment-tab-btn active">
-                  <input type="radio" name="payment_provider" value="flutterwave" checked>
-                  <div>
-                    <strong class="block text-xs text-[#142c55]">Cards & Bank / Mobile</strong>
-                    <span class="block text-[11px] text-slate-500">Flutterwave</span>
-                  </div>
-                </label>
-
-                <label id="provider-card-nowpayments" class="payment-tab-btn">
-                  <input type="radio" name="payment_provider" value="nowpayments">
-                  <div>
-                    <strong class="block text-xs text-[#142c55]">Cryptocurrency</strong>
-                    <span class="block text-[11px] text-slate-500">NOWPayments</span>
-                  </div>
-                </label>
-              </div>
-
-              <!-- FLUTTERWAVE CONFIG SUB-PANEL -->
-              <div id="flutterwave-options-panel" class="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3">
-                <div>
-                  <label class="label text-xs" for="flw-currency-select">
-                    Pay in your currency (Live converter)
-                  </label>
-                  <select id="flw-currency-select" class="field !mt-1 !py-2 text-xs w-full bg-white">
-                    <option value="USD">USD ($) — US Dollar (Base)</option>
-                    <option value="NGN">NGN (₦) — Nigerian Naira</option>
-                    <option value="GBP">GBP (£) — British Pound</option>
-                    <option value="EUR">EUR (€) — Euro</option>
-                    <option value="KES">KES (KSh) — Kenyan Shilling</option>
-                    <option value="GHS">GHS (GH₵) — Ghanaian Cedi</option>
-                    <option value="ZAR">ZAR (R) — South African Rand</option>
-                    <option value="CAD">CAD (CA$) — Canadian Dollar</option>
-                    <option value="UGX">UGX (USh) — Ugandan Shilling</option>
-                    <option value="AUD">AUD (A$) — Australian Dollar</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="label text-xs" for="flw-method-select">
-                    Payment channel
-                  </label>
-                  <select id="flw-method-select" class="field !mt-1 !py-2 text-xs w-full bg-white">
-                    <option value="all">All payment channels (Card, Bank, MoMo, USSD)</option>
-                    <option value="card">Debit / Credit Card (Visa, Mastercard, Verve)</option>
-                    <option value="mobilemoney">Mobile Money / M-Pesa</option>
-                    <option value="banktransfer">Direct Bank Transfer</option>
-                    <option value="ussd">USSD Bank Code</option>
-                  </select>
-                </div>
-              </div>
-
-              <!-- NOWPAYMENTS CRYPTO CONFIG SUB-PANEL -->
-              <div id="nowpayments-options-panel" class="hidden rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3">
-                <div>
-                  <label class="label text-xs" for="crypto-currency-select">
-                    Select cryptocurrency
-                  </label>
-                  <select id="crypto-currency-select" class="field !mt-1 !py-2 text-xs w-full bg-white">
-                    <option value="any">Choose on payment screen (300+ coins)</option>
-                    <optgroup label="Popular">
-                      <option value="usdttrc20">USDT — TRC20 (Low fees)</option>
-                      <option value="usdtbsc">USDT — BEP20 (BNB Chain)</option>
-                      <option value="usdterc20">USDT — ERC20 (Ethereum)</option>
-                      <option value="btc">Bitcoin (BTC)</option>
-                      <option value="eth">Ethereum (ETH)</option>
-                      <option value="sol">Solana (SOL)</option>
-                      <option value="ltc">Litecoin (LTC)</option>
-                    </optgroup>
-                    <optgroup label="Other Cryptocurrencies">
-                      <option value="trx">TRON (TRX)</option>
-                      <option value="bnbbsc">BNB (BEP20)</option>
-                      <option value="doge">Dogecoin (DOGE)</option>
-                      <option value="ton">Toncoin (TON)</option>
-                      <option value="xrp">Ripple (XRP)</option>
-                      <option value="ada">Cardano (ADA)</option>
-                      <option value="xmr">Monero (XMR)</option>
-                      <option value="usdc">USD Coin (USDC)</option>
-                    </optgroup>
-                  </select>
-                </div>
-              </div>
-
-              <!-- Main Submit Action Button -->
-              <button id="pay-submit-btn" type="submit" class="button button-primary w-full !py-3 !text-sm flex items-center justify-center gap-2">
-                <span id="pay-btn-label">Proceed to payment</span>
-              </button>
-
-              <p id="checkout-feedback" class="status-line mt-3 text-xs" aria-live="polite"></p>
-            </form>
-
-            <div class="mt-4 text-center">
-              <p class="text-[11px] text-slate-400 inline-flex items-center gap-1">
-                <i data-lucide="lock" width="12" height="12" class="text-slate-400"></i>
-                <span>256-bit encrypted checkout · Instant delivery upon completion</span>
-              </p>
-            </div>
+            <strong id="total" class="text-2xl font-black" style="color:var(--text)">—</strong>
           </div>
         </div>
 
-        <div class="text-center">
-          <a href="./store" class="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-orange-600 transition-colors">
-            <i data-lucide="arrow-left" width="13" height="13"></i>
-            <span>Continue browsing full catalog</span>
-          </a>
-        </div>
+        <form id="checkout-form"></form>
+        <button id="pay-submit-btn" type="submit" form="checkout-form" class="button button-primary w-full !py-3 !text-sm flex items-center justify-center gap-2">
+          <span id="pay-btn-label">Complete Secure Purchase</span>
+        </button>
+        <p id="checkout-feedback" class="status-line text-xs" aria-live="polite"></p>
+
+        <a href="./cart" class="text-center text-xs font-bold" style="color:var(--text-muted)">← Back to cart</a>
       </aside>
-
     </div>
   </main>
 
   <footer id="site-footer"></footer>
-
-  <!-- Full Description Modal -->
-  <dialog id="description-modal" class="description-modal">
-    <div class="p-6 sm:p-8">
-      <div class="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
-        <div>
-          <span class="tag">Full description</span>
-          <h2 id="modal-book-title" class="mt-2 text-xl font-black text-[#142c55]">Book Details</h2>
-        </div>
-        <button id="close-desc-modal" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer border-0 bg-transparent flex items-center justify-center" aria-label="Close">
-          <i data-lucide="x" width="20" height="20"></i>
-        </button>
-      </div>
-      <div id="modal-desc-content" class="mt-5 max-h-[60vh] overflow-y-auto pr-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line space-y-3"></div>
-      <div class="mt-6 pt-4 border-t border-slate-100 flex justify-end">
-        <button id="close-desc-modal-btn" type="button" class="button button-primary !px-6 text-sm">Close</button>
-      </div>
-    </div>
-  </dialog>
-
-  <!-- Fullscreen Image Lightbox Modal -->
-  <dialog id="image-lightbox-modal" class="rounded-2xl border-0 p-0 shadow-2xl bg-slate-950/90 backdrop:bg-slate-950/80 text-white max-w-4xl w-[min(96vw,840px)]">
-    <div class="p-4 sm:p-6">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-        <span id="lightbox-title" class="text-sm font-bold text-slate-300 truncate">Product Image Preview</span>
-        <button id="close-lightbox-btn" type="button" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer border-0 bg-transparent flex items-center justify-center" aria-label="Close">
-          <i data-lucide="x" width="20" height="20"></i>
-        </button>
-      </div>
-      <div class="py-4 flex items-center justify-center min-h-[250px] max-h-[72vh]">
-        <img id="lightbox-img" src="" alt="Full Product Image" class="max-h-[68vh] max-w-full rounded-xl object-contain shadow-2xl">
-      </div>
-    </div>
-  </dialog>
 
   <script type="module" src="./js/checkout.js"></script>
 </body>

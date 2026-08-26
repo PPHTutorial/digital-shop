@@ -1,17 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Learn about DigiStore, powered by Codeink Technologies.">
-  <title>About DigiStore | Codeink Technologies</title>
+  <meta name="description" content="Learn about DigiStore, the multi-vendor digital marketplace powered by Codeink Technologies.">
+  <title>About Us | DigiStore</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="./css/app.css">
 </head>
 
-<body class="bg-slate-50 text-slate-900 flex flex-col min-h-screen">
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
   <div id="page-loader" class="page-loader">
     <div class="loader-card">
       <div class="shimmer logo"></div>
@@ -20,46 +20,106 @@
     </div>
   </div>
 
-  <header id="site-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur shadow-sm"></header>
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
 
-  <main class="shell py-16 flex-1">
-    <span class="eyebrow">ABOUT DIGISTORE</span>
-    <h1 class="mt-3 max-w-3xl text-4xl sm:text-5xl font-black text-[#142c55] tracking-tight">
-      Digital products that earn their place in your workflow.
-    </h1>
-    <p class="mt-4 text-base text-slate-600 max-w-2xl leading-relaxed">
-      DigiStore is a verified digital marketplace platform by Codeink Technologies, delivering premium software templates, development kits, professional guides, and digital media to builders worldwide.
-    </p>
+  <main class="flex-1">
+    <section class="about-hero">
+      <span class="hero-badge">About Our Company</span>
+      <h1 class="about-hero__title">Empowering Creators Through Digital Commerce</h1>
+      <p class="about-hero__sub">
+        Quality products. Trusted creators. Smarter sourcing. We connect expert creators with
+        builders worldwide, verifying every listing along the way.
+      </p>
+    </section>
 
-    <div class="mt-12 grid gap-6 md:grid-cols-3">
-      <article class="soft-panel p-8 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
-        <span class="tag !bg-orange-100 !text-orange-800">Verified Quality</span>
-        <h2 class="font-black text-xl text-[#142c55]">Carefully Curated</h2>
-        <p class="text-sm leading-relaxed text-slate-600">Every product is tested, structured, and ready to implement directly in production or learning environments.</p>
-      </article>
+    <section class="about-split">
+      <div class="about-split__image">
+        <img src="./img/about/mission.jpg" alt="A DigiStore creator team collaborating in a workspace" style="height:420px" loading="lazy">
+      </div>
+      <div>
+        <h2>Quality products. Trusted creators. Smarter sourcing.</h2>
+        <p>
+          We believe that high-quality assets speed up creation, development, and growth. DigiStore
+          verifies every author and runs detailed checks on all listed assets. This ensures every
+          transaction is safe, clean, and immediately productive.
+        </p>
+        <a class="hero-cta-primary" href="./store">
+          <span>Explore All Products</span>
+          <i data-lucide="arrow-right" width="16" height="16"></i>
+        </a>
+      </div>
+    </section>
 
-      <article class="soft-panel p-8 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
-        <span class="tag !bg-green-100 !text-green-800">Encrypted Delivery</span>
-        <h2 class="font-black text-xl text-[#142c55]">Protected &amp; Instant</h2>
-        <p class="text-sm leading-relaxed text-slate-600">Immediate access upon verified checkout with lifetime re-download capability linked to your secure customer account.</p>
-      </article>
+    <section class="stats-band">
+      <div id="about-stats" class="stats-bar"></div>
+    </section>
 
-      <article class="soft-panel p-8 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
-        <span class="tag !bg-blue-100 !text-blue-800">Codeink Tech</span>
-        <h2 class="font-black text-xl text-[#142c55]">Global Payments</h2>
-        <p class="text-sm leading-relaxed text-slate-600">Seamlessly checkout with Cards, African Mobile Money (GHS, KES, UGX, NGN), and 300+ cryptocurrencies via NOWPayments.</p>
-      </article>
-    </div>
+    <section class="about-split">
+      <div>
+        <h2>Our Global Creator Network</h2>
+        <p>
+          DigiStore spans across borders, aggregating unique talent and robust tools built by
+          operators from Silicon Valley to Tokyo.
+        </p>
+        <div class="about-bullets">
+          <div class="about-bullet"><span class="about-bullet__dot"></span><span>Globally vetted software modules</span></div>
+          <div class="about-bullet"><span class="about-bullet__dot"></span><span>Multi-vendor tax compliance managed automatically</span></div>
+          <div class="about-bullet"><span class="about-bullet__dot"></span><span>Secure, reliable, instant access worldwide</span></div>
+        </div>
+      </div>
+      <div class="about-split__image">
+        <img src="./img/about/network-map.jpg" alt="World map illustrating DigiStore's global creator network" style="height:360px" loading="lazy">
+      </div>
+    </section>
+
+    <section class="about-faq">
+      <div class="about-faq__head">
+        <h2>Frequently Asked Questions</h2>
+        <p>Common questions regarding our curation and safety policies.</p>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>
+            <span>How are products verified on DigiStore?</span>
+            <span class="faq-icon"><i data-lucide="plus" width="16" height="16"></i></span>
+          </summary>
+          <p>Every item submitted goes through our internal validation process, checking for secure code practices, valid download components, and verified developer identities before it can be published.</p>
+        </details>
+        <details class="faq-item">
+          <summary>
+            <span>What is the lifetime DigiStore Vault storage?</span>
+            <span class="faq-icon"><i data-lucide="plus" width="16" height="16"></i></span>
+          </summary>
+          <p>Every purchased asset is saved instantly into your account's order history. If the creator updates the file, you can download the fresh version at no extra charge, any time.</p>
+        </details>
+        <details class="faq-item">
+          <summary>
+            <span>Can I apply to sell my own digital goods?</span>
+            <span class="faq-icon"><i data-lucide="plus" width="16" height="16"></i></span>
+          </summary>
+          <p>Yes — you can apply as a vendor from your account. We review every application, then handle checkout, payment verification, and secure delivery on your behalf.</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="newsletter-band">
+      <div class="newsletter-panel">
+        <div>
+          <h2>Subscribe to our Newsletter</h2>
+          <p>New releases, tools, and digital insights — occasionally, never spam.</p>
+        </div>
+        <form id="subscribe-form" class="newsletter-form">
+          <input name="email" required type="email" placeholder="Your email address…">
+          <button type="submit">Submit</button>
+        </form>
+      </div>
+      <p id="subscribe-status" class="status-line px-6 pb-4" aria-live="polite"></p>
+    </section>
   </main>
 
   <footer id="site-footer"></footer>
 
-  <script type="module">
-    import { mountHeader, mountFooter, initMotion } from './js/ui.js';
-    mountHeader();
-    mountFooter();
-    initMotion();
-  </script>
+  <script type="module" src="./js/about.js"></script>
 </body>
 
 </html>

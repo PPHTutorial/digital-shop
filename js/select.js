@@ -11,6 +11,12 @@
  * reach one-handed than a dropdown anchored to the top of the page.
  */
 
+// Keyed by the native <select> so callers that mutate `select.innerHTML`
+// directly (repopulating options after the element was already enhanced —
+// e.g. a country picker whose payment-method options depend on the chosen
+// country) can ask the wrapper to re-read them, via refreshSelect() below.
+const instancesByNative = new WeakMap();
+
 let openInstance = null;
 
 function closeOpen() {
@@ -149,7 +155,18 @@ export function enhanceSelect(select, { label = '' } = {}) {
   head.addEventListener('click', () => instance.close());
 
   renderOptions();
+  instancesByNative.set(select, instance);
   return instance;
+}
+
+/**
+ * Re-reads a native <select>'s current <option>s into its custom trigger and
+ * list — needed after code sets `select.innerHTML` directly (bypassing the
+ * option-click path above) on a select that was already enhanced. A no-op if
+ * the select was never enhanced.
+ */
+export function refreshSelect(select) {
+  instancesByNative.get(select)?.refresh();
 }
 
 /** Enhances every matching select and returns the instances, keyed by id. */

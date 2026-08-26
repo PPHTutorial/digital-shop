@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Product details, reviews, and secure instant download on DigiStore.">
+  <title>Product | DigiStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
+    </div>
+  </div>
+
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
+
+  <main class="shell py-8 lg:py-10 flex-1">
+    <!-- Not-found state -->
+    <div id="pd-not-found" class="hidden soft-panel p-10 text-center">
+      <p class="font-bold" style="color:var(--text)">That product could not be found.</p>
+      <p class="mt-1 text-sm" style="color:var(--text-muted)">It may have been unpublished or the link is out of date.</p>
+      <a class="button button-primary mt-4" href="./store">Browse all products</a>
+    </div>
+
+    <div id="pd-content" class="hidden">
+      <nav class="store-crumb mb-6" aria-label="Breadcrumb">
+        <a href="./index.html">Home</a>
+        <span class="store-crumb__sep">›</span>
+        <a id="pd-crumb-category" href="./store">Shop</a>
+        <span class="store-crumb__sep">›</span>
+        <span id="pd-crumb-title"></span>
+      </nav>
+
+      <div class="pd-layout">
+        <div class="pd-gallery">
+          <div id="pd-gallery-main" class="pd-gallery-main"></div>
+          <div id="pd-thumbs" class="pd-thumbs hidden"></div>
+        </div>
+
+        <div class="pd-info">
+          <span id="pd-category" class="pd-cat-badge"></span>
+          <h1 id="pd-title" class="pd-title"></h1>
+          <div class="pd-byline">
+            <span>By <a id="pd-vendor-link" href="#"></a></span>
+            <span id="pd-rating-sep" class="pd-byline__sep hidden"></span>
+            <span id="pd-rating" class="pd-rating hidden">
+              <span class="pd-stars"></span>
+              <span id="pd-rating-count"></span>
+            </span>
+          </div>
+
+          <div class="pd-price-block">
+            <div class="pd-price-row">
+              <span id="pd-price-current" class="pd-price-current"></span>
+              <span id="pd-price-original" class="pd-price-original hidden"></span>
+              <span id="pd-price-save" class="pd-price-save hidden"></span>
+            </div>
+            <p id="pd-price-note" class="pd-price-note"></p>
+          </div>
+
+          <div id="pd-specs" class="pd-specs"></div>
+
+          <div class="pd-cta">
+            <button type="button" id="pd-add-cart-btn" class="pd-buy-btn" style="background:var(--ink-950);color:#fff">
+              <i data-lucide="shopping-bag" width="18" height="18"></i>
+              <span>Add to Cart</span>
+            </button>
+            <a id="pd-buy-btn" class="pd-buy-btn" href="#">
+              <i data-lucide="zap" width="18" height="18"></i>
+              <span>Buy Now</span>
+            </a>
+            <div id="pd-wish-slot"></div>
+          </div>
+        </div>
+      </div>
+
+      <section class="pd-tabs-section uk-tabs" id="pd-tabs">
+        <div class="uk-tabs__list" role="tablist">
+          <button type="button" class="uk-tabs__btn is-active" data-uk-tab="description">Description</button>
+          <button type="button" class="uk-tabs__btn" data-uk-tab="included">What's Included</button>
+          <button type="button" class="uk-tabs__btn" data-uk-tab="reviews">Reviews (<span id="pd-tab-review-count">0</span>)</button>
+        </div>
+
+        <div class="uk-tabs__panel is-active" data-uk-tab-panel="description">
+          <p id="pd-description" class="pd-tab-body"></p>
+        </div>
+
+        <div class="uk-tabs__panel" data-uk-tab-panel="included">
+          <p id="pd-included" class="pd-tab-body"></p>
+        </div>
+
+        <div class="uk-tabs__panel" data-uk-tab-panel="reviews">
+          <div class="pd-reviews-layout">
+            <div class="pd-rating-panel">
+              <div>
+                <div id="pd-rating-big" class="pd-rating-big">—</div>
+                <span class="pd-stars" id="pd-rating-big-stars"></span>
+                <p id="pd-rating-panel-count" class="pd-rating-count"></p>
+              </div>
+              <div id="pd-rating-bars"></div>
+              <button type="button" id="pd-write-review-btn" class="button button-primary pd-write-review-btn">Write a review</button>
+            </div>
+
+            <div id="pd-reviews-list" class="pd-review-cards"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pd-related" class="pd-related hidden">
+        <h2>You Might Also Like</h2>
+        <div id="pd-related-grid" class="pd-related-grid"></div>
+      </section>
+    </div>
+
+    <!-- Loading skeleton -->
+    <div id="pd-loading" class="pd-layout">
+      <div class="pd-gallery-main uk-skel" style="aspect-ratio:4/3"></div>
+      <div class="space-y-4">
+        <div class="uk-skel" style="height:20px;width:120px;border-radius:999px"></div>
+        <div class="uk-skel" style="height:36px;width:80%"></div>
+        <div class="uk-skel" style="height:16px;width:50%"></div>
+        <div class="uk-skel" style="height:40px;width:40%"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module" src="./js/product.js"></script>
+</body>
+
+</html>

@@ -1,27 +1,40 @@
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, toast } from './ui.js';
+import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons } from './ui.js';
 import { loadServableCampaigns, attachAdTracking, promoteSponsored } from './ads.js';
 import { enhanceSelect } from './select.js';
+import { enhanceCheckboxes, enhanceRadios } from './form-controls.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
 
 let adCampaigns = new Map();
-let categorySelect = null;
 
 let allProducts = [];
 let managedCategories = [];
 const params = new URLSearchParams(window.location.search);
-let activeCategory = params.get('category') || 'all';
+
+// Filter state — every dimension the sidebar exposes.
+let activeCategories = new Set(params.get('category') ? [params.get('category')] : []);
+let activeFileTypes = new Set();
+let minRating = 0;
+let priceBounds = { min: 0, max: 500 };
+let priceMin = 0;
+let priceMax = 500;
+let priceUserTouched = false;
 let activeSearchQuery = params.get('search') || '';
-let activeSort = 'newest';
+let activeSort = 'bestselling';
 const PAGE_SIZE = 12;
-let visibleCount = PAGE_SIZE;
+let currentPage = 1;
 
 const grid = document.querySelector('#product-grid');
-const loadMoreContainer = document.querySelector('#load-more-container');
-const loadMoreBtn = document.querySelector('#load-more-btn');
+const pagination = document.querySelector('#store-pagination');
 const searchInput = document.querySelector('#store-search-input');
 const sortSelect = document.querySelector('#store-sort-select');
 if (sortSelect) enhanceSelect(sortSelect, { label: 'Sort products by' });
+
+const priceMinRange = document.querySelector('#price-min-range');
+const priceMaxRange = document.querySelector('#price-max-range');
+const priceMinLabel = document.querySelector('#price-min-label');
+const priceMaxLabel = document.querySelector('#price-max-label');
+const priceFill = document.querySelector('#price-slider-fill');
 
 /** Human-readable file size, e.g. "2.4 MB". */
 function formatFileSize(bytes) {
@@ -29,6 +42,18 @@ function formatFileSize(bytes) {
   if (!size || size <= 0) return '';
   if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
   return `${(size / (1024 * 1024)).toFixed(size < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+}
+
+function ratingAverage(p) {
+  return Number(p.rating_count) > 0 ? Number(p.rating_sum) / Number(p.rating_count) : 0;
+}
+
+function starsHtml(count, size = 12) {
+  let out = '';
+  for (let i = 1; i <= 5; i++) {
+    out += `<i data-lucide="star" width="${size}" height="${size}" class="${i <= count ? '' : 'is-empty'}"></i>`;
+  }
+  return out;
 }
 
 /**
@@ -39,7 +64,7 @@ function cardMetaHtml(p) {
   const bits = [];
 
   if (Number(p.rating_count) > 0) {
-    const average = (Number(p.rating_sum) / Number(p.rating_count)).toFixed(1);
+    const average = ratingAverage(p).toFixed(1);
     bits.push(
       `<span class="catalog-card__meta-item catalog-card__rating">
          <i data-lucide="star" width="12" height="12"></i>${average}
@@ -67,8 +92,9 @@ function cardMetaHtml(p) {
 function createCardHtml(p) {
   const hasDiscount = p.original_price && Number(p.original_price) > Number(p.price);
   const discountPct = hasDiscount ? Math.round((1 - Number(p.price) / Number(p.original_price)) * 100) : 0;
-  const href = `./checkout?product=${encodeURIComponent(p.slug || p.id)}`;
+  const href = `./product?product=${encodeURIComponent(p.slug || p.id)}`;
   const blurb = p.short_description || p.description || '';
+  const vendorLabel = p.vendor_id ? (p.vendor?.display_name || 'Marketplace Seller') : 'DigiStore Official';
 
   // The whole card is the link. A single stretched anchor covers it, so the
   // title, image, price and empty space all lead to checkout without nesting
@@ -90,6 +116,7 @@ function createCardHtml(p) {
       ${wishlistButton(p.id, p.title)}
 
       <span class="catalog-card__body">
+        <span class="store-card-vendor">${escapeHtml(vendorLabel)}</span>
         <span class="catalog-card__cat">${escapeHtml(p.category || 'General')}</span>
         <h3 class="catalog-card__title">${escapeHtml(p.title)}</h3>
         ${blurb ? `<span class="catalog-card__blurb">${escapeHtml(blurb)}</span>` : ''}
@@ -110,142 +137,330 @@ function createCardHtml(p) {
     </article>`;
 }
 
-function getFilteredList() {
-  let list = [...allProducts];
+/* ==========================================================================
+   Filter predicates — one function per sidebar dimension, so facet counts
+   can exclude their own dimension (standard faceted-search behaviour: a
+   filter option's count reflects every OTHER active filter, not itself).
+   ========================================================================== */
+const matchesCategory = (p) => activeCategories.size === 0 || activeCategories.has(p.category || 'General');
+const matchesFileType = (p) => activeFileTypes.size === 0 || activeFileTypes.has(String(p.file_type || '').toLowerCase());
+const matchesRating = (p) => minRating === 0 || ratingAverage(p) >= minRating;
+const matchesPrice = (p) => {
+  const price = Number(p.price || 0);
+  return price >= priceMin && price <= priceMax;
+};
+const matchesSearch = (p) => {
+  if (!activeSearchQuery.trim()) return true;
+  const q = activeSearchQuery.toLowerCase().trim();
+  return (p.title || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q);
+};
 
-  if (activeCategory !== 'all') {
-    list = list.filter((p) => (p.category || 'General').toLowerCase() === activeCategory.toLowerCase());
-  }
-
-  if (activeSearchQuery.trim()) {
-    const q = activeSearchQuery.toLowerCase().trim();
-    list = list.filter((p) => (p.title || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
-  }
-
-  if (activeSort === 'newest') {
-    list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-  } else if (activeSort === 'price-low') {
-    list.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
-  } else if (activeSort === 'price-high') {
-    list.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
-  } else if (activeSort === 'title') {
-    list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-  }
-
-  // Sponsored products lift to the front of the default view only. An explicit
-  // sort (price, title) is the shopper's instruction and paid placement must
-  // not override it.
-  if (activeSort === 'newest') {
-    list = promoteSponsored(list, adCampaigns);
-  }
-
-  return list;
+function passesExcept(p, exceptDim) {
+  if (exceptDim !== 'category' && !matchesCategory(p)) return false;
+  if (exceptDim !== 'filetype' && !matchesFileType(p)) return false;
+  if (exceptDim !== 'rating' && !matchesRating(p)) return false;
+  if (exceptDim !== 'price' && !matchesPrice(p)) return false;
+  if (!matchesSearch(p)) return false;
+  return true;
 }
 
+function sortList(list) {
+  const sorted = [...list];
+  if (activeSort === 'newest') {
+    sorted.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  } else if (activeSort === 'price-low') {
+    sorted.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+  } else if (activeSort === 'price-high') {
+    sorted.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
+  } else if (activeSort === 'title') {
+    sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  } else {
+    sorted.sort((a, b) => Number(b.purchase_count || 0) - Number(a.purchase_count || 0));
+  }
+
+  // Sponsored products lift to the front of the default (bestselling) view
+  // only. An explicit sort (price, title, newest) is the shopper's
+  // instruction and paid placement must not override it.
+  return activeSort === 'bestselling' ? promoteSponsored(sorted, adCampaigns) : sorted;
+}
+
+function getFilteredList() {
+  const list = allProducts.filter((p) => passesExcept(p, null));
+  return sortList(list);
+}
+
+/* ==========================================================================
+   Sidebar rendering
+   ========================================================================== */
+function renderCategoryFilter() {
+  const host = document.querySelector('#filter-category-list');
+  const clearBtn = document.querySelector('#filter-category-clear');
+  if (!host) return;
+
+  const named = managedCategories.map((c) => c.name);
+  const present = new Set(allProducts.map((p) => p.category || 'General'));
+  const names = [...new Set([...named, ...present])].filter((n) => present.has(n) || activeCategories.has(n));
+
+  host.innerHTML = names.map((name) => {
+    const count = allProducts.filter((p) => passesExcept(p, 'category') && (p.category || 'General') === name).length;
+    const checked = activeCategories.has(name);
+    return `
+      <label class="store-check">
+        <input type="checkbox" data-filter="category" value="${escapeHtml(name)}" ${checked ? 'checked' : ''}>
+        <span>${escapeHtml(name)}</span>
+        <span class="store-check__count">${count}</span>
+      </label>`;
+  }).join('') || '<p class="text-xs" style="color:var(--text-soft)">No categories yet.</p>';
+  enhanceCheckboxes('#filter-category-list input[type="checkbox"]');
+
+  clearBtn?.classList.toggle('hidden', activeCategories.size === 0);
+}
+
+function renderFileTypeFilter() {
+  const host = document.querySelector('#filter-filetype-list');
+  const clearBtn = document.querySelector('#filter-filetype-clear');
+  if (!host) return;
+
+  const types = [...new Set(allProducts.map((p) => String(p.file_type || '').toLowerCase()).filter(Boolean))].sort();
+
+  host.innerHTML = types.map((type) => {
+    const count = allProducts.filter((p) => passesExcept(p, 'filetype') && String(p.file_type || '').toLowerCase() === type).length;
+    const checked = activeFileTypes.has(type);
+    return `
+      <label class="store-check">
+        <input type="checkbox" data-filter="filetype" value="${escapeHtml(type)}" ${checked ? 'checked' : ''}>
+        <span>${escapeHtml(type.toUpperCase())}</span>
+        <span class="store-check__count">${count}</span>
+      </label>`;
+  }).join('') || '<p class="text-xs" style="color:var(--text-soft)">No file types yet.</p>';
+  enhanceCheckboxes('#filter-filetype-list input[type="checkbox"]');
+
+  clearBtn?.classList.toggle('hidden', activeFileTypes.size === 0);
+}
+
+function renderRatingFilter() {
+  const host = document.querySelector('#filter-rating-list');
+  const clearBtn = document.querySelector('#filter-rating-clear');
+  if (!host) return;
+
+  host.innerHTML = [4, 3, 2, 1].map((threshold) => {
+    const count = allProducts.filter((p) => passesExcept(p, 'rating') && ratingAverage(p) >= threshold).length;
+    const checked = minRating === threshold;
+    return `
+      <label class="store-check">
+        <input type="radio" name="rating-filter" data-filter="rating" value="${threshold}" ${checked ? 'checked' : ''}>
+        <span class="store-check__stars">${starsHtml(threshold)}</span>
+        <span>&amp; up</span>
+        <span class="store-check__count">${count}</span>
+      </label>`;
+  }).join('');
+  enhanceRadios('#filter-rating-list input[type="radio"]');
+
+  clearBtn?.classList.toggle('hidden', minRating === 0);
+}
+
+function renderPriceSlider() {
+  if (!priceMinRange || !priceMaxRange) return;
+  const pct = (value) => priceBounds.max > priceBounds.min ? ((value - priceBounds.min) / (priceBounds.max - priceBounds.min)) * 100 : 0;
+  const left = pct(priceMin);
+  const right = pct(priceMax);
+  if (priceFill) {
+    priceFill.style.left = `${left}%`;
+    priceFill.style.width = `${Math.max(0, right - left)}%`;
+  }
+  if (priceMinLabel) priceMinLabel.textContent = `$${Math.round(priceMin)}`;
+  if (priceMaxLabel) priceMaxLabel.textContent = `$${Math.round(priceMax)}`;
+}
+
+function renderFilterChips() {
+  const host = document.querySelector('#store-filter-chips');
+  if (!host) return;
+  const chips = [];
+
+  for (const name of activeCategories) {
+    chips.push({ label: name, clear: () => activeCategories.delete(name) });
+  }
+  for (const type of activeFileTypes) {
+    chips.push({ label: type.toUpperCase(), clear: () => activeFileTypes.delete(type) });
+  }
+  if (minRating > 0) {
+    chips.push({ label: `${minRating}★ & up`, clear: () => { minRating = 0; } });
+  }
+  if (priceUserTouched && (priceMin > priceBounds.min || priceMax < priceBounds.max)) {
+    chips.push({ label: `$${Math.round(priceMin)}–$${Math.round(priceMax)}`, clear: () => { priceMin = priceBounds.min; priceMax = priceBounds.max; priceUserTouched = false; } });
+  }
+
+  host.innerHTML = chips.map((c, i) => `
+    <span class="store-chip">${escapeHtml(c.label)}<button type="button" data-chip="${i}" aria-label="Remove filter">${icon('x', 12)}</button></span>`).join('');
+
+  host.querySelectorAll('[data-chip]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      chips[Number(btn.dataset.chip)]?.clear();
+      currentPage = 1;
+      renderAll();
+    });
+  });
+  renderIcons();
+}
+
+/* ==========================================================================
+   Pagination
+   ========================================================================== */
+function renderPagination(totalItems) {
+  if (!pagination) return;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  currentPage = Math.min(currentPage, totalPages);
+
+  if (totalPages <= 1) {
+    pagination.innerHTML = '';
+    return;
+  }
+
+  const pages = new Set([1, totalPages, currentPage, currentPage - 1, currentPage + 1]);
+  const sortedPages = [...pages].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+
+  let html = `<button type="button" class="store-page-btn" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''} aria-label="Previous page">${icon('chevron-left', 16)}</button>`;
+
+  let prev = 0;
+  for (const p of sortedPages) {
+    if (prev && p - prev > 1) html += `<span class="store-page-ellipsis">…</span>`;
+    html += `<button type="button" class="store-page-btn ${p === currentPage ? 'is-active' : ''}" data-page="${p}">${p}</button>`;
+    prev = p;
+  }
+
+  html += `<button type="button" class="store-page-btn" data-page="${currentPage + 1}" ${currentPage === totalPages ? 'disabled' : ''} aria-label="Next page">${icon('chevron-right', 16)}</button>`;
+
+  pagination.innerHTML = html;
+  pagination.querySelectorAll('[data-page]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      currentPage = Number(btn.dataset.page);
+      renderCatalog();
+      grid?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+  renderIcons();
+}
+
+/* ==========================================================================
+   Main render
+   ========================================================================== */
 function renderCatalog() {
   if (!grid) return;
   const filtered = getFilteredList();
 
-  document.querySelector('#product-count').textContent = `${filtered.length} product${filtered.length === 1 ? '' : 's'} available`;
+  const countEl = document.querySelector('#product-count');
+  if (countEl) {
+    if (!filtered.length) {
+      countEl.textContent = '0 products found';
+    } else {
+      const start = (currentPage - 1) * PAGE_SIZE + 1;
+      const end = Math.min(currentPage * PAGE_SIZE, filtered.length);
+      countEl.textContent = `Showing ${start}–${end} of ${filtered.length} result${filtered.length === 1 ? '' : 's'}`;
+    }
+  }
 
+  const crumbCurrent = document.querySelector('#store-crumb-current');
+  const crumbLabel = document.querySelector('#store-crumb-current-label');
   const headingEl = document.querySelector('#store-heading');
-  if (headingEl) {
-    headingEl.textContent = activeCategory === 'all' ? 'All Products' : activeCategory;
+  if (activeCategories.size === 1) {
+    const [only] = activeCategories;
+    if (headingEl) headingEl.textContent = only;
+    if (crumbLabel) crumbLabel.textContent = only;
+    crumbCurrent?.classList.remove('hidden');
+  } else {
+    if (headingEl) headingEl.textContent = 'All Products & Assets';
+    crumbCurrent?.classList.add('hidden');
   }
 
   if (!filtered.length) {
     grid.innerHTML = `
-      <div class="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200 p-8 space-y-3">
+      <div class="w-full col-span-full py-16 text-center rounded-2xl border p-8 space-y-3" style="background:var(--surface);border-color:var(--border)">
         <div class="text-4xl">🔍</div>
-        <h3 class="font-black text-xl text-[#142c55]">No products found</h3>
-        <p class="text-xs text-slate-500 max-w-sm mx-auto">No products matched your selected criteria. Try adjusting your filters or search keywords.</p>
+        <h3 class="font-black text-xl" style="color:var(--text)">No products found</h3>
+        <p class="text-xs max-w-sm mx-auto" style="color:var(--text-muted)">No products matched your selected criteria. Try adjusting your filters or search keywords.</p>
         <button type="button" id="reset-filters-btn" class="button button-primary !min-h-9 !px-4 text-xs font-bold">Clear All Filters</button>
       </div>`;
-    document.querySelector('#reset-filters-btn')?.addEventListener('click', () => {
-      activeCategory = 'all';
-      activeSearchQuery = '';
-      if (searchInput) searchInput.value = '';
-      renderPills();
-      renderCatalog();
-    });
-    loadMoreContainer?.classList.add('hidden');
+    document.querySelector('#reset-filters-btn')?.addEventListener('click', resetAllFilters);
+    pagination.innerHTML = '';
     return;
   }
 
-  const subset = filtered.slice(0, visibleCount);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const subset = filtered.slice(start, start + PAGE_SIZE);
   grid.innerHTML = subset.map(createCardHtml).join('');
-
-  if (loadMoreContainer && loadMoreBtn) {
-    if (visibleCount < filtered.length) {
-      loadMoreContainer.classList.remove('hidden');
-      loadMoreBtn.textContent = `Load more products (${filtered.length - visibleCount} remaining)`;
-    } else {
-      loadMoreContainer.classList.add('hidden');
-    }
-  }
 
   renderIcons();
   paintWishlist(grid);
   attachAdTracking(grid, adCampaigns);
+  renderPagination(filtered.length);
 }
 
-function renderPills() {
-  const container = document.querySelector('#catalog-category-pills');
-  const select = document.querySelector('#catalog-category-select');
-  if (!container) return;
-
-  // Only offer categories that actually have something in them, plus whatever
-  // is currently selected — a list of empty categories is noise, and with a
-  // full taxonomy seeded most of them will be empty early on.
-  const counts = new Map();
-  for (const product of allProducts) {
-    const key = product.category || 'General';
-    counts.set(key, (counts.get(key) || 0) + 1);
-  }
-
-  const named = managedCategories.map((category) => category.name);
-  const categories = ['all', ...new Set([...named, ...counts.keys()])]
-    .filter((cat) => cat === 'all' || counts.get(cat) > 0 || cat.toLowerCase() === activeCategory.toLowerCase());
-
-  const labelFor = (cat) => (cat === 'all' ? 'All products' : cat);
-  const countFor = (cat) => (cat === 'all' ? allProducts.length : counts.get(cat) || 0);
-  const isActive = (cat) => cat.toLowerCase() === activeCategory.toLowerCase();
-
-  container.innerHTML = categories
-    .map((cat) => `
-      <button type="button" class="catpill ${isActive(cat) ? 'is-active' : ''}" data-cat="${escapeHtml(cat)}">
-        <span>${escapeHtml(labelFor(cat))}</span>
-        <span class="catpill__count">${countFor(cat)}</span>
-      </button>`)
-    .join('');
-
-  if (select) {
-    select.innerHTML = categories
-      .map((cat) => `
-        <option value="${escapeHtml(cat)}" ${isActive(cat) ? 'selected' : ''}>
-          ${escapeHtml(labelFor(cat))} (${countFor(cat)})
-        </option>`)
-      .join('');
-    // Rebuild the custom list whenever the options change.
-    categorySelect = categorySelect || enhanceSelect(select, { label: 'Browse category' });
-    categorySelect?.refresh();
-  }
-
-  container.querySelectorAll('[data-cat]').forEach((btn) => {
-    btn.addEventListener('click', () => selectCategory(btn.dataset.cat));
-  });
-}
-
-/** Single entry point so the pills and the dropdown can never disagree. */
-function selectCategory(category) {
-  activeCategory = category;
-  visibleCount = PAGE_SIZE;
-  renderPills();
+function renderAll() {
+  renderCategoryFilter();
+  renderFileTypeFilter();
+  renderRatingFilter();
+  renderPriceSlider();
+  renderFilterChips();
   renderCatalog();
 }
 
-document.querySelector('#catalog-category-select')
-  ?.addEventListener('change', (event) => selectCategory(event.target.value));
+function resetAllFilters() {
+  activeCategories = new Set();
+  activeFileTypes = new Set();
+  minRating = 0;
+  priceMin = priceBounds.min;
+  priceMax = priceBounds.max;
+  priceUserTouched = false;
+  activeSearchQuery = '';
+  if (searchInput) searchInput.value = '';
+  currentPage = 1;
+  renderAll();
+}
+
+/* ==========================================================================
+   Wiring
+   ========================================================================== */
+document.body.addEventListener('change', (e) => {
+  const target = e.target;
+  if (!(target instanceof HTMLInputElement) || !target.dataset.filter) return;
+
+  currentPage = 1;
+  if (target.dataset.filter === 'category') {
+    target.checked ? activeCategories.add(target.value) : activeCategories.delete(target.value);
+  } else if (target.dataset.filter === 'filetype') {
+    target.checked ? activeFileTypes.add(target.value) : activeFileTypes.delete(target.value);
+  } else if (target.dataset.filter === 'rating') {
+    minRating = Number(target.value);
+  }
+  renderAll();
+});
+
+document.querySelector('#filter-category-clear')?.addEventListener('click', () => { activeCategories = new Set(); currentPage = 1; renderAll(); });
+document.querySelector('#filter-filetype-clear')?.addEventListener('click', () => { activeFileTypes = new Set(); currentPage = 1; renderAll(); });
+document.querySelector('#filter-rating-clear')?.addEventListener('click', () => { minRating = 0; currentPage = 1; renderAll(); });
+document.querySelector('#filter-price-clear')?.addEventListener('click', () => {
+  priceMin = priceBounds.min; priceMax = priceBounds.max; priceUserTouched = false; currentPage = 1; renderAll();
+});
+
+function wirePriceSlider() {
+  if (!priceMinRange || !priceMaxRange) return;
+  priceMinRange.addEventListener('input', () => {
+    priceMin = Math.min(Number(priceMinRange.value), priceMax);
+    priceMinRange.value = priceMin;
+    priceUserTouched = true;
+    renderPriceSlider();
+  });
+  priceMaxRange.addEventListener('input', () => {
+    priceMax = Math.max(Number(priceMaxRange.value), priceMin);
+    priceMaxRange.value = priceMax;
+    priceUserTouched = true;
+    renderPriceSlider();
+  });
+  ['change'].forEach((evt) => {
+    priceMinRange.addEventListener(evt, () => { currentPage = 1; renderAll(); });
+    priceMaxRange.addEventListener(evt, () => { currentPage = 1; renderAll(); });
+  });
+}
 
 /**
  * Renders one seller's public store. Returns false when the slug does not
@@ -261,8 +476,8 @@ async function renderVendorStore(slug) {
     document.querySelector('#product-loading')?.classList.add('hidden');
     grid.innerHTML = `
       <div class="soft-panel col-span-full p-10 text-center">
-        <p class="font-bold text-[#142c55]">That store could not be found.</p>
-        <p class="mt-1 text-sm text-slate-500">It may have been closed or renamed.</p>
+        <p class="font-bold" style="color:var(--text)">That store could not be found.</p>
+        <p class="mt-1 text-sm" style="color:var(--text-muted)">It may have been closed or renamed.</p>
         <a class="button button-primary mt-4" href="./store">Browse all products</a>
       </div>`;
     finishPageLoader();
@@ -273,6 +488,10 @@ async function renderVendorStore(slug) {
 
   document.querySelector('#vendor-header').classList.remove('hidden');
   document.querySelector('#store-header').classList.add('hidden');
+  document.querySelector('.store-sidebar')?.classList.add('hidden');
+  document.querySelector('#store-layout')?.classList.add('is-single-col');
+  document.querySelector('#store-search-row')?.classList.add('hidden');
+  document.querySelector('#store-sort-row')?.classList.add('hidden');
   document.querySelector('#vendor-title').textContent = vendor.display_name;
   document.querySelector('#vendor-logo').innerHTML = vendor.logo_url
     ? `<img src="${escapeHtml(vendor.logo_url)}" alt="" class="h-full w-full object-cover">`
@@ -297,11 +516,10 @@ async function renderVendorStore(slug) {
 
   document.title = `${vendor.display_name} | DigiStore`;
   document.querySelector('#product-loading')?.classList.add('hidden');
-  document.querySelector('#catalog-category-pills')?.closest('.bg-white')?.classList.add('hidden');
 
   grid.innerHTML = products.length
     ? products.map(createCardHtml).join('')
-    : '<div class="soft-panel col-span-full p-10 text-center text-slate-500">This store has not published anything yet.</div>';
+    : '<div class="soft-panel col-span-full p-10 text-center" style="color:var(--text-muted)">This store has not published anything yet.</div>';
 
   const count = document.querySelector('#product-count');
   if (count) count.textContent = `${products.length} product${products.length === 1 ? '' : 's'}`;
@@ -312,26 +530,22 @@ async function renderVendorStore(slug) {
   return true;
 }
 
-
 async function init() {
   mountHeader();
   mountFooter();
+  wirePriceSlider();
 
   if (searchInput && activeSearchQuery) searchInput.value = activeSearchQuery;
 
   searchInput?.addEventListener('input', (e) => {
     activeSearchQuery = e.target.value;
-    visibleCount = PAGE_SIZE;
-    renderCatalog();
+    currentPage = 1;
+    renderAll();
   });
 
   sortSelect?.addEventListener('change', (e) => {
     activeSort = e.target.value;
-    renderCatalog();
-  });
-
-  loadMoreBtn?.addEventListener('click', () => {
-    visibleCount += PAGE_SIZE;
+    currentPage = 1;
     renderCatalog();
   });
 
@@ -345,7 +559,9 @@ async function init() {
   }
 
   const [productsResult, categoriesResult] = await Promise.all([
-    supabase.from('products').select('id,title,slug,category,description,short_description,price,original_price,currency,cover_url,file_type,file_size_bytes,purchase_count,rating_sum,rating_count,is_featured,is_published,created_at').eq('is_published', true).order('created_at', { ascending: false }),
+    supabase.from('products')
+      .select('id,title,slug,category,description,short_description,price,original_price,currency,cover_url,file_type,file_size_bytes,purchase_count,rating_sum,rating_count,is_featured,is_published,created_at,vendor_id,vendor:vendors(display_name,slug)')
+      .eq('is_published', true).order('created_at', { ascending: false }),
     supabase.from('categories').select('name,slug,description,sort_order').eq('is_active', true).order('sort_order').order('name'),
   ]);
   const { data, error } = productsResult;
@@ -354,17 +570,24 @@ async function init() {
   document.querySelector('#product-loading')?.classList.add('hidden');
 
   if (error) {
-    grid.innerHTML = '<div class="soft-panel p-8 text-slate-600 col-span-full">The catalog is temporarily unavailable.</div>';
+    grid.innerHTML = '<div class="soft-panel p-8 col-span-full" style="color:var(--text-muted)">The catalog is temporarily unavailable.</div>';
     finishPageLoader();
     return;
   }
 
   allProducts = data || [];
+
+  const prices = allProducts.map((p) => Number(p.price || 0)).filter((n) => Number.isFinite(n));
+  priceBounds = { min: 0, max: prices.length ? Math.max(...prices, 1) : 500 };
+  priceMin = priceBounds.min;
+  priceMax = priceBounds.max;
+  if (priceMinRange) { priceMinRange.min = priceBounds.min; priceMinRange.max = priceBounds.max; priceMinRange.value = priceMin; }
+  if (priceMaxRange) { priceMaxRange.min = priceBounds.min; priceMaxRange.max = priceBounds.max; priceMaxRange.value = priceMax; }
+
   adCampaigns = await loadServableCampaigns();
   await loadWishlist();
   wireWishlist(grid);
-  renderPills();
-  renderCatalog();
+  renderAll();
   finishPageLoader();
 }
 

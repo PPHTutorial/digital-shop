@@ -1,25 +1,55 @@
 import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
-import { renderCategoryJumbotron, categoryLook } from './categories.js';
+import { categoryLook } from './category-look.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
+import { paintSkeletonGrid, emptyState } from './uikit.js';
 
-let allProducts = [];
+let allProducts = []; // full published catalogue — powers the category-specific rails + jumbotron counts
 let managedCategories = [];
+const RAIL_LIMIT = 10;
+
+// ============================================================
+// Rating stars (real data only — hidden entirely when a product has no
+// reviews yet, rather than rendering a fabricated 0-star row).
+// ============================================================
+function ratingStarsHtml(ratingAverage, ratingCount) {
+  if (!ratingCount) return '';
+  const rounded = Math.round(Number(ratingAverage) || 0);
+  const stars = Array.from({ length: 5 }, (_, i) =>
+    `<i data-lucide="star" width="12" height="12" class="${i < rounded ? '' : 'is-empty'}"></i>`).join('');
+  return `
+    <span class="catalog-card__rating-row">
+      <span class="catalog-card__stars">${stars}</span>
+      <span class="catalog-card__rating-count">(${ratingCount})</span>
+    </span>`;
+}
+
+// ============================================================
+// Badge — one clear label per card, derived from real product fields.
+// `context` lets a rail assert its own reason ("New", "Bestseller"...)
+// when the card is already known to belong to that rail; otherwise the
+// badge is inferred from the product's own fields.
+// ============================================================
+function badgeHtml(p, context) {
+  const hasDiscount = p.original_price && Number(p.original_price) > Number(p.price);
+  if (hasDiscount) {
+    const pct = Math.round((1 - Number(p.price) / Number(p.original_price)) * 100);
+    return `<span class="catalog-card__badge catalog-card__badge--deal">−${pct}%</span>`;
+  }
+  if (p.is_featured) return `<span class="catalog-card__badge catalog-card__badge--featured">Featured</span>`;
+  if (context === 'bestseller' && p.purchase_count > 0) return `<span class="catalog-card__badge catalog-card__badge--bestseller">Bestseller</span>`;
+  const ageDays = (Date.now() - new Date(p.created_at || p.published_at || 0).getTime()) / 86400000;
+  if (context === 'new' || ageDays <= 21) return `<span class="catalog-card__badge catalog-card__badge--new">New</span>`;
+  return '';
+}
 
 // ============================================================
 // Single Product Card HTML Generator
 // ============================================================
-function createProductCardHtml(p) {
+function createProductCardHtml(p, context) {
   const hasDiscount = p.original_price && Number(p.original_price) > Number(p.price);
-  const discountPct = hasDiscount ? Math.round((1 - Number(p.price) / Number(p.original_price)) * 100) : 0;
-  const priceHtml = hasDiscount
-    ? `<div class="flex items-baseline gap-1.5">
-         <span class="price-original text-xs">${p.currency || 'USD'} ${Number(p.original_price).toFixed(2)}</span>
-         <strong class="text-base sm:text-lg text-[#142c55] font-black">${p.currency || 'USD'} ${Number(p.price).toFixed(2)}</strong>
-       </div>`
-    : `<strong class="text-base sm:text-lg text-[#142c55] font-black">${p.currency || 'USD'} ${Number(p.price).toFixed(2)}</strong>`;
-
   const canonicalSlug = p.slug || p.id;
+  const ratingAverage = p.rating_average ?? (p.rating_count ? Number(p.rating_sum) / Number(p.rating_count) : null);
 
   return `
     <article class="scroll-card-item catalog-card is-clickable" data-product-id="${p.id}">
@@ -29,9 +59,7 @@ function createProductCardHtml(p) {
             ? `<img src="${escapeHtml(p.cover_url)}" alt="${escapeHtml(p.title)}" loading="lazy">`
             : `<span class="catalog-card__placeholder"><i data-lucide="file-text" width="26" height="26"></i></span>`
         }
-        <span class="catalog-card__badges">
-          ${hasDiscount ? `<span class="catalog-card__badge catalog-card__badge--sale">−${discountPct}%</span>` : ''}
-        </span>
+        <span class="catalog-card__badges">${badgeHtml(p, context)}</span>
       </span>
 
       ${wishlistButton(p.id, p.title)}
@@ -39,7 +67,7 @@ function createProductCardHtml(p) {
       <span class="catalog-card__body">
         <span class="catalog-card__cat">${escapeHtml(p.category || 'General')}</span>
         <h3 class="catalog-card__title">${escapeHtml(p.title)}</h3>
-        ${p.description ? `<span class="catalog-card__blurb">${escapeHtml(p.description)}</span>` : ''}
+        ${ratingStarsHtml(ratingAverage, p.rating_count)}
       </span>
 
       <span class="catalog-card__foot">
@@ -47,85 +75,79 @@ function createProductCardHtml(p) {
           ${hasDiscount ? `<span class="price-original">${p.currency || 'USD'} ${Number(p.original_price).toFixed(2)}</span>` : ''}
           <strong>${p.currency || 'USD'} ${Number(p.price).toFixed(2)}</strong>
         </span>
-        <span class="catalog-card__go">${icon('arrow-right', 15)}</span>
+        <span class="catalog-card__go" aria-hidden="true">${icon('arrow-right', 15)}</span>
       </span>
 
-      <a class="catalog-card__link" href="./checkout?product=${encodeURIComponent(canonicalSlug)}">
+      <a class="catalog-card__link" href="./product?product=${encodeURIComponent(canonicalSlug)}">
         <span class="sr-only">${escapeHtml(p.title)}</span>
       </a>
     </article>`;
 }
 
-// ============================================================
-// Render All 10 Horizontal Scrolling Sections
-// ============================================================
-function renderShowcaseSections() {
-  const sections = [
-    {
-      id: 'scroll-featured',
-      countClass: '.count-featured',
-      items: allProducts.slice(0, 10),
-    },
-    {
-      id: 'scroll-new',
-      countClass: '.count-new',
-      items: [...allProducts].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)).slice(0, 10),
-    },
-    {
-      id: 'scroll-bestsellers',
-      countClass: '.count-bestsellers',
-      items: allProducts.filter((p) => p.is_published).slice(0, 10),
-    },
-    {
-      id: 'scroll-trending',
-      countClass: '.count-trending',
-      items: [...allProducts].reverse().slice(0, 10),
-    },
-    {
-      id: 'scroll-deals',
-      countClass: '.count-deals',
-      items: allProducts.filter((p) => p.original_price && Number(p.original_price) > Number(p.price)),
-    },
-    {
-      id: 'scroll-ebooks',
-      countClass: '.count-ebooks',
-      items: allProducts.filter((p) => (p.category || '').toLowerCase().includes('ebook')),
-    },
-    {
-      id: 'scroll-software',
-      countClass: '.count-software',
-      items: allProducts.filter((p) => (p.category || '').toLowerCase().includes('software') || (p.category || '').toLowerCase().includes('tool')),
-    },
-    {
-      id: 'scroll-templates',
-      countClass: '.count-templates',
-      items: allProducts.filter((p) => (p.category || '').toLowerCase().includes('template') || (p.category || '').toLowerCase().includes('theme')),
-    },
-    {
-      id: 'scroll-courses',
-      countClass: '.count-courses',
-      items: allProducts.filter((p) => (p.category || '').toLowerCase().includes('course') || (p.category || '').toLowerCase().includes('masterclass')),
-    },
-    {
-      id: 'scroll-audio',
-      countClass: '.count-audio',
-      items: allProducts.filter((p) => (p.category || '').toLowerCase().includes('audio') || (p.category || '').toLowerCase().includes('media')),
-    },
-  ];
+function paintSection(id, countClass, items, context, emptyLabel) {
+  const container = document.querySelector(`#${id}`);
+  const countEl = document.querySelector(countClass);
+  if (countEl) countEl.textContent = items.length;
+  if (!container) return;
 
-  sections.forEach((sec) => {
-    const container = document.querySelector(`#${sec.id}`);
-    const countEl = document.querySelector(sec.countClass);
-    if (countEl) countEl.textContent = sec.items.length;
+  container.innerHTML = items.length
+    ? items.map((p) => createProductCardHtml(p, context)).join('')
+    : `<div class="w-full">${emptyState({ icon: 'package-search', title: 'Nothing here yet', body: emptyLabel || 'New releases in this collection are arriving soon.' })}</div>`;
+}
 
-    if (container) {
-      if (sec.items.length > 0) {
-        container.innerHTML = sec.items.map((p) => createProductCardHtml(p)).join('');
-      } else {
-        container.innerHTML = `<div class="p-6 text-xs text-slate-400 bg-white border border-slate-200 rounded-2xl w-full">New releases in this collection are arriving soon.</div>`;
-      }
-    }
-  });
+// ============================================================
+// Category-specific rails, sliced from the full published catalogue
+// (storefront_rails covers the algorithmic ones — featured/new/bestseller/
+// trending/deals — but has no notion of category, so those five stay
+// client-side over `allProducts`).
+// ============================================================
+function renderCategoryRails() {
+  const byCategory = (needle) => allProducts.filter((p) => (p.category || '').toLowerCase().includes(needle)).slice(0, RAIL_LIMIT);
+
+  paintSection('scroll-ebooks', '.count-ebooks', byCategory('ebook'));
+  paintSection('scroll-software', '.count-software', [
+    ...allProducts.filter((p) => (p.category || '').toLowerCase().includes('software') || (p.category || '').toLowerCase().includes('tool')),
+  ].slice(0, RAIL_LIMIT));
+  paintSection('scroll-templates', '.count-templates', [
+    ...allProducts.filter((p) => (p.category || '').toLowerCase().includes('template') || (p.category || '').toLowerCase().includes('theme')),
+  ].slice(0, RAIL_LIMIT));
+  paintSection('scroll-courses', '.count-courses', [
+    ...allProducts.filter((p) => (p.category || '').toLowerCase().includes('course') || (p.category || '').toLowerCase().includes('masterclass')),
+  ].slice(0, RAIL_LIMIT));
+  paintSection('scroll-audio', '.count-audio', [
+    ...allProducts.filter((p) => (p.category || '').toLowerCase().includes('audio') || (p.category || '').toLowerCase().includes('media')),
+  ].slice(0, RAIL_LIMIT));
+
+  wireHorizontalScrollButtons();
+  paintWishlist(document);
+  renderIcons();
+}
+
+// ============================================================
+// Algorithmic rails — one call to storefront_rails(), server-computed
+// (featured/new/best_selling/trending/deals), so ordering and rating
+// averages match exactly what every other screen in the app will show.
+// ============================================================
+async function renderRailSections() {
+  ['scroll-featured', 'scroll-new', 'scroll-bestsellers', 'scroll-trending', 'scroll-deals']
+    .forEach((id) => paintSkeletonGrid(document.querySelector(`#${id}`), 4));
+
+  const { data, error } = await supabase.rpc('storefront_rails', { p_limit: RAIL_LIMIT });
+  if (error || !data) {
+    console.error('storefront_rails failed:', error);
+    // Fall back to what we already have client-side, so the page never sits empty.
+    paintSection('scroll-featured', '.count-featured', allProducts.filter((p) => p.is_featured).slice(0, RAIL_LIMIT), 'featured');
+    paintSection('scroll-new', '.count-new', [...allProducts].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)).slice(0, RAIL_LIMIT), 'new');
+    paintSection('scroll-bestsellers', '.count-bestsellers', [...allProducts].sort((a, b) => (b.purchase_count || 0) - (a.purchase_count || 0)).slice(0, RAIL_LIMIT), 'bestseller');
+    paintSection('scroll-trending', '.count-trending', [...allProducts].slice(0, RAIL_LIMIT));
+    paintSection('scroll-deals', '.count-deals', allProducts.filter((p) => p.original_price && Number(p.original_price) > Number(p.price)));
+  } else {
+    paintSection('scroll-featured', '.count-featured', data.featured || [], 'featured');
+    paintSection('scroll-new', '.count-new', data.new || [], 'new');
+    paintSection('scroll-bestsellers', '.count-bestsellers', data.best_selling || [], 'bestseller', 'Sales are just getting started — check back soon.');
+    paintSection('scroll-trending', '.count-trending', data.trending || []);
+    paintSection('scroll-deals', '.count-deals', data.deals || [], null, 'No active deals right now — check back soon.');
+  }
 
   wireHorizontalScrollButtons();
   paintWishlist(document);
@@ -155,6 +177,51 @@ function wireHorizontalScrollButtons() {
   });
 }
 
+// ============================================================
+// Category tile grid — icon-circle cards fed by real category rows +
+// live product counts (categories.js keeps the icon/accent lookup so the
+// dedicated /categories page and this grid cannot drift apart).
+// ============================================================
+function categoryTileHtml(category) {
+  const href = `./store?category=${encodeURIComponent(category.name)}`;
+  return `
+    <a class="cattile" href="${href}">
+      <span class="cattile__icon">${icon(category.icon, 22)}</span>
+      <span>
+        <span class="cattile__name" style="display:block">${escapeHtml(category.name)}</span>
+        <span class="cattile__count" style="display:block">${category.count.toLocaleString()} ${category.count === 1 ? 'item' : 'items'}</span>
+      </span>
+    </a>`;
+}
+
+function renderCategoryTiles(host, categories) {
+  if (!host) return;
+  const ranked = [...categories].sort((a, b) => b.count - a.count);
+  host.innerHTML = ranked.map(categoryTileHtml).join('') + `
+    <a class="cattile__more" href="./categories">
+      ${icon('layout-grid', 20)}
+      <span>View all categories</span>
+    </a>`;
+  renderIcons();
+}
+
+// ============================================================
+// Hero visual — a real collage of current covers, not a stock illustration.
+// ============================================================
+function renderHeroVisual(products) {
+  const host = document.querySelector('#hero-visual');
+  if (!host) return;
+  const covers = products.filter((p) => p.cover_url).slice(0, 4);
+  if (!covers.length) {
+    host.innerHTML = `<span style="display:grid;place-items:center;height:100%;color:var(--ink-muted)">${icon('sparkles', 40)}</span>`;
+    renderIcons();
+    return;
+  }
+  host.style.display = 'grid';
+  host.style.gridTemplateColumns = '1fr 1fr';
+  host.style.gap = '2px';
+  host.innerHTML = covers.map((p) => `<img src="${escapeHtml(p.cover_url)}" alt="${escapeHtml(p.title)}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`).join('');
+}
 
 // ============================================================
 // Main Storefront Load
@@ -165,7 +232,9 @@ async function load() {
 
   try {
     const [productsResult, categoriesResult] = await Promise.all([
-      supabase.from('products').select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published,created_at').eq('is_published', true).order('created_at', { ascending: false }),
+      supabase.from('products')
+        .select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published,is_featured,purchase_count,rating_sum,rating_count,created_at')
+        .eq('is_published', true).order('created_at', { ascending: false }),
       supabase.from('categories').select('name,slug,description,sort_order').eq('is_active', true).order('sort_order').order('name'),
     ]);
     const { data, error } = productsResult;
@@ -180,8 +249,9 @@ async function load() {
     console.error('Fetch error:', err);
   }
 
+  renderHeroVisual(allProducts.filter((p) => p.is_featured).length ? allProducts.filter((p) => p.is_featured) : allProducts);
 
-  // Category jumbotron — counts come from the same product list already loaded.
+  // Category tiles — counts come from the same product list already loaded.
   try {
     const counts = new Map();
     for (const product of allProducts) {
@@ -193,14 +263,15 @@ async function load() {
       count: counts.get(category.name) || 0,
       ...categoryLook(category.slug),
     }));
-    renderCategoryJumbotron(document.querySelector('#category-jumbotron'), withCounts);
+    renderCategoryTiles(document.querySelector('#category-jumbotron'), withCounts.slice(9));
   } catch (error) {
-    console.error('Category jumbotron failed:', error);
+    console.error('Category tiles failed:', error);
   }
 
   await loadWishlist();
   wireWishlist(document.body);
-  renderShowcaseSections();
+  await renderRailSections();
+  renderCategoryRails();
   renderIcons();
   finishPageLoader();
 }
@@ -217,13 +288,15 @@ document.querySelector('#subscribe-form')?.addEventListener('submit', async (e) 
   if (error && error.code !== '23505') {
     if (status) {
       status.textContent = 'Unable to subscribe. Please try again.';
-      status.className = 'status-line error sm:col-span-2';
+      status.className = 'status-line error';
     }
+    toast('Unable to subscribe. Please try again.', 'error');
   } else {
     if (status) {
       status.textContent = 'Thank you for subscribing to DigiStore updates!';
-      status.className = 'status-line success sm:col-span-2';
+      status.className = 'status-line success';
     }
+    toast('Subscribed! Watch your inbox for new releases.', 'success');
     e.currentTarget.reset();
   }
 });

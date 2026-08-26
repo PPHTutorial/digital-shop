@@ -4,44 +4,54 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>Seller Dashboard | DigiStore</title>
+  <title>Seller Centre | DigiStore</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="./css/app.css">
 </head>
-<body class="bg-slate-50 text-slate-900">
-
-  <!-- Gate shown while we work out whether this account sells yet -->
-  <div id="vendor-gate" class="min-h-screen grid place-items-center p-5">
-    <div class="soft-panel w-full max-w-lg p-8 text-center">
-      <div class="progress-track"></div>
-      <p class="mt-4 text-sm text-slate-500">Checking your seller account…</p>
+<body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
     </div>
   </div>
 
-  <!-- Application form for users who are not vendors yet -->
-  <div id="vendor-apply" class="hidden min-h-screen grid place-items-center p-5">
-    <div class="soft-panel w-full max-w-xl p-8">
-      <span class="eyebrow">START SELLING</span>
-      <h1 class="mt-1 text-2xl font-black text-[#142c55]">Open your store on DigiStore</h1>
-      <p class="mt-2 text-sm leading-relaxed text-slate-500">
-        Sell your own digital products to our audience. We handle checkout, payment verification and secure
-        delivery — you keep the majority of every sale and withdraw to your bank or mobile money account.
-      </p>
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
 
-      <form id="apply-form" class="mt-6 grid gap-4">
-        <label>
-          <span class="label">Store name</span>
-          <input class="field" name="display_name" required maxlength="60" placeholder="e.g. Kwame Design Studio">
-          <small class="help">Shown to buyers on every product you publish.</small>
-        </label>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label>
+  <main class="flex-1">
+
+    <!-- Gate shown while we work out whether this account sells yet -->
+    <div id="vendor-gate" class="vnd-gate">
+      <div class="vnd-gate-card">
+        <div class="progress-track"></div>
+        <p>Checking your seller account…</p>
+      </div>
+    </div>
+
+    <!-- Application form for users who are not vendors yet -->
+    <div id="vendor-apply" class="hidden vnd-gate">
+      <div class="vnd-gate-card vnd-gate-card--wide">
+        <span class="eyebrow">START SELLING</span>
+        <h1>Open your store on DigiStore</h1>
+        <p class="vnd-gate-lede">
+          Sell your own digital products to our audience. We handle checkout, payment verification and secure
+          delivery — you keep the majority of every sale and withdraw to your bank or mobile money account.
+        </p>
+
+        <form id="apply-form" class="vnd-form">
+          <label class="vnd-field vnd-field--span2">
+            <span class="label">Store name</span>
+            <input class="field" name="display_name" required maxlength="60" placeholder="e.g. Kwame Design Studio">
+            <small class="help">Shown to buyers on every product you publish.</small>
+          </label>
+          <label class="vnd-field">
             <span class="label">Country</span>
             <select class="field" name="country" id="apply-country"></select>
             <small class="help">Determines your payout options.</small>
           </label>
-          <label>
+          <label class="vnd-field">
             <span class="label">Payout currency</span>
             <select class="field" name="payout_currency">
               <option value="USD">USD</option>
@@ -53,598 +63,313 @@
               <option value="EUR">EUR</option>
             </select>
           </label>
-        </div>
-        <label>
-          <span class="label">About your store <span class="text-slate-400 font-normal">(optional)</span></span>
-          <textarea class="field" name="bio" rows="3" maxlength="500" placeholder="What do you make, and who is it for?"></textarea>
-        </label>
+          <label class="vnd-field vnd-field--span2">
+            <span class="label">About your store <span class="vnd-optional">(optional)</span></span>
+            <textarea class="field" name="bio" rows="3" maxlength="500" placeholder="What do you make, and who is it for?"></textarea>
+          </label>
 
-        <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">
-          <strong class="text-[#142c55]">How payouts work.</strong>
-          A platform commission is deducted from each sale. Earnings mature after a short holding period that
-          covers refunds, then become available to withdraw to your payout account.
-        </div>
+          <div class="vnd-field--span2 vnd-callout">
+            <strong>How payouts work.</strong>
+            A platform commission is deducted from each sale. Earnings mature after a short holding period that
+            covers refunds, then become available to withdraw to your payout account.
+          </div>
 
-        <div class="flex flex-wrap items-center gap-3">
-          <button class="button button-primary" type="submit">Submit application</button>
-          <a class="button" href="./account">Back to account</a>
-        </div>
-        <p id="apply-feedback" class="status-line text-xs" aria-live="polite"></p>
-      </form>
-    </div>
-  </div>
-
-  <!-- Pending / suspended / rejected notice -->
-  <div id="vendor-status" class="hidden min-h-screen grid place-items-center p-5">
-    <div class="soft-panel w-full max-w-lg p-8 text-center">
-      <div id="status-icon" class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-amber-50 text-amber-600"></div>
-      <h1 id="status-title" class="mt-4 text-xl font-black text-[#142c55]"></h1>
-      <p id="status-copy" class="mt-2 text-sm leading-relaxed text-slate-500"></p>
-      <div class="mt-6 flex justify-center gap-3">
-        <a class="button" href="./account">My account</a>
-        <a class="button button-primary" href="./store">Browse the store</a>
+          <div class="vnd-field--span2 flex flex-wrap items-center gap-3">
+            <button class="button button-primary" type="submit">Submit application</button>
+            <a class="button" href="./account">Back to account</a>
+          </div>
+          <p id="apply-feedback" class="status-line text-xs vnd-field--span2" aria-live="polite"></p>
+        </form>
       </div>
     </div>
-  </div>
 
-  <!-- Dashboard -->
-  <div id="vendor-shell" class="hidden">
-    <div id="admin-scrim" class="admin-scrim" hidden></div>
-    <div class="min-h-screen lg:flex">
-      <aside id="admin-sidebar" class="admin-sidebar bg-[#142c55] p-5 text-white lg:sticky lg:top-0 lg:h-screen lg:w-64 flex flex-col justify-between shrink-0">
-        <div>
-          <div class="flex items-center justify-between gap-3">
-            <a class="brand !text-white" href="./">
-              <span class="brand-mark">D</span>
-              <span>DigiStore<small class="!text-slate-400">Seller centre</small></span>
-            </a>
-            <button id="admin-menu-close" class="admin-menu-close" type="button" aria-label="Close menu">
-              <i data-lucide="x" width="20" height="20"></i>
-            </button>
-          </div>
-
-          <div class="mt-6 flex items-center gap-3 rounded-xl bg-white/5 p-3">
-            <span id="vendor-avatar" class="avatar !h-9 !w-9 !text-sm"></span>
-            <span class="min-w-0">
-              <strong id="vendor-name" class="block truncate text-sm"></strong>
-              <a id="vendor-view-store" class="block truncate text-[11px] text-slate-400 hover:text-orange-400" href="#">View public store</a>
-            </span>
-          </div>
-
-          <nav class="mt-6 grid gap-1.5 text-sm font-bold" aria-label="Seller sections">
-            <a class="admin-link active" href="#overview"><i data-lucide="layout-dashboard" width="16" height="16"></i><span>Overview</span></a>
-            <a class="admin-link" href="#products"><i data-lucide="package" width="16" height="16"></i><span>My products</span></a>
-            <a class="admin-link" href="#sales"><i data-lucide="receipt" width="16" height="16"></i><span>Sales</span></a>
-            <a class="admin-link" href="#payouts"><i data-lucide="banknote" width="16" height="16"></i><span>Payouts</span></a>
-            <a class="admin-link" href="#boost"><i data-lucide="megaphone" width="16" height="16"></i><span>Boost &amp; ads</span></a>
-            <a class="admin-link" href="#settings"><i data-lucide="settings" width="16" height="16"></i><span>Store settings</span></a>
-          </nav>
+    <!-- Pending / suspended / rejected notice -->
+    <div id="vendor-status" class="hidden vnd-gate">
+      <div class="vnd-gate-card vnd-gate-card--center">
+        <div id="status-icon" class="vnd-status-icon"></div>
+        <h1 id="status-title"></h1>
+        <p id="status-copy"></p>
+        <div class="mt-6 flex justify-center gap-3">
+          <a class="button" href="./account">My account</a>
+          <a class="button button-primary" href="./store">Browse the store</a>
         </div>
-        <div class="mt-8 border-t border-slate-700 pt-4">
-          <a class="button !w-full !bg-slate-800 hover:!bg-slate-700 !text-white flex items-center justify-center gap-2 text-xs" href="./account">
-            <i data-lucide="user-round" width="14" height="14"></i><span>My account</span>
-          </a>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="vendor-shell" class="hidden vnd-shell">
+      <button id="dash-menu-button" class="dash-menu-button" aria-label="Open dashboard menu" aria-expanded="false" aria-controls="dash-sidebar">
+        <i data-lucide="menu" width="18" height="18"></i><span>Menu</span>
+      </button>
+      <div id="dash-scrim" class="dash-scrim"></div>
+      <aside id="dash-sidebar" class="vnd-sidebar dash-sidebar">
+        <button id="dash-sidebar-close" class="dash-sidebar-close" aria-label="Close dashboard menu"><i data-lucide="x" width="18" height="18"></i></button>
+        <div class="vnd-store-card">
+          <span id="vendor-avatar" class="vnd-store-card__avatar"></span>
+          <div class="min-w-0">
+            <strong id="vendor-name" class="vnd-store-card__name"></strong>
+            <span id="vendor-tier" class="uk-badge uk-badge--info"></span>
+          </div>
+        </div>
+        <div class="vnd-balance-pill">
+          <span>Available balance</span>
+          <strong id="vnd-sidebar-balance">—</strong>
+        </div>
+
+        <nav class="vnd-nav" id="vnd-nav" aria-label="Seller sections">
+          <a href="#overview" data-vnd-link="overview"><i data-lucide="layout-dashboard" width="17" height="17"></i><span>Overview</span></a>
+          <a href="#products" data-vnd-link="products"><i data-lucide="package" width="17" height="17"></i><span>My Products</span></a>
+          <a href="#sales" data-vnd-link="sales"><i data-lucide="receipt" width="17" height="17"></i><span>Sales &amp; Earnings</span></a>
+          <a href="#payouts" data-vnd-link="payouts"><i data-lucide="banknote" width="17" height="17"></i><span>Payouts</span></a>
+          <a href="#boost" data-vnd-link="boost"><i data-lucide="megaphone" width="17" height="17"></i><span>Boost &amp; Ads</span></a>
+          <a href="#wallet" data-vnd-link="wallet"><i data-lucide="wallet" width="17" height="17"></i><span>Ad Wallet</span></a>
+          <a href="#team" data-vnd-link="team"><i data-lucide="users-round" width="17" height="17"></i><span>Team</span></a>
+          <a href="#settings" data-vnd-link="settings"><i data-lucide="settings" width="17" height="17"></i><span>Store Settings</span></a>
+        </nav>
+
+        <div class="vnd-sidebar-foot">
+          <a id="vendor-view-store" class="vnd-sidebar-link" href="#" target="_blank" rel="noopener"><i data-lucide="external-link" width="14" height="14"></i><span>View public store</span></a>
+          <a class="vnd-sidebar-link" href="./account"><i data-lucide="user-round" width="14" height="14"></i><span>My account</span></a>
         </div>
       </aside>
 
-      <main class="min-w-0 flex-1">
-        <header class="border-b bg-white">
-          <div class="shell flex items-center justify-between gap-3 py-5">
-            <div class="flex items-center gap-3 min-w-0">
-              <button id="admin-menu-button" class="admin-menu-button" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="admin-sidebar">
-                <i data-lucide="menu" width="20" height="20"></i>
-              </button>
-              <div class="min-w-0">
-                <span class="eyebrow">SELLER CENTRE</span>
-                <h1 id="vendor-page-title" class="mt-1 text-2xl font-black text-[#142c55]">Overview</h1>
-              </div>
+      <div class="vnd-content">
+        <!-- Overview -->
+        <section class="vnd-tab-panel" data-vnd-panel="overview">
+          <div class="vnd-panel-head">
+            <div>
+              <span class="eyebrow">OVERVIEW</span>
+              <h2 id="vnd-welcome-title">Welcome back</h2>
+              <p id="vnd-welcome-sub">A snapshot of how your store is performing.</p>
             </div>
-            <button id="new-product-btn" class="button button-primary shrink-0 !min-h-9 !px-4 !text-xs">+ New product</button>
           </div>
-        </header>
 
-        <div class="shell py-7">
-          <p id="vendor-feedback" class="status-line"></p>
+          <div class="vnd-stat-grid">
+            <div class="vnd-stat-card"><span>Net revenue (lifetime)</span><strong id="m-lifetime">—</strong><small id="m-commission">After commission</small></div>
+            <div class="vnd-stat-card"><span>Total sales</span><strong id="m-sales-count">—</strong><small>All-time orders</small></div>
+            <div class="vnd-stat-card"><span>Products listed</span><strong id="m-products">—</strong><small>Live on the storefront</small></div>
+            <div class="vnd-stat-card"><span>Average rating</span><strong id="m-rating">—</strong><small id="m-rating-note">Across all products</small></div>
+          </div>
 
-          <!-- Overview -->
-          <section id="overview" class="admin-screen space-y-6">
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <div class="metric"><span>Available to withdraw</span><strong id="m-available">—</strong><small id="m-available-note">Matured earnings</small></div>
-              <div class="metric"><span>Pending (clearing)</span><strong id="m-pending">—</strong><small>Released after the refund window</small></div>
-              <div class="metric"><span>Lifetime earnings</span><strong id="m-lifetime">—</strong><small id="m-commission">After commission</small></div>
-              <div class="metric"><span>Products live</span><strong id="m-products">—</strong><small id="m-sales-count">—</small></div>
+          <div class="vnd-two-col">
+            <div class="vnd-panel">
+              <span class="eyebrow">LAST 30 DAYS</span>
+              <h3>Net revenue</h3>
+              <div id="vendor-chart" class="vnd-chart"></div>
             </div>
-
-            <div class="grid gap-6 xl:grid-cols-[1.3fr_.7fr]">
-              <div class="soft-panel p-6">
-                <span class="eyebrow">LAST 30 DAYS</span>
-                <h2 class="mt-1 text-xl font-black text-[#142c55]">Net revenue</h2>
-                <div id="vendor-chart" class="mt-6 h-44"></div>
-              </div>
-              <div class="soft-panel p-6">
-                <span class="eyebrow">GETTING PAID</span>
-                <h2 class="mt-1 text-xl font-black text-[#142c55]">Next steps</h2>
-                <div id="vendor-checklist" class="mt-5 grid gap-3"></div>
-              </div>
+            <div class="vnd-panel">
+              <span class="eyebrow">GETTING PAID</span>
+              <h3>Vendor launch checklist</h3>
+              <p class="vnd-panel-note">Complete these steps to optimize your storefront and payout readiness.</p>
+              <div id="vendor-checklist" class="vnd-checklist"></div>
             </div>
+          </div>
 
-            <div class="soft-panel p-6">
-              <span class="eyebrow">RECENT SALES</span>
-              <h2 class="mt-1 text-xl font-black text-[#142c55]">Latest activity</h2>
-              <div id="recent-sales" class="mt-5"></div>
+          <div class="vnd-panel">
+            <span class="eyebrow">RECENT ACTIVITY</span>
+            <h3>Latest sales</h3>
+            <div id="recent-sales" class="vnd-activity-list"></div>
+          </div>
+        </section>
+
+        <!-- Products -->
+        <section class="vnd-tab-panel" data-vnd-panel="products">
+          <div class="vnd-panel-head">
+            <div>
+              <span class="eyebrow">CATALOG</span>
+              <h2>My Products</h2>
+              <p>Publish and price the digital products you sell through DigiStore.</p>
             </div>
-          </section>
+            <button id="new-product-btn" class="button button-primary" type="button">+ Add product</button>
+          </div>
+          <div class="vnd-panel"><div id="vendor-products-table"></div></div>
+        </section>
 
-          <!-- Products -->
-          <section id="products" class="admin-screen space-y-6">
-            <div class="admin-screen-heading">
-              <div>
-                <span class="eyebrow">CATALOG</span>
-                <h2>My products</h2>
-                <p>Publish and price the digital products you sell through DigiStore.</p>
-              </div>
-              <button id="new-product-btn-2" class="button button-primary">+ Add product</button>
+        <!-- Sales -->
+        <section class="vnd-tab-panel" data-vnd-panel="sales">
+          <div class="vnd-panel-head">
+            <div>
+              <span class="eyebrow">EARNINGS</span>
+              <h2>Sales &amp; Earnings</h2>
+              <p>Every line item sold, what the platform took, and what you keep.</p>
             </div>
-            <div class="soft-panel p-6"><div id="vendor-products-table"></div></div>
-          </section>
+          </div>
+          <div class="vnd-stat-grid vnd-stat-grid--3">
+            <div class="vnd-stat-card"><span>Gross revenue (30d)</span><strong id="s-gross">—</strong></div>
+            <div class="vnd-stat-card"><span id="s-commission-label">Commission</span><strong id="s-commission">—</strong></div>
+            <div class="vnd-stat-card"><span>Net earnings (30d)</span><strong id="s-net">—</strong></div>
+          </div>
+          <div class="vnd-panel"><div id="vendor-sales-table"></div></div>
+        </section>
 
-          <!-- Sales -->
-          <section id="sales" class="admin-screen space-y-6">
-            <div class="admin-screen-heading">
-              <div>
-                <span class="eyebrow">EARNINGS</span>
-                <h2>Sales &amp; earnings</h2>
-                <p>Every line item sold, what the platform took, and what you keep.</p>
-              </div>
-              <div id="sales-insight" class="admin-insight"></div>
+        <!-- Payouts -->
+        <section class="vnd-tab-panel" data-vnd-panel="payouts">
+          <div class="vnd-panel-head">
+            <div>
+              <span class="eyebrow">WITHDRAWALS</span>
+              <h2>Payouts</h2>
+              <p>Add where you want to be paid, then withdraw your matured earnings.</p>
             </div>
-            <div class="soft-panel p-6"><div id="vendor-sales-table"></div></div>
-          </section>
+            <button id="new-payout-account" class="button" type="button">+ Payout account</button>
+          </div>
 
-          <!-- Payouts -->
-          <section id="payouts" class="admin-screen space-y-6">
-            <div class="admin-screen-heading">
-              <div>
-                <span class="eyebrow">WITHDRAWALS</span>
-                <h2>Payouts</h2>
-                <p>Add where you want to be paid, then withdraw your matured earnings.</p>
-              </div>
-              <button id="new-payout-account" class="button button-primary">+ Payout account</button>
+          <div class="vnd-panel vnd-balance-block">
+            <div>
+              <span class="eyebrow">AVAILABLE BALANCE</span>
+              <strong id="payout-balance">—</strong>
+              <p id="payout-balance-note"></p>
             </div>
+            <button id="request-payout-btn" class="button button-primary" type="button">Request payout</button>
+          </div>
 
-            <div class="soft-panel p-6">
-              <div class="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <span class="eyebrow">AVAILABLE BALANCE</span>
-                  <strong id="payout-balance" class="mt-1 block text-3xl font-black text-[#142c55]">—</strong>
-                  <p id="payout-balance-note" class="mt-1 text-xs text-slate-500"></p>
+          <div class="vnd-panel">
+            <span class="eyebrow">PAYOUT ACCOUNTS</span>
+            <h3>Where we send your money</h3>
+            <div id="payout-accounts-list" class="vnd-account-list"></div>
+          </div>
+
+          <div class="vnd-panel">
+            <span class="eyebrow">HISTORY</span>
+            <h3>Payout history &amp; receipts</h3>
+            <div id="payouts-history"></div>
+          </div>
+        </section>
+
+        <!-- Boost & Ads -->
+        <section class="vnd-tab-panel" data-vnd-panel="boost">
+          <div class="vnd-panel-head">
+            <div>
+              <span class="eyebrow">PROMOTION</span>
+              <h2>Boost &amp; Ads</h2>
+              <p>Put a product in front of more buyers across the storefront.</p>
+            </div>
+            <button id="new-campaign" class="button button-primary" type="button">+ Create campaign</button>
+          </div>
+
+          <div class="vnd-two-col vnd-two-col--reverse">
+            <div class="vnd-panel">
+              <span class="eyebrow">WHAT YOU PAY FOR</span>
+              <h3>How boosting is charged</h3>
+              <div class="vnd-charge-list">
+                <div class="vnd-charge-row">
+                  <span class="vnd-charge-icon"><i data-lucide="eye" width="14" height="14"></i></span>
+                  <span><strong>Views</strong> — charged per 1,000 times your product is actually seen on screen.</span>
                 </div>
-                <button id="request-payout-btn" class="button button-primary">Request payout</button>
-              </div>
-            </div>
-
-            <div class="soft-panel p-6">
-              <span class="eyebrow">PAYOUT ACCOUNTS</span>
-              <h3 class="mt-1 text-lg font-black text-[#142c55]">Where we send your money</h3>
-              <div id="payout-accounts-list" class="mt-5"></div>
-            </div>
-
-            <div class="soft-panel p-6">
-              <span class="eyebrow">HISTORY</span>
-              <h3 class="mt-1 text-lg font-black text-[#142c55]">Past withdrawals</h3>
-              <div id="payouts-history" class="mt-5"></div>
-            </div>
-          </section>
-
-          <!-- Boost -->
-          <section id="boost" class="admin-screen space-y-6">
-            <div class="admin-screen-heading">
-              <div>
-                <span class="eyebrow">PROMOTION</span>
-                <h2>Boost &amp; ads</h2>
-                <p>Put a product in front of more buyers across the storefront.</p>
-              </div>
-              <button id="new-campaign" class="button button-primary">+ New campaign</button>
-            </div>
-
-            <div class="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-              <div class="soft-panel p-6">
-                <span class="eyebrow">AD WALLET</span>
-                <strong id="wallet-balance" class="mt-1 block text-3xl font-black text-[#142c55]">—</strong>
-                <p id="wallet-note" class="mt-1 text-xs text-slate-500">Campaign spend is drawn from this balance.</p>
-                <div class="mt-4 flex flex-wrap gap-2">
-                  <button id="topup-btn" class="button button-primary !min-h-9 !px-4 !text-xs">Top up wallet</button>
-                  <button id="wallet-history-btn" class="button !min-h-9 !px-4 !text-xs">History</button>
+                <div class="vnd-charge-row">
+                  <span class="vnd-charge-icon"><i data-lucide="mouse-pointer-click" width="14" height="14"></i></span>
+                  <span><strong>Clicks</strong> — a flat rate when someone opens your product from a boosted card.</span>
                 </div>
-                <div id="wallet-history" class="mt-5 hidden"></div>
-              </div>
-
-              <div class="soft-panel p-6">
-                <span class="eyebrow">WHAT YOU PAY FOR</span>
-                <h3 class="mt-1 text-lg font-black text-[#142c55]">How boosting is charged</h3>
-                <div class="mt-4 grid gap-3 text-sm">
-                  <div class="flex items-start gap-3">
-                    <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500"><i data-lucide="eye" width="13" height="13"></i></span>
-                    <span><strong class="text-[#142c55]">Views</strong> — charged per 1,000 times your product is actually seen on screen. Cards nobody scrolls to cost nothing.</span>
-                  </div>
-                  <div class="flex items-start gap-3">
-                    <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500"><i data-lucide="mouse-pointer-click" width="13" height="13"></i></span>
-                    <span><strong class="text-[#142c55]">Clicks</strong> — a flat rate when someone opens your product from a boosted card.</span>
-                  </div>
-                  <div class="flex items-start gap-3">
-                    <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500"><i data-lucide="shopping-bag" width="13" height="13"></i></span>
-                    <span><strong class="text-[#142c55]">Sales</strong> — a small percentage of the order value, charged only when a boosted product actually sells.</span>
-                  </div>
+                <div class="vnd-charge-row">
+                  <span class="vnd-charge-icon"><i data-lucide="shopping-bag" width="14" height="14"></i></span>
+                  <span><strong>Sales</strong> — a small percentage of order value, charged only on a boosted sale.</span>
                 </div>
-                <p class="mt-4 text-xs leading-relaxed text-slate-500">
-                  The same viewer is only counted once per day per campaign. Spending stops automatically when
-                  the budget or the wallet runs out.
-                </p>
-                <div id="rate-card" class="mt-4"></div>
               </div>
+              <div id="rate-card" class="mt-4"></div>
             </div>
-
-            <div class="soft-panel p-6"><div id="campaigns-table"></div></div>
-          </section>
-
-          <!-- Settings -->
-          <section id="settings" class="admin-screen space-y-6">
-            <div class="admin-screen-heading">
-              <div>
-                <span class="eyebrow">STORE PROFILE</span>
-                <h2>Store settings</h2>
-                <p>How your store appears to buyers across DigiStore.</p>
-              </div>
+            <div class="vnd-panel">
+              <span class="eyebrow">AD WALLET</span>
+              <strong id="wallet-balance-mini">—</strong>
+              <p id="wallet-note-mini" class="vnd-panel-note">Campaign spend is drawn from this balance.</p>
+              <a class="button button-primary vnd-full-btn" href="#wallet">Manage wallet</a>
             </div>
-            <div class="soft-panel p-6">
-              <form id="vendor-settings-form" class="grid gap-5 sm:grid-cols-2">
-                <label class="sm:col-span-2">
-                  <span class="label">Store name</span>
-                  <input class="field" name="display_name" required maxlength="60">
-                </label>
-                <label class="sm:col-span-2">
-                  <span class="label">About</span>
-                  <textarea class="field" name="bio" rows="3" maxlength="500"></textarea>
-                </label>
-                <label>
-                  <span class="label">Country</span>
-                  <select class="field" name="country" id="settings-country"></select>
-                </label>
-                <label>
-                  <span class="label">Support email</span>
-                  <input class="field" name="support_email" type="email" placeholder="you@example.com">
-                </label>
-                <label class="sm:col-span-2">
-                  <span class="label">Store logo</span>
-                  <div class="flex items-center gap-4">
-                    <span id="logo-preview" class="avatar !h-14 !w-14 !text-lg"></span>
-                    <input type="file" id="logo-file" accept="image/*" class="text-xs">
-                  </div>
-                  <input type="hidden" name="logo_url" id="logo-url">
-                  <small id="logo-status" class="help"></small>
-                </label>
-                <div class="sm:col-span-2 flex items-center gap-3">
-                  <button class="button button-primary" type="submit">Save settings</button>
-                  <p id="settings-feedback" class="status-line text-xs my-0"></p>
+          </div>
+
+          <div class="vnd-panel">
+            <span class="eyebrow">CAMPAIGNS</span>
+            <h3>Active &amp; past campaigns</h3>
+            <div id="campaigns-list" class="vnd-campaign-grid"></div>
+          </div>
+        </section>
+
+        <!-- Ad Wallet -->
+        <section class="vnd-tab-panel" data-vnd-panel="wallet">
+          <div class="vnd-panel-head">
+            <div>
+              <span class="eyebrow">AD WALLET &amp; LEDGER</span>
+              <h2>Ad Wallet</h2>
+              <p>Fund your wallet, then spend it powering campaigns in Boost &amp; Ads.</p>
+            </div>
+            <button id="topup-btn" class="button button-primary" type="button">+ Add funds</button>
+          </div>
+
+          <div class="vnd-stat-grid vnd-stat-grid--3">
+            <div class="vnd-stat-card"><span>Current wallet balance</span><strong id="wallet-balance">—</strong></div>
+            <div class="vnd-stat-card"><span>Lifetime top-up</span><strong id="wallet-lifetime-topup">—</strong></div>
+            <div class="vnd-stat-card"><span>Lifetime spend</span><strong id="wallet-lifetime-spend">—</strong></div>
+          </div>
+          <p id="wallet-note" class="vnd-panel-note"></p>
+
+          <div class="vnd-panel">
+            <span class="eyebrow">TRANSACTION LEDGER</span>
+            <h3>Every top-up, charge and refund</h3>
+            <div id="wallet-history"></div>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section class="vnd-tab-panel" data-vnd-panel="settings">
+          <div class="vnd-panel-head">
+            <div>
+              <span class="eyebrow">STORE PROFILE</span>
+              <h2>Store Settings</h2>
+              <p>How your store appears to buyers across DigiStore.</p>
+            </div>
+          </div>
+          <div class="vnd-panel">
+            <form id="vendor-settings-form" class="vnd-form">
+              <label class="vnd-field vnd-field--span2">
+                <span class="label">Store name</span>
+                <input class="field" name="display_name" required maxlength="60">
+              </label>
+              <label class="vnd-field vnd-field--span2">
+                <span class="label">About</span>
+                <textarea class="field" name="bio" rows="3" maxlength="500"></textarea>
+              </label>
+              <label class="vnd-field">
+                <span class="label">Country</span>
+                <select class="field" name="country" id="settings-country"></select>
+              </label>
+              <label class="vnd-field">
+                <span class="label">Support email</span>
+                <input class="field" name="support_email" type="email" placeholder="you@example.com">
+              </label>
+              <label class="vnd-field vnd-field--span2">
+                <span class="label">Store logo</span>
+                <div class="flex items-center gap-4">
+                  <span id="logo-preview" class="vnd-logo-preview"></span>
+                  <input type="file" id="logo-file" accept="image/*" class="text-xs">
                 </div>
-              </form>
+                <input type="hidden" name="logo_url" id="logo-url">
+                <small id="logo-status" class="help"></small>
+              </label>
+              <div class="vnd-field--span2 flex items-center gap-3">
+                <button class="button button-primary" type="submit">Save settings</button>
+                <p id="settings-feedback" class="status-line text-xs my-0"></p>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- Team -->
+        <section class="vnd-tab-panel" data-vnd-panel="team">
+          <div class="vnd-panel-head">
+            <div>
+              <span class="eyebrow">STORE TEAM</span>
+              <h2>Team</h2>
+              <p>Invite people to help run this store. Team members currently manage store membership only — products, earnings, payouts and campaigns still belong to the original store owner.</p>
             </div>
-          </section>
-        </div>
-      </main>
+            <button id="invite-member" class="button button-primary" type="button">+ Invite</button>
+          </div>
+          <div class="vnd-panel">
+            <p class="vnd-panel-note">Staff and support roles do not yet get access to products, sales, payouts or ad campaigns — that is a deliberate, not-yet-built extension. This screen only manages who is on the team and what role they hold.</p>
+            <div id="team-list" class="mt-4"></div>
+          </div>
+        </section>
+      </div>
     </div>
-  </div>
+  </main>
 
-  <!-- Product editor -->
-  <dialog id="product-modal" class="admin-modal-container">
-    <form id="product-form" class="flex flex-col h-full max-h-[92vh]">
-      <div class="flex items-start justify-between border-b border-slate-100 bg-white p-5 pb-4 shrink-0 sm:p-6">
-        <div>
-          <span class="eyebrow">MY CATALOG</span>
-          <h2 id="product-modal-title" class="mt-0.5 text-xl font-black text-[#142c55]">New product</h2>
-        </div>
-        <button type="button" id="close-product-modal" class="cursor-pointer rounded-lg border-0 bg-transparent p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
-          <i data-lucide="x" width="20" height="20"></i>
-        </button>
-      </div>
-      <div class="admin-modal-body space-y-5">
-        <input type="hidden" name="id">
-        <label class="block">
-          <span class="label">Title</span>
-          <input class="field !mt-1" name="title" id="v-title" required placeholder="e.g. The 24-Hour Product Launch Kit">
-        </label>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label class="block">
-            <span class="label">Category</span>
-            <select class="field !mt-1" name="category" id="v-category"></select>
-          </label>
-          <label class="block">
-            <span class="label">URL slug</span>
-            <input class="field font-mono text-xs !mt-1" name="slug" id="v-slug" required>
-          </label>
-        </div>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label class="block">
-            <span class="label">Price</span>
-            <input class="field font-bold !mt-1" name="price" type="number" step=".01" min="0" required placeholder="0.00">
-          </label>
-          <label class="block">
-            <span class="label">Compare-at price <span class="font-normal text-slate-400">(optional)</span></span>
-            <input class="field !mt-1" name="original_price" type="number" step=".01" min="0" placeholder="0.00">
-          </label>
-        </div>
-        <label class="block">
-          <span class="label">Short description</span>
-          <input class="field !mt-1" name="short_description" maxlength="160" placeholder="One line shown on the product card">
-        </label>
-        <label class="block">
-          <span class="label">Full description</span>
-          <textarea class="field !mt-1" name="description" rows="4" placeholder="What's included, who it's for, what they'll achieve…"></textarea>
-        </label>
-
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div>
-            <span class="label">Cover image</span>
-            <div class="upload-zone mt-1">
-              <input type="file" id="v-cover-file" accept="image/*" class="text-xs">
-              <img id="v-cover-preview" class="mx-auto mt-3 hidden max-h-28 rounded-lg" alt="">
-            </div>
-            <input type="hidden" name="cover_url" id="v-cover-url">
-            <small id="v-cover-status" class="help"></small>
-          </div>
-          <div>
-            <span class="label">Product file <span class="font-normal text-slate-400">(what buyers download)</span></span>
-            <div class="upload-zone mt-1">
-              <input type="file" id="v-product-file" class="text-xs">
-            </div>
-            <input type="hidden" name="file_path" id="v-file-path">
-            <small id="v-file-status" class="help"></small>
-          </div>
-        </div>
-
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label class="block">
-            <span class="label">File type</span>
-            <input class="field !mt-1" name="file_type" placeholder="e.g. PDF, ZIP, MP4">
-          </label>
-          <label class="block">
-            <span class="label">Licence</span>
-            <select class="field !mt-1" name="license_type">
-              <option value="personal">Personal use</option>
-              <option value="commercial">Commercial use</option>
-              <option value="extended">Extended licence</option>
-            </select>
-          </label>
-        </div>
-
-        <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
-          <input type="checkbox" name="is_published" class="rounded text-orange-600" checked>
-          Publish to the storefront
-        </label>
-      </div>
-      <div class="admin-modal-footer flex items-center justify-between gap-3">
-        <p id="product-feedback" class="status-line mr-auto my-0 text-xs"></p>
-        <div class="flex shrink-0 items-center gap-3">
-          <button type="button" id="cancel-product" class="button">Cancel</button>
-          <button type="submit" id="save-product" class="button button-primary">Save product</button>
-        </div>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- Payout account editor -->
-  <dialog id="payout-modal" class="admin-modal-container">
-    <form id="payout-form" class="flex flex-col h-full max-h-[92vh]">
-      <div class="flex items-start justify-between border-b border-slate-100 bg-white p-5 pb-4 shrink-0 sm:p-6">
-        <div>
-          <span class="eyebrow">GET PAID</span>
-          <h2 class="mt-0.5 text-xl font-black text-[#142c55]">Payout account</h2>
-        </div>
-        <button type="button" id="close-payout-modal" class="cursor-pointer rounded-lg border-0 bg-transparent p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
-          <i data-lucide="x" width="20" height="20"></i>
-        </button>
-      </div>
-      <div class="admin-modal-body space-y-5">
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label class="block">
-            <span class="label">Country</span>
-            <select class="field !mt-1" name="country" id="payout-country"></select>
-          </label>
-          <label class="block">
-            <span class="label">Method</span>
-            <select class="field !mt-1" name="method" id="payout-method"></select>
-          </label>
-        </div>
-        <label class="block">
-          <span class="label">Account holder name</span>
-          <input class="field !mt-1" name="account_name" required placeholder="Name exactly as it appears on the account">
-        </label>
-
-        <div id="fields-bank" class="hidden grid gap-4 sm:grid-cols-2">
-          <label class="block sm:col-span-2">
-            <span class="label">Bank name</span>
-            <input class="field !mt-1" name="bank_name" placeholder="e.g. GCB Bank">
-          </label>
-          <label class="block">
-            <span class="label">Account number</span>
-            <input class="field font-mono !mt-1" name="account_number" inputmode="numeric" autocomplete="off">
-          </label>
-          <label class="block">
-            <span class="label">Branch / sort code <span class="font-normal text-slate-400">(optional)</span></span>
-            <input class="field !mt-1" name="branch_code">
-          </label>
-          <label class="block">
-            <span class="label">SWIFT / BIC <span class="font-normal text-slate-400">(optional)</span></span>
-            <input class="field !mt-1" name="swift_code">
-          </label>
-          <label class="block">
-            <span class="label">IBAN <span class="font-normal text-slate-400">(optional)</span></span>
-            <input class="field !mt-1" name="iban">
-          </label>
-        </div>
-
-        <div id="fields-momo" class="hidden grid gap-4 sm:grid-cols-2">
-          <label class="block">
-            <span class="label">Provider</span>
-            <select class="field !mt-1" name="momo_provider" id="momo-provider"></select>
-          </label>
-          <label class="block">
-            <span class="label">Mobile money number</span>
-            <input class="field font-mono !mt-1" name="momo_number" inputmode="tel" placeholder="e.g. 024 123 4567">
-          </label>
-        </div>
-
-        <div id="fields-paypal" class="hidden">
-          <label class="block">
-            <span class="label">PayPal email</span>
-            <input class="field !mt-1" name="paypal_email" type="email" placeholder="you@example.com">
-          </label>
-        </div>
-
-        <div id="fields-crypto" class="hidden grid gap-4 sm:grid-cols-2">
-          <label class="block">
-            <span class="label">Asset</span>
-            <select class="field !mt-1" name="crypto_asset">
-              <option value="USDT">USDT</option>
-              <option value="BTC">BTC</option>
-              <option value="ETH">ETH</option>
-              <option value="USDC">USDC</option>
-            </select>
-          </label>
-          <label class="block">
-            <span class="label">Wallet address</span>
-            <input class="field font-mono text-xs !mt-1" name="crypto_address">
-          </label>
-        </div>
-
-        <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
-          <input type="checkbox" name="is_default" class="rounded text-orange-600" checked>
-          Use as my default payout account
-        </label>
-
-        <p class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
-          Your payout details are visible only to you and our payments team. They are never shown on your
-          public store or shared with buyers.
-        </p>
-      </div>
-      <div class="admin-modal-footer flex items-center justify-between gap-3">
-        <p id="payout-feedback" class="status-line mr-auto my-0 text-xs"></p>
-        <div class="flex shrink-0 items-center gap-3">
-          <button type="button" id="cancel-payout" class="button">Cancel</button>
-          <button type="submit" class="button button-primary">Save account</button>
-        </div>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- Campaign editor -->
-  <dialog id="campaign-modal" class="admin-modal-container">
-    <form id="campaign-form" class="flex flex-col h-full max-h-[92vh]">
-      <div class="flex items-start justify-between border-b border-slate-100 bg-white p-5 pb-4 shrink-0 sm:p-6">
-        <div>
-          <span class="eyebrow">BOOST</span>
-          <h2 class="mt-0.5 text-xl font-black text-[#142c55]">Promote a product</h2>
-        </div>
-        <button type="button" id="close-campaign-modal" class="cursor-pointer rounded-lg border-0 bg-transparent p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
-          <i data-lucide="x" width="20" height="20"></i>
-        </button>
-      </div>
-      <div class="admin-modal-body space-y-5">
-        <label class="block">
-          <span class="label">Campaign name</span>
-          <input class="field !mt-1" name="name" required placeholder="e.g. Launch week push">
-        </label>
-        <label class="block">
-          <span class="label">Product</span>
-          <select class="field !mt-1" name="product_id" id="campaign-product" required></select>
-        </label>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label class="block">
-            <span class="label">Placement</span>
-            <select class="field !mt-1" name="placement">
-              <option value="featured">Featured — home page rails</option>
-              <option value="search">Search — weighted in results</option>
-              <option value="category">Category — top of its category</option>
-            </select>
-          </label>
-          <label class="block">
-            <span class="label">Budget</span>
-            <input class="field !mt-1" name="budget" type="number" step=".01" min="1" required placeholder="50.00">
-          </label>
-        </div>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label class="block">
-            <span class="label">Starts</span>
-            <input class="field !mt-1" name="starts_at" type="date">
-          </label>
-          <label class="block">
-            <span class="label">Ends <span class="font-normal text-slate-400">(optional)</span></span>
-            <input class="field !mt-1" name="ends_at" type="date">
-          </label>
-        </div>
-        <p class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
-          Campaigns start as a draft and are reviewed before going live. Spend is drawn from your available
-          earnings balance.
-        </p>
-      </div>
-      <div class="admin-modal-footer flex items-center justify-between gap-3">
-        <p id="campaign-feedback" class="status-line mr-auto my-0 text-xs"></p>
-        <div class="flex shrink-0 items-center gap-3">
-          <button type="button" id="cancel-campaign" class="button">Cancel</button>
-          <button type="submit" class="button button-primary">Create campaign</button>
-        </div>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- Wallet top-up -->
-  <dialog id="topup-modal" class="w-[min(94vw,460px)] rounded-2xl border-0 bg-white p-0 shadow-2xl" style="margin:auto">
-    <form id="topup-form" class="p-6">
-      <span class="eyebrow">AD WALLET</span>
-      <h2 class="mt-1 text-xl font-black text-[#142c55]">Add funds</h2>
-      <p class="mt-2 text-sm leading-relaxed text-slate-500">
-        Your wallet is credited automatically as soon as the payment clears.
-      </p>
-
-      <div class="mt-5">
-        <span class="label">Amount</span>
-        <div class="mt-1 flex flex-wrap gap-2" id="topup-presets">
-          <button type="button" class="button !min-h-9 !px-4 text-xs" data-amount="25">$25</button>
-          <button type="button" class="button !min-h-9 !px-4 text-xs" data-amount="50">$50</button>
-          <button type="button" class="button !min-h-9 !px-4 text-xs" data-amount="100">$100</button>
-          <button type="button" class="button !min-h-9 !px-4 text-xs" data-amount="250">$250</button>
-        </div>
-        <input class="field mt-3 font-bold" name="amount" type="number" step="1" min="25" value="25" required>
-        <small class="help">Minimum $25. Enter any higher amount you like.</small>
-      </div>
-
-      <div class="mt-4">
-        <span class="label">Pay with</span>
-        <div class="mt-1 grid gap-2">
-          <label class="method flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3">
-            <input type="radio" name="provider" value="flutterwave" checked class="mt-1">
-            <span>
-              <strong class="block text-sm text-[#142c55]">Card, bank transfer or mobile money</strong>
-              <span class="text-xs text-slate-500">Visa, Mastercard, bank transfer, MTN MoMo, M-Pesa</span>
-            </span>
-          </label>
-          <label class="method flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3">
-            <input type="radio" name="provider" value="nowpayments" class="mt-1">
-            <span>
-              <strong class="block text-sm text-[#142c55]">Cryptocurrency</strong>
-              <span class="text-xs text-slate-500">Bitcoin, Ethereum, USDT and 300+ coins</span>
-            </span>
-          </label>
-        </div>
-      </div>
-
-      <p id="topup-feedback" class="status-line mt-3 text-xs"></p>
-      <div class="mt-5 flex justify-end gap-3">
-        <button type="button" id="cancel-topup" class="button">Cancel</button>
-        <button type="submit" class="button button-primary">Continue to payment</button>
-      </div>
-    </form>
-  </dialog>
+  <footer id="site-footer"></footer>
 
   <script type="module" src="./js/vendor.js"></script>
 </body>

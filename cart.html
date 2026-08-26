@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Your Cart | DigiStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
+    </div>
+  </div>
+
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
+
+  <main class="flex-1">
+    <div class="cart-page-header">
+      <h1>Your Shopping Cart</h1>
+    </div>
+
+    <div id="cart-loading" class="cart-layout">
+      <div class="uk-skel-card" style="height:120px"></div>
+      <div class="uk-skel-card" style="height:220px"></div>
+    </div>
+
+    <div id="cart-layout" class="cart-layout hidden">
+      <div id="cart-items-list" class="cart-items-list"></div>
+
+      <aside class="cart-summary">
+        <h2>Order Summary</h2>
+        <div id="cart-summary-lines"></div>
+        <div class="cart-summary-total">
+          <span>Total</span>
+          <strong id="cart-total">$0.00</strong>
+        </div>
+        <a id="cart-checkout-btn" class="cart-checkout-btn" href="./checkout">Proceed to Checkout</a>
+        <a class="cart-continue-link" href="./store">Continue Shopping</a>
+      </aside>
+    </div>
+
+    <div id="cart-empty" class="cart-layout hidden">
+      <div class="cart-empty" style="grid-column:1/-1">
+        <i data-lucide="shopping-bag" width="40" height="40"></i>
+        <h2>Your cart is empty</h2>
+        <p>Browse the catalog and add something you'll actually use.</p>
+        <a class="button button-primary mt-4" href="./store">Browse Products</a>
+      </div>
+    </div>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module" src="./js/cart.js"></script>
+</body>
+
+</html>

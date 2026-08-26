@@ -18,9 +18,10 @@ export function finishPageLoader() {
   }
 }
 export function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
-export function toast(message,type='success'){let r=document.querySelector('#toast-region');if(!r){r=document.createElement('div');r.id='toast-region';r.className='toast-region';document.body.append(r)}const e=document.createElement('div');e.className=`toast toast-${type}`;e.innerHTML=`<span>${type==='error'?'!':'✓'}</span><p>${escapeHtml(message)}</p><button>×</button>`;e.querySelector('button').onclick=()=>e.remove();r.append(e);setTimeout(()=>e.remove(),6000)}
+const TOAST_GLYPH = { success: '✓', error: '!', warning: '!', info: 'i' };
+export function toast(message,type='success'){let r=document.querySelector('#toast-region');if(!r){r=document.createElement('div');r.id='toast-region';r.className='toast-region';document.body.append(r)}const e=document.createElement('div');e.className=`toast toast-${type}`;e.innerHTML=`<span>${TOAST_GLYPH[type]||'✓'}</span><p>${escapeHtml(message)}</p><button>×</button>`;e.querySelector('button').onclick=()=>e.remove();r.append(e);setTimeout(()=>e.remove(),6000)}
 export function setButtonLoading(b,loading,label='Please wait…'){if(!b)return;if(loading){b.dataset.label=b.textContent;b.disabled=true;b.innerHTML=`<span class="spinner"></span>${label}`}else{b.disabled=false;b.textContent=b.dataset.label||b.textContent}}
-export async function getAccount(){const{data:{user}}=await supabase.auth.getUser();if(!user)return{user:null,profile:null};const{data:profile}=await supabase.from('profiles').select('full_name,role,phone,address,country,occupation,age,created_at').eq('id',user.id).maybeSingle();return{user,profile}}
+export async function getAccount(){const{data:{user}}=await supabase.auth.getUser();if(!user)return{user:null,profile:null};const{data:profile}=await supabase.from('profiles').select('full_name,role,phone,address,country,occupation,age,created_at,admin_tier,account_status,account_status_reason').eq('id',user.id).maybeSingle();return{user,profile}}
 export const icon = (name, size = 18) => `<i data-lucide="${name}" width="${size}" height="${size}"></i>`;
 export function renderIcons() {
   if (window.lucide) {
@@ -31,6 +32,35 @@ export function renderIcons() {
   script.src = 'https://unpkg.com/lucide@latest';
   script.onload = () => window.lucide?.createIcons();
   document.head.append(script);
+}
+
+// Fetched once per page load and cached — every page's header shows the
+// same "top categories" quick-nav, and mountHeader's render() re-runs on
+// every auth-state change, so this must not re-query each time.
+let topCategoriesPromise = null;
+function loadTopCategories() {
+  if (topCategoriesPromise) return topCategoriesPromise;
+  topCategoriesPromise = (async () => {
+    try {
+      const [productsResult, categoriesResult] = await Promise.all([
+        supabase.from('products').select('category').eq('is_published', true),
+        supabase.from('categories').select('name,slug').eq('is_active', true),
+      ]);
+      const counts = new Map();
+      for (const row of productsResult.data || []) {
+        const key = row.category || 'General';
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      const slugByName = new Map((categoriesResult.data || []).map((c) => [c.name, c.slug]));
+      return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([name]) => ({ name, slug: slugByName.get(name) || '' }));
+    } catch {
+      return [];
+    }
+  })();
+  return topCategoriesPromise;
 }
 
 export async function mountHeader() {
@@ -66,7 +96,24 @@ export async function mountHeader() {
     const isContact = path.includes('contact');
     const isSupport = path.includes('support');
 
+    // The Figma nav was 4 plain-text links (Home/All Products/About/Contact)
+    // with no icons; Blog is back in the visible nav per the project owner,
+    // Support still stays reachable via the drawer/footer only. The search
+    // bar's width now flexes (see .nav-search) rather than holding a fixed
+    // 480px, so the 5th link doesn't crowd it.
     const links = `
+      <a href="./" class="${isHome ? 'active' : ''}">Home</a>
+      <a href="./store" class="${isStore ? 'active' : ''}">All Products</a>
+      <a href="./blog" class="${isBlog ? 'active' : ''}">Blog</a>
+      <a href="./about" class="${isAbout ? 'active' : ''}">About</a>
+      <a href="./contact" class="${isContact ? 'active' : ''}">Contact</a>
+    `;
+
+    // The nav drawer (hamburger) carries only site destinations — icons plus
+    // the two pages the compact desktop nav dropped. Account-specific links
+    // (My account/Admin centre/Log out/Log in/Create account) live in the
+    // separate account drawer below instead, opened from the account chip.
+    const drawerLinks = `
       <a href="./" class="${isHome ? 'active' : ''}">${icon('house')}<span>Home</span></a>
       <a href="./store" class="${isStore ? 'active' : ''}">${icon('shopping-bag')}<span>All Products</span></a>
       <a href="./blog" class="${isBlog ? 'active' : ''}">${icon('newspaper')}<span>Blog</span></a>
@@ -79,27 +126,50 @@ export async function mountHeader() {
     // straight to their centre, everyone else to the pitch.
     const sellHref = './vendor';
     const sellLabel = isSeller ? 'Seller centre' : 'Start selling';
+
+    const topCategories = await loadTopCategories();
+    const categoryLinksHtml = topCategories.map(({ name }) => {
+      const shortLabel = name.split(' & ')[0];
+      return `<a class="catnavbar__link" href="./store?category=${encodeURIComponent(name)}"><span>${escapeHtml(shortLabel)}</span>${icon('chevron-down', 10)}</a>`;
+    }).join('');
+
     target.innerHTML = `
       <div class="utility-bar">
-        <div class="shell utility-content">
-          <span>Digital products, delivered securely</span>
-          <a href="mailto:hello@codeinktechnologies.com">hello@codeinktechnologies.com</a>
+        <div class="header-shell utility-content">
+          <div class="utility-left">
+            <a href="mailto:hello@codeinktechnologies.com">${icon('mail', 13)} hello@codeinktechnologies.com</a>
+            <span>Digital products, delivered securely</span>
+          </div>
+          <div class="utility-right">
+            <span>${icon('shield-check', 13)} Tax &amp; VAT Compliant</span>
+          </div>
         </div>
       </div>
       <div class="main-nav-container">
         <div class="main-nav">
           <a href="./" class="brand">
             <span class="brand-mark">D</span>
-            <span>DigiStore<small>powered by codeinktechnologies</small></span>
+            <span>Digi<em>Store</em></span>
           </a>
+          <form id="header-search-form" class="nav-search" role="search">
+            <span class="nav-search__icon">${icon('search', 16)}</span>
+            <input id="header-search-input" type="search" name="search" placeholder="Search templates, ebooks, software, design assets…" aria-label="Search products">
+            <span class="nav-search__kbd">${navigator.platform?.toLowerCase().includes('mac') ? '⌘K' : 'Ctrl K'}</span>
+          </form>
+          <div class="header-actions">
           <nav class="nav-links" aria-label="Main navigation">${links}</nav>
+          <span class="nav-divider" aria-hidden="true"></span>
           <div class="nav-actions">
+            <a class="cart-link" href="./cart" aria-label="View cart">
+              ${icon('shopping-bag', 20)}
+              <span class="cart-link__badge hidden" data-cart-badge>0</span>
+            </a>
             ${
               user
                 ? `<details class="account-popover">
                     <summary class="account-chip">
                       <span class="avatar">${escapeHtml(name[0].toUpperCase())}</span>
-                      <span>${escapeHtml(name)}</span>
+                      <!-- <span>${escapeHtml(name)}</span> -->
                       ${icon('chevron-down', 15)}
                     </summary>
                     <div class="account-popover-panel">
@@ -114,19 +184,31 @@ export async function mountHeader() {
                   </details>`
                 : `<a class="text-action" href="./auth">Log in</a><a class="button button-primary" href="./auth?mode=signup">Get started</a>`
             }
+            <button id="account-menu-button" class="account-menu-button" aria-label="Account menu">
+              ${user ? `<span class="avatar">${escapeHtml(name[0].toUpperCase())}</span>` : icon('user-round', 20)}
+            </button>
             <button id="mobile-menu-button" class="mobile-menu-button" aria-label="Open menu">${icon('menu', 22)}</button>
           </div>
+          </div>
+        </div>
+      </div>
+      <div class="catnavbar">
+        <div class="header-shell catnavbar__inner">
+          <a class="catnavbar__all" href="./categories">${icon('list', 16)}<span>All Categories</span></a>
+          <div class="catnavbar__links">${categoryLinksHtml}</div>
         </div>
       </div>
     `;
 
-    // The drawer lives on <body>, never inside #site-header. The header carries
+    // The drawers live on <body>, never inside #site-header. The header carries
     // `backdrop-blur`, and backdrop-filter creates a containing block for
-    // position:fixed descendants — nested here the drawer would be positioned
+    // position:fixed descendants — nested here a drawer would be positioned
     // and clipped against the header box instead of the viewport, and its
     // z-index would be trapped inside the header's stacking context.
     document.querySelector('#mobile-drawer')?.remove();
     document.querySelector('#mobile-scrim')?.remove();
+    document.querySelector('#account-drawer')?.remove();
+    document.querySelector('#account-scrim')?.remove();
 
     const scrim = document.createElement('div');
     scrim.id = 'mobile-scrim';
@@ -142,46 +224,137 @@ export async function mountHeader() {
         <button id="mobile-menu-close" aria-label="Close menu">${icon('x', 22)}</button>
       </div>
       <nav>
-        ${links}
+        <form id="drawer-search-form" class="drawer-search" role="search">
+          <span class="drawer-search__icon">${icon('search', 16)}</span>
+          <input id="drawer-search-input" type="search" name="search" placeholder="Search products…" aria-label="Search products">
+        </form>
+        ${drawerLinks}
+        <a href="./categories">${icon('layout-grid')} Browse Categories</a>
         <a href="${sellHref}" class="drawer-sell">${icon('store')} ${sellLabel}</a>
+      </nav>`;
+
+    // The account drawer carries only account/session actions — split out of
+    // the old combined drawer so the hamburger stays pure navigation. Opened
+    // from the account chip (`#account-menu-button`), which is the mobile
+    // stand-in for the desktop hover/click popover (hidden below 1024px).
+    const acctScrim = document.createElement('div');
+    acctScrim.id = 'account-scrim';
+    acctScrim.className = 'mobile-scrim';
+
+    const acctDrawer = document.createElement('aside');
+    acctDrawer.id = 'account-drawer';
+    acctDrawer.className = 'mobile-drawer';
+    acctDrawer.setAttribute('aria-label', 'Account menu');
+    acctDrawer.innerHTML = `
+      <div class="mobile-drawer-head">
+        <strong>${user ? escapeHtml(name) : 'Your account'}</strong>
+        <button id="account-drawer-close" aria-label="Close account menu">${icon('x', 22)}</button>
+      </div>
+      <nav>
         ${
           user
-            ? `<a href="./account">${icon('user-round')} ${escapeHtml(name)}</a>
-               ${profile?.role === 'admin' ? `<a href="./admin">${icon('shield-check')} Admin centre</a>` : ''}
-               <button id="mobile-sign-out">${icon('log-out')} Log out</button>`
-            : `<a href="./auth">${icon('log-in')} Log in</a>
-               <a href="./auth?mode=signup">${icon('user-plus')} Create account</a>`
+            ? `<a href="./account">${icon('layout-dashboard')}<span>Overview</span></a>
+               <a href="./account#orders-list">${icon('package')}<span>Orders</span></a>
+               <a href="./checkout">${icon('shopping-cart')}<span>Cart / checkout</span></a>
+               <a href="${sellHref}">${icon('store')}<span>${sellLabel}</span></a>
+               ${profile?.role === 'admin' ? `<a href="./admin">${icon('shield-check')}<span>Admin centre</span></a>` : ''}
+               <button id="account-drawer-signout">${icon('log-out')}<span>Log out</span></button>`
+            : `<a href="./auth">${icon('log-in')}<span>Log in</span></a>
+               <a href="./auth?mode=signup">${icon('user-plus')}<span>Create account</span></a>`
         }
       </nav>`;
 
-    document.body.append(scrim, drawer);
+    document.body.append(scrim, drawer, acctScrim, acctDrawer);
 
+    // A shared scroll lock: the page behind must not scroll while either
+    // drawer is open.
+    const syncScrollLock = () => {
+      const anyOpen = drawer.classList.contains('open') || acctDrawer.classList.contains('open');
+      document.body.style.overflow = anyOpen ? 'hidden' : '';
+    };
     const setDrawer = (open) => {
       drawer.classList.toggle('open', open);
       scrim.classList.toggle('open', open);
-      // Body scroll lock, so the page behind does not scroll under the drawer.
-      document.body.style.overflow = open ? 'hidden' : '';
+      syncScrollLock();
       if (open) drawer.querySelector('a, button')?.focus();
     };
+    const setAccountDrawer = (open) => {
+      acctDrawer.classList.toggle('open', open);
+      acctScrim.classList.toggle('open', open);
+      syncScrollLock();
+      if (open) acctDrawer.querySelector('a, button')?.focus();
+    };
+
+    // Header search — a query navigates to the store's own search filter.
+    // The store page reads ?search= on load, so this works from any page.
+    const goSearch = (value) => {
+      const q = value.trim();
+      if (!q) return;
+      location.href = `./store?search=${encodeURIComponent(q)}`;
+    };
+    target.querySelector('#header-search-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      goSearch(target.querySelector('#header-search-input')?.value || '');
+    });
+    drawer.querySelector('#drawer-search-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      goSearch(drawer.querySelector('#drawer-search-input')?.value || '');
+    });
+    // ⌘K / Ctrl+K jumps focus to the header search from anywhere on the page.
+    // Bound once, guarded like the popover dismiss handler below.
+    if (!document.body.dataset.searchShortcutWired) {
+      document.body.dataset.searchShortcutWired = 'true';
+      document.addEventListener('keydown', (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+          const input = document.querySelector('#header-search-input');
+          if (input) {
+            event.preventDefault();
+            input.focus();
+            input.select();
+          }
+        }
+      });
+    }
 
     target.querySelector('#mobile-menu-button').onclick = () => setDrawer(true);
     drawer.querySelector('#mobile-menu-close').onclick = () => setDrawer(false);
     scrim.onclick = () => setDrawer(false);
     // Any destination closes it — in-page links would otherwise leave it open.
     drawer.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setDrawer(false)));
+
+    target.querySelector('#account-menu-button').onclick = () => setAccountDrawer(true);
+    acctDrawer.querySelector('#account-drawer-close').onclick = () => setAccountDrawer(false);
+    acctScrim.onclick = () => setAccountDrawer(false);
+    acctDrawer.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setAccountDrawer(false)));
+
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') setDrawer(false);
+      if (event.key === 'Escape') {
+        setDrawer(false);
+        setAccountDrawer(false);
+      }
     });
 
     renderIcons();
     finishPageLoader();
+
+    // Real cart count for a signed-in shopper — no badge (not a "0") for
+    // anonymous visitors, since there's nothing server-side to count for them.
+    if (user) {
+      supabase.from('cart_items').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
+        .then(({ count }) => {
+          document.querySelectorAll('[data-cart-badge]').forEach((el) => {
+            el.textContent = String(count || 0);
+            el.classList.toggle('hidden', !count);
+          });
+        });
+    }
 
     const logout = async () => {
       await supabase.auth.signOut();
       location.href = './';
     };
     target.querySelector('#sign-out')?.addEventListener('click', logout);
-    drawer.querySelector('#mobile-sign-out')?.addEventListener('click', logout);
+    acctDrawer.querySelector('#account-drawer-signout')?.addEventListener('click', logout);
 
     // <details> has no dismiss-on-outside-click of its own, so it would stay
     // open until clicked again. Bound once, guarded by a flag, because
@@ -210,7 +383,10 @@ export function mountFooter() {
     document.body.append(target);
   }
   const year = new Date().getFullYear();
-  target.className = 'bg-[#0e1e38] text-slate-300 pt-16 pb-12 border-t border-slate-800 mt-auto';
+  target.className = 'pt-14 pb-10 border-t mt-auto';
+  target.style.background = 'var(--surface)';
+  target.style.borderColor = 'var(--border)';
+  target.style.color = 'var(--text-muted)';
   target.innerHTML = `
     <div class="shell space-y-12">
       <div class="seller-strip">
@@ -230,21 +406,21 @@ export function mountFooter() {
       <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-6 text-sm">
         <div class="lg:col-span-2 space-y-4 pr-4">
           <div class="flex items-center gap-3">
-            <span class="brand-mark !bg-orange-500 !text-white font-black text-lg w-10 h-10 rounded-xl flex items-center justify-center">D</span>
+            <span class="brand-mark">D</span>
             <div>
-              <span class="text-xl font-black text-white tracking-tight">DigiStore</span>
-              <span class="block text-[11px] text-slate-400 font-medium uppercase tracking-wider">by Codeink Technologies</span>
+              <span class="text-xl font-black tracking-tight" style="color:var(--text);font-family:var(--font-display)">DigiStore</span>
+              <span class="block text-[11px] font-medium uppercase tracking-wider" style="color:var(--text-muted)">by Codeink Technologies</span>
             </div>
           </div>
-          <p class="text-xs leading-relaxed text-slate-400 max-w-sm">
+          <p class="text-xs leading-relaxed max-w-sm" style="color:var(--text-muted)">
             Empowering professionals, creators, and developers worldwide with verified, high-value digital products, comprehensive ebooks, tools, and software templates.
           </p>
-          <div class="pt-2 flex flex-wrap gap-2 items-center text-[11px] text-slate-400">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-slate-300 font-medium">
+          <div class="pt-2 flex flex-wrap gap-2 items-center text-[11px]" style="color:var(--text-muted)">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium" style="background:var(--surface-sunken)">
               ${icon('shield-check', 13)}
               <span>Verified Merchant Platform</span>
             </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-slate-300 font-medium">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium" style="background:var(--surface-sunken)">
               ${icon('lock', 13)}
               <span>256-Bit SSL Encrypted</span>
             </span>
@@ -252,56 +428,56 @@ export function mountFooter() {
         </div>
 
         <div class="space-y-3">
-          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Digital Catalog</h3>
-          <ul class="space-y-2 text-xs text-slate-400">
-            <li><a href="./store?category=Ebooks%20%26%20Guides" class="hover:text-orange-400 transition">Ebooks &amp; Guides</a></li>
-            <li><a href="./store?category=Software%20%26%20Tools" class="hover:text-orange-400 transition">Software &amp; Tools</a></li>
-            <li><a href="./store?category=Templates%20%26%20Themes" class="hover:text-orange-400 transition">Templates &amp; Themes</a></li>
-            <li><a href="./store?category=Online%20Courses" class="hover:text-orange-400 transition">Online Courses</a></li>
-            <li><a href="./store?category=Audio%20%26%20Media" class="hover:text-orange-400 transition">Audio &amp; Media</a></li>
-            <li><a href="./store?category=Design%20%26%20Graphics" class="hover:text-orange-400 transition">Design &amp; Graphics</a></li>
+          <h3 class="text-xs uppercase tracking-wider" style="color:var(--text);font-family:var(--font-display);font-weight:700">Digital Catalog</h3>
+          <ul class="space-y-2 text-xs" style="color:var(--text-muted)">
+            <li><a href="./store?category=Ebooks%20%26%20Guides" class="hover:opacity-100" style="transition:color .15s">Ebooks &amp; Guides</a></li>
+            <li><a href="./store?category=Software%20%26%20Tools">Software &amp; Tools</a></li>
+            <li><a href="./store?category=Templates%20%26%20Themes">Templates &amp; Themes</a></li>
+            <li><a href="./store?category=Online%20Courses">Online Courses</a></li>
+            <li><a href="./store?category=Audio%20%26%20Media">Audio &amp; Media</a></li>
+            <li><a href="./store?category=Design%20%26%20Graphics">Design &amp; Graphics</a></li>
           </ul>
         </div>
 
         <div class="space-y-3">
-          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Customer Hub</h3>
-          <ul class="space-y-2 text-xs text-slate-400">
-            <li><a href="./account" class="hover:text-orange-400 transition">My Account &amp; Vault</a></li>
-            <li><a href="./account#orders-list" class="hover:text-orange-400 transition">Order History</a></li>
-            <li><a href="./support" class="hover:text-orange-400 transition">Customer Helpdesk</a></li>
-            <li><a href="./support" class="hover:text-orange-400 transition">Submit Support Ticket</a></li>
-            <li><a href="./blog" class="hover:text-orange-400 transition">Articles &amp; Updates</a></li>
-            <li><a href="./about" class="hover:text-orange-400 transition">About Codeink</a></li>
+          <h3 class="text-xs uppercase tracking-wider" style="color:var(--text);font-family:var(--font-display);font-weight:700">Customer Hub</h3>
+          <ul class="space-y-2 text-xs" style="color:var(--text-muted)">
+            <li><a href="./account">My Account &amp; Vault</a></li>
+            <li><a href="./account#orders-list">Order History</a></li>
+            <li><a href="./support">Customer Helpdesk</a></li>
+            <li><a href="./support">Submit Support Ticket</a></li>
+            <li><a href="./blog">Articles &amp; Updates</a></li>
+            <li><a href="./about">About Codeink</a></li>
           </ul>
         </div>
 
         <div class="space-y-3">
-          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Sell With Us</h3>
-          <ul class="space-y-2 text-xs text-slate-400">
-            <li><a href="./vendor" class="font-bold text-orange-400 hover:text-orange-300 transition">Start selling →</a></li>
-            <li><a href="./vendor" class="hover:text-orange-400 transition">Seller centre</a></li>
-            <li><a href="./categories" class="hover:text-orange-400 transition">What sells here</a></li>
-            <li><a href="./support" class="hover:text-orange-400 transition">Seller support</a></li>
+          <h3 class="text-xs uppercase tracking-wider" style="color:var(--text);font-family:var(--font-display);font-weight:700">Sell With Us</h3>
+          <ul class="space-y-2 text-xs" style="color:var(--text-muted)">
+            <li><a href="./vendor" class="font-bold" style="color:#92660a">Start selling →</a></li>
+            <li><a href="./vendor">Seller centre</a></li>
+            <li><a href="./categories">What sells here</a></li>
+            <li><a href="./support">Seller support</a></li>
           </ul>
         </div>
 
         <div class="space-y-3">
-          <h3 class="font-bold text-white text-xs uppercase tracking-wider">Trust &amp; Legal</h3>
-          <ul class="space-y-2 text-xs text-slate-400">
-            <li><a href="./support#faq" class="hover:text-orange-400 transition">Terms of Service</a></li>
-            <li><a href="./support#faq" class="hover:text-orange-400 transition">Privacy Policy</a></li>
-            <li><a href="./support#faq" class="hover:text-orange-400 transition">Refund &amp; Return Policy</a></li>
-            <li><a href="./support#faq" class="hover:text-orange-400 transition">Digital License Agreement</a></li>
-            <li><a href="./support#faq" class="hover:text-orange-400 transition">Security &amp; Compliance</a></li>
-            <li><a href="./contact" class="hover:text-orange-400 transition">Contact Legal Team</a></li>
+          <h3 class="text-xs uppercase tracking-wider" style="color:var(--text);font-family:var(--font-display);font-weight:700">Trust &amp; Legal</h3>
+          <ul class="space-y-2 text-xs" style="color:var(--text-muted)">
+            <li><a href="./support#faq">Terms of Service</a></li>
+            <li><a href="./support#faq">Privacy Policy</a></li>
+            <li><a href="./support#faq">Refund &amp; Return Policy</a></li>
+            <li><a href="./support#faq">Digital License Agreement</a></li>
+            <li><a href="./support#faq">Security &amp; Compliance</a></li>
+            <li><a href="./contact">Contact Legal Team</a></li>
           </ul>
         </div>
       </div>
 
-      <div class="border-t border-slate-800/80 pt-8 flex flex-wrap items-center justify-between gap-6 text-xs text-slate-500">
+      <div class="pt-8 flex flex-wrap items-center justify-between gap-6 text-xs" style="border-top:1px solid var(--border);color:var(--text-soft)">
         <div>
-          <p>© ${year} <strong class="text-slate-400">Codeink Technologies</strong>. All rights reserved.</p>
-          <p class="text-[11px] text-slate-500 mt-0.5">DigiStore is a registered digital merchandise platform by Codeink Technologies.</p>
+          <p>© ${year} <strong style="color:var(--text-muted)">Codeink Technologies</strong>. All rights reserved.</p>
+          <p class="text-[11px] mt-0.5">DigiStore is a registered digital merchandise platform by Codeink Technologies.</p>
         </div>
         <div class="flex flex-wrap items-center gap-5 sm:gap-6">
           <div class="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition cursor-default" title="Flutterwave Verified Partner">

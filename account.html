@@ -1,14 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>My account | DigiStore</title>
+  <title>My Account | DigiStore</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="./css/app.css">
 </head>
-<body class="bg-slate-50 text-slate-900">
+
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
   <div id="page-loader" class="page-loader">
     <div class="loader-card">
       <div class="shimmer logo"></div>
@@ -17,88 +19,95 @@
     </div>
   </div>
 
-  <header id="site-header"></header>
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
 
-  <main class="shell py-10">
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <span class="eyebrow">MY DIGISTORE</span>
-        <h1 id="account-title" class="mt-2 text-3xl font-black text-[#142c55]">Your dashboard</h1>
-        <p id="account-subtitle" class="mt-2 text-slate-600">Loading your account activity…</p>
-      </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <a id="seller-link" class="button hidden" href="./vendor"></a>
-        <button id="edit-profile" class="button">Edit profile</button>
+  <main class="flex-1">
+    <div class="acct-shell">
+      <aside class="acct-sidebar">
+        <nav class="acct-nav" id="acct-nav">
+          <button type="button" class="is-active" data-acct-tab="overview"><i data-lucide="layout-grid" width="18" height="18"></i><span>Overview</span></button>
+          <button type="button" data-acct-tab="orders"><i data-lucide="shopping-bag" width="18" height="18"></i><span>My Orders</span></button>
+          <button type="button" data-acct-tab="wishlist"><i data-lucide="heart" width="18" height="18"></i><span>Wishlist</span></button>
+          <button type="button" data-acct-tab="profile"><i data-lucide="user" width="18" height="18"></i><span>Profile Settings</span></button>
+        </nav>
+
+        <div id="acct-admin-link-wrap" class="hidden">
+          <a class="button w-full" href="./admin"><i data-lucide="shield-check" width="15" height="15"></i><span>Admin centre</span></a>
+        </div>
+
+        <div id="acct-seller-card" class="acct-seller-card hidden">
+          <h3 id="acct-seller-title">Seller Centre</h3>
+          <p id="acct-seller-copy">Sell digital templates, resources, and start earning payouts.</p>
+          <a id="acct-seller-link" href="./vendor">Start Selling</a>
+        </div>
+      </aside>
+
+      <div class="acct-content">
+        <!-- Overview -->
+        <div class="acct-tab-panel is-active" data-acct-panel="overview">
+          <div class="acct-welcome">
+            <span class="acct-welcome__avatar" id="acct-avatar">?</span>
+            <div>
+              <h2 id="acct-welcome-title">Welcome back!</h2>
+              <p id="acct-welcome-sub">Loading your account…</p>
+            </div>
+          </div>
+
+          <div id="acct-invites-banner" class="hidden" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-radius:var(--radius-md);background:var(--surface-sunken);border:1px solid var(--border);margin-bottom:20px"></div>
+
+          <div class="acct-stats">
+            <div class="acct-stat-card"><span>Total Digital Orders</span><strong id="acct-stat-orders">—</strong></div>
+            <div class="acct-stat-card"><span>Wishlisted Resources</span><strong id="acct-stat-wishlist">—</strong></div>
+            <div class="acct-stat-card"><span>Total Spent</span><strong id="acct-stat-spend">—</strong></div>
+          </div>
+
+          <div class="acct-panel">
+            <h2>Recent Digital Orders</h2>
+            <div id="acct-overview-orders" class="acct-table-wrap"></div>
+          </div>
+        </div>
+
+        <!-- Orders -->
+        <div class="acct-tab-panel" data-acct-panel="orders">
+          <div class="acct-panel">
+            <h2>Order History</h2>
+            <p class="text-xs -mt-3 mb-3" style="color:var(--text-muted)">Only completed (paid) orders count toward your totals above.</p>
+            <div id="acct-orders-list" class="acct-table-wrap"></div>
+            <div id="acct-orders-pagination" class="mt-4 flex items-center justify-between gap-3 text-xs"></div>
+          </div>
+        </div>
+
+        <!-- Wishlist -->
+        <div class="acct-tab-panel" data-acct-panel="wishlist">
+          <div class="acct-panel">
+            <h2>Your Wishlist</h2>
+            <div id="acct-wishlist-grid" class="acct-wishlist-grid"></div>
+          </div>
+        </div>
+
+        <!-- Profile -->
+        <div class="acct-tab-panel" data-acct-panel="profile">
+          <div class="acct-panel">
+            <h2>Edit Your Details</h2>
+            <form id="profile-form" class="acct-profile-form">
+              <div class="form-field span-2"><label for="full_name">Full name</label><input id="full_name" class="field" name="full_name" required></div>
+              <div class="form-field"><label for="phone">Phone</label><input id="phone" class="field" name="phone"></div>
+              <div class="form-field"><label for="country">Country</label><input id="country" class="field" name="country"></div>
+              <div class="form-field span-2"><label for="address">Address</label><textarea id="address" class="field" name="address"></textarea></div>
+              <div class="form-field"><label for="occupation">Occupation</label><input id="occupation" class="field" name="occupation"></div>
+              <div class="form-field"><label for="age">Age</label><input id="age" class="field" name="age" type="number"></div>
+              <button type="submit" class="button button-primary form-submit">Save profile</button>
+              <p id="profile-feedback" class="status-line span-2"></p>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
-
-    <!-- Seller invitation — replaced by a dashboard link once they sell -->
-    <section id="sell-cta" class="soft-panel mt-7 hidden p-6">
-      <div class="flex flex-wrap items-center justify-between gap-5">
-        <div class="max-w-xl">
-          <span class="eyebrow">EARN ON DIGISTORE</span>
-          <h2 class="mt-1 text-xl font-black text-[#142c55]">Sell your own digital products</h2>
-          <p class="mt-2 text-sm leading-relaxed text-slate-600">
-            Open a store, publish your work, and get paid to your bank or mobile money account.
-            We handle checkout, payment verification, and secure delivery.
-          </p>
-        </div>
-        <a class="button button-primary shrink-0" href="./vendor">Start selling</a>
-      </div>
-    </section>
-
-    <!-- Account Metrics — Only PAID orders count -->
-    <section class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <div class="metric"><span>Completed purchases</span><strong id="a-orders">—</strong></div>
-      <div class="metric"><span>Total amount spent</span><strong id="a-spend">—</strong></div>
-      <div class="metric"><span>Downloads ready</span><strong id="a-ready">—</strong></div>
-      <div class="metric"><span>Member since</span><strong id="a-member" class="!text-xl">—</strong></div>
-    </section>
-
-    <section class="mt-7 grid gap-7 lg:grid-cols-[1.1fr_.9fr]">
-      <div class="soft-panel p-6">
-        <span class="eyebrow">YOUR ACTIVITY</span>
-        <h2 class="mt-1 text-xl font-black text-[#142c55]">Purchase activity</h2>
-        <div id="activity-chart" class="mt-7 h-48"></div>
-      </div>
-      <div class="soft-panel p-6">
-        <span class="eyebrow">QUICK ACTIONS</span>
-        <h2 class="mt-1 text-xl font-black text-[#142c55]">Keep moving</h2>
-        <div class="mt-5 grid gap-3">
-          <a class="button button-primary" href="./#store">Browse catalog</a>
-          <a class="button" href="./support">Get support</a>
-          <a id="account-admin" class="button hidden" href="./admin">Open admin centre</a>
-        </div>
-      </div>
-    </section>
-
-    <section class="mt-7 grid gap-7 lg:grid-cols-[1.1fr_.9fr]">
-      <div class="soft-panel p-6">
-        <span class="eyebrow">ORDER HISTORY</span>
-        <h2 class="mt-1 text-xl font-black text-[#142c55]">Purchases &amp; downloads</h2>
-        <p class="mt-1 text-xs text-slate-400">Only completed (paid) orders appear in your metrics above.</p>
-        <div id="orders-list" class="mt-5"></div>
-        <div id="orders-pagination" class="mt-4 flex items-center justify-between gap-3 text-xs"></div>
-      </div>
-
-      <section id="profile-panel" class="soft-panel hidden p-6">
-        <span class="eyebrow">PROFILE</span>
-        <h2 class="mt-1 text-xl font-black text-[#142c55]">Edit your details</h2>
-        <form id="profile-form" class="mt-5 grid gap-4 sm:grid-cols-2">
-          <label class="sm:col-span-2"><span class="label">Full name</span><input class="field" name="full_name" required></label>
-          <label><span class="label">Phone</span><input class="field" name="phone"></label>
-          <label><span class="label">Country</span><input class="field" name="country"></label>
-          <label class="sm:col-span-2"><span class="label">Address</span><textarea class="field" name="address"></textarea></label>
-          <label><span class="label">Occupation</span><input class="field" name="occupation"></label>
-          <label><span class="label">Age</span><input class="field" name="age" type="number"></label>
-          <button class="button button-primary sm:col-span-2">Save profile</button>
-          <p id="profile-feedback" class="status-line sm:col-span-2"></p>
-        </form>
-      </section>
   </main>
 
   <footer id="site-footer"></footer>
 
   <script type="module" src="./js/account.js"></script>
 </body>
+
 </html>

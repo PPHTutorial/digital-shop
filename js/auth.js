@@ -1,24 +1,29 @@
 import { supabase } from './client.js';
 import { CONFIG } from './config.js';
-import { mountFooter, mountHeader, setButtonLoading, toast } from './ui.js';
+import { mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 
 mountHeader();
 mountFooter();
+renderIcons();
 
 const form = document.querySelector('#auth-form');
-const title = document.querySelector('#auth-title');
 const submit = document.querySelector('#auth-submit');
-const toggle = document.querySelector('#auth-toggle');
 const notice = document.querySelector('#auth-notice');
+const tabSignin = document.querySelector('#tab-signin');
+const tabSignup = document.querySelector('#tab-signup');
 let mode = new URLSearchParams(location.search).get('mode') === 'signup' ? 'signup' : 'signin';
+let forgotMode = false;
 
 function setMode(nextMode) {
   mode = nextMode;
-  title.textContent = mode === 'signup' ? 'Create your account' : 'Welcome back';
-  submit.textContent = mode === 'signup' ? 'Create account' : 'Sign in';
-  toggle.textContent = mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account';
-  document.querySelector('#full-name-wrap').hidden = mode !== 'signup';
+  forgotMode = false;
+  tabSignin.classList.toggle('is-active', mode === 'signin');
+  tabSignup.classList.toggle('is-active', mode === 'signup');
+  submit.textContent = mode === 'signup' ? 'Create Account' : 'Sign In to Account';
+  document.querySelector('#full-name-wrap').classList.toggle('hidden', mode !== 'signup');
   document.querySelector('[name="full_name"]').required = mode === 'signup';
+  document.querySelector('#auth-password').required = true;
+  document.querySelector('#auth-password').closest('.form-field').classList.remove('hidden');
   notice.textContent = '';
 }
 
@@ -34,10 +39,43 @@ async function redirectIfSignedIn() {
   }
 }
 
-toggle.addEventListener('click', () => setMode(mode === 'signup' ? 'signin' : 'signup'));
+tabSignin.addEventListener('click', () => setMode('signin'));
+tabSignup.addEventListener('click', () => setMode('signup'));
+
+document.querySelector('#forgot-password-link').addEventListener('click', async (event) => {
+  event.preventDefault();
+  if (!forgotMode) {
+    forgotMode = true;
+    document.querySelector('#auth-password').closest('.form-field').classList.add('hidden');
+    document.querySelector('#auth-password').required = false;
+    submit.textContent = 'Send Reset Link';
+    notice.textContent = 'Enter your email above, then send a reset link.';
+    notice.className = 'status-line';
+    return;
+  }
+});
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(form).entries());
+
+  if (forgotMode) {
+    setButtonLoading(submit, true, 'Sending…');
+    const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
+      redirectTo: `${CONFIG.SITE_URL}${location.pathname.replace(/[^/]+$/, 'account')}`,
+    });
+    setButtonLoading(submit, false);
+    submit.textContent = 'Send Reset Link';
+    if (error) {
+      notice.textContent = error.message;
+      notice.className = 'status-line error';
+      return;
+    }
+    notice.textContent = 'Check your email for a password reset link.';
+    notice.className = 'status-line success';
+    return;
+  }
+
   setButtonLoading(submit, true, mode === 'signup' ? 'Creating account…' : 'Signing in…');
   notice.textContent = '';
   const redirectTo = `${CONFIG.SITE_URL}${location.pathname.replace(/[^/]+$/, 'auth')}`;
@@ -45,6 +83,7 @@ form.addEventListener('submit', async (event) => {
     ? await supabase.auth.signUp({ email: values.email, password: values.password, options: { data: { full_name: values.full_name }, emailRedirectTo: redirectTo } })
     : await supabase.auth.signInWithPassword({ email: values.email, password: values.password });
   setButtonLoading(submit, false);
+  submit.textContent = mode === 'signup' ? 'Create Account' : 'Sign In to Account';
   if (result.error) {
     notice.textContent = result.error.message;
     notice.className = 'status-line error';

@@ -3,330 +3,402 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
   <title>Admin Centre | DigiStore</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="./css/app.css">
 </head>
-<body class="bg-slate-50 text-slate-900">
-  <div id="admin-scrim" class="admin-scrim" hidden></div>
-  <div class="min-h-screen lg:flex">
-    <aside id="admin-sidebar" class="admin-sidebar bg-[#142c55] p-5 text-white lg:sticky lg:top-0 lg:h-screen lg:w-64 flex flex-col justify-between shrink-0">
-      <div>
-        <div class="flex items-center justify-between gap-3">
-          <a class="brand !text-white" href="./">
-            <span class="brand-mark">D</span>
-            <span>DigiStore<small class="!text-slate-400">Control centre</small></span>
-          </a>
-          <button id="admin-menu-close" class="admin-menu-close" type="button" aria-label="Close menu">
-            <i data-lucide="x" width="20" height="20"></i>
-          </button>
-        </div>
-        <nav class="mt-7 grid gap-1.5 text-sm font-bold" aria-label="Admin sections">
-          <a class="admin-link active flex items-center gap-2" href="#overview"><i data-lucide="layout-dashboard" width="16" height="16"></i><span>Overview</span></a>
-          <a class="admin-link flex items-center gap-2" href="#products"><i data-lucide="package" width="16" height="16"></i><span>Catalog</span></a>
-          <a class="admin-link flex items-center gap-2" href="#categories"><i data-lucide="tags" width="16" height="16"></i><span>Categories</span></a>
-          <a class="admin-link flex items-center gap-2" href="#transactions"><i data-lucide="credit-card" width="16" height="16"></i><span>Orders</span></a>
-          <a class="admin-link flex items-center gap-2" href="#customers"><i data-lucide="users" width="16" height="16"></i><span>Customers</span></a>
-          <a class="admin-link flex items-center gap-2" href="#promotions"><i data-lucide="badge-percent" width="16" height="16"></i><span>Promotions</span></a>
-          <a class="admin-link flex items-center gap-2" href="#content"><i data-lucide="file-text" width="16" height="16"></i><span>Content</span></a>
-          <a class="admin-link flex items-center gap-2" href="#automation"><i data-lucide="workflow" width="16" height="16"></i><span>Operations</span></a>
-          <a class="admin-link flex items-center gap-2" href="#moderation"><i data-lucide="shield-check" width="16" height="16"></i><span class="flex-1">Sellers &amp; ads</span><span id="mod-badge" class="hidden rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-black text-white"></span></a>
-          <a class="admin-link flex items-center gap-2" href="#tickets"><i data-lucide="life-buoy" width="16" height="16"></i><span>Support</span></a>
-        </nav>
-      </div>
-      <div class="mt-8 text-xs text-slate-400 pt-4 border-t border-slate-700">
-        <button id="admin-signout" class="button !w-full !bg-slate-800 hover:!bg-slate-700 !text-white flex items-center justify-center gap-2 text-xs">
-          <i data-lucide="log-out" width="14" height="14"></i>
-          <span>Sign out</span>
-        </button>
-      </div>
-    </aside>
-
-    <main class="min-w-0 flex-1">
-      <header class="border-b bg-white">
-        <div class="shell flex items-center justify-between py-5">
-          <div class="flex items-center gap-3 min-w-0">
-            <button id="admin-menu-button" class="admin-menu-button" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="admin-sidebar">
-              <i data-lucide="menu" width="20" height="20"></i>
-            </button>
-            <div class="min-w-0">
-              <span class="eyebrow">DIGISTORE OPERATIONS</span>
-              <h1 id="admin-page-title" class="mt-1 text-2xl font-black text-[#142c55]">Store overview</h1>
-            </div>
-          </div>
-          <div class="flex items-center gap-3">
-            <span id="admin-user" class="hidden text-sm font-bold text-slate-500 sm:block"></span>
-            <button id="admin-header-signout" class="button">Log out</button>
-          </div>
-        </div>
-      </header>
-
-      <div class="shell py-7">
-        <p id="admin-status" class="status-line"></p>
-
-        <!-- Overview Section -->
-        <section id="overview" class="admin-screen space-y-6">
-          <div class="admin-screen-heading">
-            <div><span class="eyebrow">STORE PERFORMANCE</span><h2>Everything that needs your attention</h2><p>Commercial performance, demand and operational signals in one view.</p></div>
-            <label class="admin-period"><span>Revenue period</span><select id="revenue-period"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select></label>
-          </div>
-          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="metric"><span>Total revenue</span><strong id="m-revenue">—</strong><small id="m-revenue-change">Across paid orders</small></div>
-            <div class="metric"><span>Paid orders</span><strong id="m-orders">—</strong><small id="m-aov">Average order —</small></div>
-            <div class="metric"><span>Total customers</span><strong id="m-customers">—</strong><small id="m-conversion">Customer base</small></div>
-            <div class="metric"><span>Open tickets</span><strong id="m-tickets">—</strong><small id="m-catalog">Catalog health</small></div>
-          </div>
-          <div class="grid gap-7 xl:grid-cols-[1.25fr_.75fr]">
-          <div class="soft-panel p-6">
-            <span class="eyebrow">REVENUE ANALYTICS</span>
-            <h2 class="mt-1 text-xl font-black text-[#142c55]">Revenue over time</h2>
-            <div id="revenue-chart" class="mt-7 h-52"></div>
-          </div>
-          <div class="soft-panel p-6">
-            <span class="eyebrow">STORE HEALTH</span>
-            <h2 class="mt-1 text-xl font-black text-[#142c55]">Operations snapshot</h2>
-            <div id="operations-list" class="mt-5 grid gap-3"></div>
-          </div>
-          </div>
-          <div class="grid gap-6 xl:grid-cols-2">
-            <div class="soft-panel p-6"><span class="eyebrow">BESTSELLERS</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Top earning products</h2><div id="top-products" class="mt-5"></div></div>
-            <div class="soft-panel p-6"><span class="eyebrow">MERCHANDISING</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Category performance</h2><div id="category-performance" class="mt-5"></div></div>
-          </div>
-        </section>
-
-        <!-- Customers Section -->
-        <section id="customers" class="admin-screen space-y-6">
-          <div class="admin-screen-heading"><div><span class="eyebrow">CUSTOMERS &amp; USERS</span><h2>Customer relationships</h2><p>Keep customer profiles, account access and purchase history accurate.</p></div><div id="customers-insight" class="admin-insight"></div></div>
-          <div class="soft-panel p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <span class="eyebrow">CUSTOMERS &amp; USERS</span>
-              <h2 class="mt-1 text-xl font-black text-[#142c55]">Customer management</h2>
-            </div>
-          </div>
-          <div id="users-table" class="mt-5"></div>
-          </div>
-        </section>
-
-        <!-- Transactions Section -->
-        <section id="transactions" class="admin-screen space-y-6">
-          <div class="admin-screen-heading"><div><span class="eyebrow">TRANSACTIONS</span><h2>Orders and payments</h2><p>Review payment status, customer purchases and order trends.</p></div><div id="orders-insight" class="admin-insight"></div></div>
-          <div class="soft-panel p-6">
-          <span class="eyebrow">TRANSACTIONS</span>
-          <h2 class="mt-1 text-xl font-black text-[#142c55]">Orders and payments</h2>
-          <div id="orders-status-summary" class="mt-3 flex flex-wrap gap-2 text-xs"></div>
-          <div id="orders-filter-tabs" class="mt-3 flex flex-wrap gap-1.5"></div>
-          <div id="orders-table" class="mt-4"></div>
-          </div>
-        </section>
-
-        <!-- Catalog & Products Section -->
-        <section id="products" class="admin-screen space-y-6">
-          <div class="admin-screen-heading"><div><span class="eyebrow">CATALOG</span><h2>Products and digital editions</h2><p>Publish, price, package and merchandise every product from one workspace.</p></div><button id="new-product" class="button button-primary">+ Add product</button></div>
-          <div class="soft-panel p-6">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <span class="eyebrow">CATALOG</span>
-              <h2 class="mt-1 text-xl font-black text-[#142c55]">Products and digital editions</h2>
-            </div>
-            <span class="tag !bg-slate-100 !text-slate-600">Media-ready catalog</span>
-          </div>
-          <div id="products-table" class="mt-5"></div>
-          </div>
-        </section>
-
-        <section id="categories" class="admin-screen space-y-6">
-          <div class="admin-screen-heading"><div><span class="eyebrow">TAXONOMY</span><h2>Category management</h2><p>Shape storefront navigation and organize your catalog without code changes.</p></div><button id="new-category" class="button button-primary">+ Add category</button></div>
-          <div class="soft-panel p-6"><div id="categories-table"></div></div>
-        </section>
-
-        <section id="promotions" class="admin-screen space-y-6">
-          <div class="admin-screen-heading"><div><span class="eyebrow">DISCOUNTS</span><h2>Promotion codes</h2><p>Plan time-bound offers, redemptions and pricing incentives.</p></div><button id="new-promo" class="button button-primary">+ Add promotion</button></div>
-          <div class="soft-panel p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <span class="eyebrow">DISCOUNTS</span>
-              <h3 class="mt-1 text-xl font-black text-[#142c55]">Promotion codes</h3>
-            </div>
-            <span id="promos-insight" class="tag !bg-orange-50 !text-orange-700">Campaigns</span>
-          </div>
-          <div id="promos-table" class="mt-4"></div>
-          </div>
-        </section>
-
-        <!-- CMS Section -->
-        <section id="content" class="admin-screen space-y-6">
-          <div class="admin-screen-heading"><div><span class="eyebrow">CMS &amp; JOURNAL</span><h2>Content and store experience</h2><p>Maintain editorial content and customer-facing store information.</p></div><div id="content-insight" class="admin-insight"></div></div>
-          <div class="soft-panel p-6">
-          <div class="flex flex-wrap items-end justify-between gap-3">
-            <div><span class="eyebrow">CMS &amp; JOURNAL</span><h2 class="mt-1 text-xl font-black text-[#142c55]">Store content &amp; blog</h2></div>
-            <div class="flex gap-2"><button id="new-post" class="button">New article</button><button id="run-daily-content" class="button button-primary">Generate draft</button></div>
-          </div>
-          <div id="posts-table" class="mt-5"></div>
-          
-          <form id="cms-form" class="mt-7 grid gap-4 sm:grid-cols-2 border-t border-slate-100 pt-6">
-            <label>
-              <span class="label">Store title</span>
-              <input name="site_title" class="field">
-            </label>
-            <label>
-              <span class="label">Support email</span>
-              <input name="support_email" class="field">
-            </label>
-            <label class="sm:col-span-2">
-              <span class="label">Store announcement banner</span>
-              <textarea name="announcement" class="field" rows="2"></textarea>
-            </label>
-            <div>
-              <button class="button button-primary">Save store settings</button>
-            </div>
-          </form>
-          </div>
-        </section>
-
-        <section id="automation" class="admin-screen space-y-6">
-          <div class="admin-screen-heading"><div><span class="eyebrow">AUTOMATION &amp; INDEXING</span><h2>Publishing operations</h2><p>Keep discovery and publishing workflows dependable.</p></div></div>
-          <div class="soft-panel p-6">
-          <span class="eyebrow">AUTOMATION &amp; INDEXING</span>
-          <h2 class="mt-1 text-xl font-black text-[#142c55]">Publishing operations</h2>
-          <div class="mt-5 grid gap-4 md:grid-cols-3">
-            <div class="rounded-xl border border-slate-200 p-4"><div class="flex items-center gap-2 text-[#142c55] font-black"><i data-lucide="calendar-clock" width="17" height="17"></i> Daily content</div><p class="mt-2 text-xs leading-5 text-slate-500">Scheduled task creates a draft from approved news sources. Review before publishing.</p><button id="run-daily-content-secondary" class="button mt-4 !min-h-9 !text-xs">Run now</button></div>
-            <div class="rounded-xl border border-slate-200 p-4"><div class="flex items-center gap-2 text-[#142c55] font-black"><i data-lucide="search-check" width="17" height="17"></i> Search index</div><p class="mt-2 text-xs leading-5 text-slate-500">Products and posts are queued automatically after changes.</p><button id="run-search-index" class="button mt-4 !min-h-9 !text-xs">Process queue</button></div>
-            <div class="rounded-xl border border-slate-200 p-4"><div class="flex items-center gap-2 text-[#142c55] font-black"><i data-lucide="map" width="17" height="17"></i> Sitemap</div><p class="mt-2 text-xs leading-5 text-slate-500">Public pages, products, and published posts are refreshed dynamically.</p><button id="refresh-sitemap" class="button mt-4 !min-h-9 !text-xs">Refresh sitemap</button></div>
-          </div>
-          <p id="automation-feedback" class="status-line mt-4"></p>
-          <p class="mt-4 text-xs leading-5 text-slate-500">Schedules and run history are managed securely in <a class="font-bold text-[#e86f18] underline" href="https://supabase.com/dashboard/project/synnepvvxpluoydkmphb/integrations/cron" target="_blank" rel="noopener">Supabase Cron</a>. Store the schedule credential in Vault; never put it in this dashboard or the frontend.</p>
-          </div>
-        </section>
-
-        <!-- Marketplace moderation -->
-        <section id="moderation" class="admin-screen space-y-6">
-          <div class="admin-screen-heading">
-            <div>
-              <span class="eyebrow">MARKETPLACE</span>
-              <h2>Sellers &amp; advertising</h2>
-              <p>Approve who may sell, which ads run, and settle wallet top-ups and payouts.</p>
-            </div>
-            <button id="refresh-moderation" class="button">Refresh</button>
-          </div>
-
-          <div class="soft-panel p-6">
-            <div class="flex items-center justify-between gap-3">
-              <div><span class="eyebrow">SELLER APPLICATIONS</span><h3 class="mt-1 text-xl font-black text-[#142c55]">Awaiting approval</h3></div>
-            </div>
-            <div id="mod-vendors" class="mt-5"></div>
-          </div>
-
-          <div class="soft-panel p-6">
-            <span class="eyebrow">AD CAMPAIGNS</span>
-            <h3 class="mt-1 text-xl font-black text-[#142c55]">Awaiting review</h3>
-            <p class="mt-1 text-xs text-slate-500">Nothing runs on the storefront until it is approved here.</p>
-            <div id="mod-campaigns" class="mt-5"></div>
-          </div>
-
-          <div class="grid gap-6 xl:grid-cols-2">
-            <div class="soft-panel p-6">
-              <span class="eyebrow">WALLET TOP-UPS</span>
-              <h3 class="mt-1 text-lg font-black text-[#142c55]">Confirm payment received</h3>
-              <p class="mt-1 text-xs text-slate-500">Approving credits the seller's ad wallet immediately.</p>
-              <div id="mod-topups" class="mt-5"></div>
-            </div>
-            <div class="soft-panel p-6">
-              <span class="eyebrow">PAYOUT REQUESTS</span>
-              <h3 class="mt-1 text-lg font-black text-[#142c55]">Money going out</h3>
-              <p class="mt-1 text-xs text-slate-500">Mark as paid once the transfer has actually been sent.</p>
-              <div id="mod-payouts" class="mt-5"></div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Support Queue Section -->
-        <section id="tickets" class="admin-screen space-y-6">
-          <div class="admin-screen-heading"><div><span class="eyebrow">CUSTOMER CARE</span><h2>Support queue</h2><p>Resolve incoming issues and protect customer confidence.</p></div><div id="support-insight" class="admin-insight"></div></div>
-          <div class="soft-panel p-6">
-          <span class="eyebrow">CUSTOMER CARE</span>
-          <h2 class="mt-1 text-xl font-black text-[#142c55]">Support queue</h2>
-          <div id="tickets-table" class="mt-5"></div>
-          </div>
-        </section>
-      </div>
-    </main>
+<body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
+    </div>
   </div>
 
-  <!-- General Editor Modal (Contained & Non-bleeding) -->
-  <dialog id="editor-modal" class="admin-modal-container">
-    <form id="editor-form" class="flex flex-col h-full max-h-[92vh]">
-      <div class="flex items-start justify-between p-5 sm:p-6 pb-4 border-b border-slate-100 bg-white shrink-0">
-        <div>
-          <span id="editor-eyebrow" class="eyebrow"></span>
-          <h2 id="editor-title" class="mt-0.5 text-xl font-black text-[#142c55]"></h2>
-        </div>
-        <button id="close-modal" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 bg-transparent border-0 cursor-pointer flex items-center justify-center" aria-label="Close">
-          <i data-lucide="x" width="20" height="20"></i>
-        </button>
-      </div>
-      <div id="editor-fields" class="admin-modal-body space-y-5"></div>
-      <div class="admin-modal-footer flex items-center justify-between gap-3">
-        <p id="editor-feedback" class="status-line mr-auto my-0 text-xs"></p>
-        <div class="flex items-center gap-3 shrink-0">
-          <button id="cancel-modal-btn" type="button" class="button">Cancel</button>
-          <button id="editor-submit-btn" class="button button-primary" type="submit">Save changes</button>
-        </div>
-      </div>
-    </form>
-  </dialog>
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
 
-  <!-- Details / Activity View Modal -->
-  <dialog id="details-modal" class="w-[min(94vw,640px)] rounded-2xl border-0 p-0 shadow-2xl bg-white" style="margin:auto">
-    <div class="p-6">
-      <div class="flex items-start justify-between pb-3 border-b border-slate-100">
-        <div>
-          <span id="details-eyebrow" class="eyebrow">CUSTOMER DETAILS</span>
-          <h2 id="details-title" class="mt-1 text-xl font-black text-[#142c55]">Customer activity</h2>
-        </div>
-        <button id="close-details-modal" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 bg-transparent border-0 cursor-pointer flex items-center justify-center" aria-label="Close">
-          <i data-lucide="x" width="20" height="20"></i>
-        </button>
-      </div>
-      <div id="details-content" class="mt-5 space-y-4 max-h-[60vh] overflow-y-auto pr-1"></div>
-      <div class="mt-6 flex justify-end border-t border-slate-100 pt-4">
-        <button id="close-details-btn" type="button" class="button">Close</button>
+  <main class="flex-1">
+
+    <!-- Gate shown while we confirm this account is an administrator -->
+    <div id="admin-gate" class="vnd-gate">
+      <div class="vnd-gate-card">
+        <div class="progress-track"></div>
+        <p>Checking administrator access…</p>
       </div>
     </div>
-  </dialog>
 
-  <!-- Image Editor Modal -->
-  <dialog id="image-editor-modal" class="w-[min(94vw,680px)] rounded-2xl border-0 p-0 shadow-2xl bg-white" style="margin:auto">
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-black text-[#142c55]">Edit Image</h2>
-        <button id="cancel-crop-btn" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 border-0 bg-transparent cursor-pointer flex items-center justify-center" aria-label="Close">
-          <i data-lucide="x" width="20" height="20"></i>
-        </button>
-      </div>
-      <div class="overflow-auto rounded-xl bg-slate-100 flex justify-center items-center min-h-[200px]" style="max-height:360px">
-        <canvas id="crop-canvas" class="max-w-full block"></canvas>
-      </div>
-      <div class="mt-4 flex flex-wrap gap-2 items-center">
-        <span class="label mr-1">Crop:</span>
-        <button type="button" class="button text-xs crop-preset active" data-aspect="free">Free</button>
-        <button type="button" class="button text-xs crop-preset" data-aspect="1">Square 1:1</button>
-        <button type="button" class="button text-xs crop-preset" data-aspect="1.3333">Portrait 4:3</button>
-        <button type="button" class="button text-xs crop-preset" data-aspect="1.7778">Landscape 16:9</button>
-      </div>
-      <div class="mt-3 flex flex-wrap gap-4 items-center">
-        <span class="label mr-1">Quality:</span>
-        <label class="text-sm flex gap-1.5 items-center cursor-pointer"><input type="radio" name="img-quality" value="lossless"> Lossless (PNG)</label>
-        <label class="text-sm flex gap-1.5 items-center cursor-pointer"><input type="radio" name="img-quality" value="0.92" checked> High JPEG 92%</label>
-        <label class="text-sm flex gap-1.5 items-center cursor-pointer"><input type="radio" name="img-quality" value="0.75"> Compressed 75%</label>
-      </div>
-      <div class="mt-5 flex gap-3 justify-end">
-        <button id="cancel-crop-btn-2" type="button" class="button">Cancel</button>
-        <button id="apply-crop-btn" type="button" class="button button-primary">Apply &amp; Upload</button>
+    <!-- Dashboard -->
+    <div id="admin-shell" class="hidden adm-shell">
+      <button id="dash-menu-button" class="dash-menu-button" aria-label="Open dashboard menu" aria-expanded="false" aria-controls="dash-sidebar">
+        <i data-lucide="menu" width="18" height="18"></i><span>Menu</span>
+      </button>
+      <div id="dash-scrim" class="dash-scrim"></div>
+      <aside id="dash-sidebar" class="adm-sidebar dash-sidebar">
+        <button id="dash-sidebar-close" class="dash-sidebar-close" aria-label="Close dashboard menu"><i data-lucide="x" width="18" height="18"></i></button>
+        <div class="adm-id-card">
+          <span id="admin-avatar" class="adm-id-card__mark">A</span>
+          <div class="min-w-0">
+            <strong class="adm-id-card__name">Control centre</strong>
+            <span id="admin-user" class="adm-id-card__email"></span>
+          </div>
+        </div>
+
+        <nav class="adm-nav" id="adm-nav" aria-label="Admin sections">
+          <span class="adm-nav-group">Operations</span>
+          <a href="#overview" data-adm-link="overview"><i data-lucide="layout-dashboard" width="16" height="16"></i><span>Overview</span></a>
+          <a href="#customers" data-adm-link="customers"><i data-lucide="users" width="16" height="16"></i><span>Customers</span></a>
+          <a href="#transactions" data-adm-link="transactions"><i data-lucide="credit-card" width="16" height="16"></i><span>Transactions</span></a>
+
+          <span class="adm-nav-group">Catalog</span>
+          <a href="#products" data-adm-link="products"><i data-lucide="package" width="16" height="16"></i><span>Products</span></a>
+          <a href="#categories" data-adm-link="categories"><i data-lucide="tags" width="16" height="16"></i><span>Categories</span></a>
+          <a href="#promotions" data-adm-link="promotions"><i data-lucide="badge-percent" width="16" height="16"></i><span>Promotions</span></a>
+
+          <span class="adm-nav-group">Content</span>
+          <a href="#content" data-adm-link="content"><i data-lucide="file-text" width="16" height="16"></i><span>CMS &amp; Journal</span></a>
+
+          <span class="adm-nav-group">Marketplace</span>
+          <a href="#stores" data-adm-link="stores"><i data-lucide="store" width="16" height="16"></i><span>Stores</span></a>
+          <a href="#moderation" data-adm-link="moderation"><i data-lucide="shield-check" width="16" height="16"></i><span class="flex-1">Moderation</span><span id="mod-badge" class="adm-nav-badge hidden"></span></a>
+
+          <span class="adm-nav-group">Support</span>
+          <a href="#tickets" data-adm-link="tickets"><i data-lucide="life-buoy" width="16" height="16"></i><span>Tickets</span></a>
+          <a href="#notifications" data-adm-link="notifications"><i data-lucide="bell" width="16" height="16"></i><span>Notifications</span></a>
+
+          <span class="adm-nav-group">Governance</span>
+          <a href="#admins" data-adm-link="admins"><i data-lucide="shield" width="16" height="16"></i><span>Admins</span></a>
+
+          <span class="adm-nav-group">System</span>
+          <a href="#settings" data-adm-link="settings"><i data-lucide="settings" width="16" height="16"></i><span>Site settings</span></a>
+          <a href="#audit" data-adm-link="audit"><i data-lucide="scroll-text" width="16" height="16"></i><span>Audit log</span></a>
+        </nav>
+
+        <div class="adm-sidebar-foot">
+          <a class="adm-sidebar-link" href="./account"><i data-lucide="user-round" width="14" height="14"></i><span>My account</span></a>
+          <button id="admin-signout" class="adm-sidebar-link" type="button"><i data-lucide="log-out" width="14" height="14"></i><span>Sign out</span></button>
+        </div>
+      </aside>
+
+      <div class="adm-content">
+        <!-- A01 Overview -->
+        <section class="adm-tab-panel" data-adm-panel="overview">
+          <div class="adm-panel-head">
+            <div>
+              <span class="eyebrow">STORE PERFORMANCE</span>
+              <h2>Everything that needs your attention</h2>
+              <p>Commercial performance, demand and operational signals in one view.</p>
+            </div>
+            <label class="admin-period"><span>Revenue period</span><select id="revenue-period"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select></label>
+          </div>
+          <div class="adm-stat-grid">
+            <div class="adm-stat-card"><span>Total revenue</span><strong id="m-revenue">—</strong><small id="m-revenue-change">Across paid orders</small></div>
+            <div class="adm-stat-card"><span>Paid orders</span><strong id="m-orders">—</strong><small id="m-aov">Average order —</small></div>
+            <div class="adm-stat-card"><span>Total customers</span><strong id="m-customers">—</strong><small id="m-conversion">Customer base</small></div>
+            <div class="adm-stat-card"><span>Open tickets</span><strong id="m-tickets">—</strong><small id="m-catalog">Catalog health</small></div>
+          </div>
+          <div class="adm-two-col">
+            <div class="adm-panel">
+              <span class="eyebrow">REVENUE ANALYTICS</span>
+              <h3>Revenue over time</h3>
+              <div id="revenue-chart" class="adm-chart"></div>
+            </div>
+            <div class="adm-panel">
+              <span class="eyebrow">STORE HEALTH</span>
+              <h3>Operations snapshot</h3>
+              <div id="operations-list" class="mt-4 grid gap-3"></div>
+            </div>
+          </div>
+          <div class="adm-two-col">
+            <div class="adm-panel"><span class="eyebrow">BESTSELLERS</span><h3>Top earning products</h3><div id="top-products" class="mt-4"></div></div>
+            <div class="adm-panel"><span class="eyebrow">MERCHANDISING</span><h3>Category performance</h3><div id="category-performance" class="mt-4"></div></div>
+          </div>
+
+          <h3 class="mt-2" style="font-family:var(--font-display);font-weight:800;font-size:1.05rem;color:var(--text)">Platform breakdown</h3>
+          <div class="adm-stat-grid adm-stat-grid--3" id="entity-stat-row"></div>
+
+          <div class="adm-two-col">
+            <div class="adm-panel">
+              <span class="eyebrow">STORES</span><h3>Stores by status</h3>
+              <div id="stores-donut" class="mt-4"></div>
+            </div>
+            <div class="adm-panel">
+              <span class="eyebrow">STORES</span><h3>New approved stores</h3>
+              <div id="stores-growth-chart" class="adm-chart"></div>
+            </div>
+          </div>
+
+          <div class="adm-two-col">
+            <div class="adm-panel">
+              <span class="eyebrow">CUSTOMERS</span><h3>Signups over time</h3>
+              <div id="signups-chart" class="adm-chart"></div>
+            </div>
+            <div class="adm-panel">
+              <span class="eyebrow">CUSTOMERS</span><h3>Account status</h3>
+              <div id="account-status-bar" class="mt-4"></div>
+            </div>
+          </div>
+
+          <div class="adm-two-col">
+            <div class="adm-panel">
+              <span class="eyebrow">ADVERTISING</span><h3>Ad wallet spend over time</h3>
+              <div id="ad-spend-chart" class="adm-chart"></div>
+            </div>
+            <div class="adm-panel">
+              <span class="eyebrow">ADVERTISING</span><h3>Campaign status</h3>
+              <div id="campaign-donut" class="mt-4"></div>
+            </div>
+          </div>
+
+          <div class="adm-panel">
+            <span class="eyebrow">ADVERTISING</span><h3>Top campaigns by spend</h3>
+            <div id="top-campaigns" class="mt-4"></div>
+          </div>
+        </section>
+
+        <!-- A02 Customers -->
+        <section class="adm-tab-panel" data-adm-panel="customers">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">CUSTOMERS &amp; USERS</span><h2>Customer relationships</h2><p>Keep customer profiles, account access and purchase history accurate.</p></div>
+            <div id="customers-insight" class="admin-insight"></div>
+          </div>
+          <div class="adm-panel">
+            <div class="adm-filter-row">
+              <input id="customer-search" class="field" type="search" placeholder="Search name or email…" style="max-width:280px">
+              <select id="customer-role-filter" class="field">
+                <option value="">All roles</option>
+                <option value="customer">Customers</option>
+                <option value="admin">Admins</option>
+              </select>
+            </div>
+            <div id="users-table" class="mt-4"></div>
+          </div>
+        </section>
+
+        <!-- A03 Transactions -->
+        <section class="adm-tab-panel" data-adm-panel="transactions">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">TRANSACTIONS</span><h2>Orders and payments</h2><p>Review payment status, customer purchases and order trends.</p></div>
+            <div id="orders-insight" class="admin-insight"></div>
+          </div>
+          <div class="adm-panel">
+            <div id="orders-status-summary" class="flex flex-wrap gap-2 text-xs"></div>
+            <div id="orders-filter-tabs" class="mt-3 flex flex-wrap gap-1.5"></div>
+            <div id="orders-table" class="mt-4"></div>
+          </div>
+        </section>
+
+        <!-- A04 Products manager -->
+        <section class="adm-tab-panel" data-adm-panel="products">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">CATALOG</span><h2>Products and digital editions</h2><p>Publish, price, package and merchandise every product from one workspace.</p></div>
+            <button id="new-product" class="button button-primary" type="button">+ Add product</button>
+          </div>
+          <div class="adm-panel"><div id="products-table"></div></div>
+        </section>
+
+        <!-- A05 Categories manager -->
+        <section class="adm-tab-panel" data-adm-panel="categories">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">TAXONOMY</span><h2>Category management</h2><p>Shape storefront navigation and organize your catalog without code changes.</p></div>
+            <button id="new-category" class="button button-primary" type="button">+ Add category</button>
+          </div>
+          <div class="adm-panel"><div id="categories-table"></div></div>
+        </section>
+
+        <!-- A06 Promotions -->
+        <section class="adm-tab-panel" data-adm-panel="promotions">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">DISCOUNTS</span><h2>Promotion codes</h2><p>Plan time-bound offers, redemptions and pricing incentives.</p></div>
+            <button id="new-promo" class="button button-primary" type="button">+ Add promotion</button>
+          </div>
+          <div class="adm-panel"><div id="promos-table"></div></div>
+        </section>
+
+        <!-- A07 CMS / Content editor -->
+        <section class="adm-tab-panel" data-adm-panel="content">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">CMS &amp; JOURNAL</span><h2>Content &amp; store experience</h2><p>Draft, review and publish every page, post, FAQ and legal document that appears on the storefront.</p></div>
+            <div class="flex gap-2">
+              <select id="cms-new-type" class="field" style="max-width:160px">
+                <option value="page">Page</option>
+                <option value="post">Blog post</option>
+                <option value="author">Author</option>
+                <option value="faq">FAQ</option>
+                <option value="announcement">Announcement</option>
+                <option value="legal">Legal</option>
+                <option value="navigation">Navigation</option>
+                <option value="homepage">Homepage block</option>
+              </select>
+              <button id="cms-new-doc" class="button button-primary" type="button">+ New document</button>
+            </div>
+          </div>
+
+          <div class="adm-cms-layout">
+            <div class="adm-panel">
+              <div class="adm-filter-row">
+                <input id="cms-search" class="field" type="search" placeholder="Search documents…" style="max-width:170px">
+                <select id="cms-type-filter" class="field" style="max-width:150px">
+                  <option value="">All types</option>
+                  <option value="page">Page</option>
+                  <option value="post">Post</option>
+                  <option value="author">Author</option>
+                  <option value="faq">FAQ</option>
+                  <option value="announcement">Announcement</option>
+                  <option value="legal">Legal</option>
+                  <option value="navigation">Navigation</option>
+                  <option value="homepage">Homepage</option>
+                </select>
+              </div>
+              <div id="cms-doc-list" class="adm-cms-list mt-4"></div>
+            </div>
+
+            <div class="adm-panel">
+              <div id="cms-editor-empty" class="uk-empty"></div>
+              <div id="cms-editor" class="adm-cms-editor hidden"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Stores management (approved/suspended vendors — separate from the pending-application moderation queue) -->
+        <section class="adm-tab-panel" data-adm-panel="stores">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">MARKETPLACE</span><h2>Stores</h2><p>Every seller store on the platform. Approve/reject new applications from the Moderation queue — suspend or reinstate an already-approved store here.</p></div>
+          </div>
+          <div class="adm-panel"><div id="stores-table"></div></div>
+        </section>
+
+        <!-- A08 Moderation queue -->
+        <section class="adm-tab-panel" data-adm-panel="moderation">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">MARKETPLACE</span><h2>Sellers &amp; advertising</h2><p>Approve who may sell, which ads run, and settle wallet top-ups and payouts.</p></div>
+            <button id="refresh-moderation" class="button" type="button">Refresh</button>
+          </div>
+          <div class="adm-panel" id="mod-tabs-root">
+            <div class="uk-tabs__list" role="tablist">
+              <button type="button" class="uk-tabs__btn is-active" data-uk-tab="vendors">Seller applications <span id="mod-count-vendors" class="uk-badge uk-badge--neutral"></span></button>
+              <button type="button" class="uk-tabs__btn" data-uk-tab="campaigns">Ad campaigns <span id="mod-count-campaigns" class="uk-badge uk-badge--neutral"></span></button>
+              <button type="button" class="uk-tabs__btn" data-uk-tab="topups">Wallet top-ups <span id="mod-count-topups" class="uk-badge uk-badge--neutral"></span></button>
+              <button type="button" class="uk-tabs__btn" data-uk-tab="payouts">Payout requests <span id="mod-count-payouts" class="uk-badge uk-badge--neutral"></span></button>
+            </div>
+            <div class="uk-tabs__panel is-active mt-4" data-uk-tab-panel="vendors" id="mod-vendors"></div>
+            <div class="uk-tabs__panel mt-4" data-uk-tab-panel="campaigns" id="mod-campaigns"></div>
+            <div class="uk-tabs__panel mt-4" data-uk-tab-panel="topups" id="mod-topups"></div>
+            <div class="uk-tabs__panel mt-4" data-uk-tab-panel="payouts" id="mod-payouts"></div>
+          </div>
+        </section>
+
+        <!-- A09 Support tickets -->
+        <section class="adm-tab-panel" data-adm-panel="tickets">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">CUSTOMER CARE</span><h2>Support queue</h2><p>Resolve incoming issues and protect customer confidence.</p></div>
+            <div id="support-insight" class="admin-insight"></div>
+          </div>
+          <div class="adm-panel">
+            <div class="adm-filter-row">
+              <select id="ticket-status-filter" class="field" style="max-width:180px">
+                <option value="">All statuses</option>
+                <option value="open">Open</option>
+                <option value="pending">Pending</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+            <div id="tickets-table" class="mt-4"></div>
+          </div>
+        </section>
+
+        <!-- Notifications: compose + send, history below -->
+        <section class="adm-tab-panel" data-adm-panel="notifications">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">COMMUNICATIONS</span><h2>Notifications</h2><p>Send a broadcast to everyone, a segment, or a single person.</p></div>
+          </div>
+          <div class="adm-panel hidden" id="notif-permission-gate"></div>
+          <div class="adm-panel hidden" id="notif-compose-panel">
+            <h3>Compose</h3>
+            <form id="notif-form" class="adm-settings-form mt-3">
+              <label class="adm-field adm-field--span2"><span class="label">Title</span><input class="field" name="title" required maxlength="120"></label>
+              <label class="adm-field adm-field--span2"><span class="label">Message</span><textarea class="field" name="body" rows="4" required></textarea></label>
+              <label class="adm-field"><span class="label">Audience</span>
+                <select class="field" name="audience" id="notif-audience">
+                  <option value="all">Everyone</option>
+                  <option value="customers">Customers</option>
+                  <option value="vendors">Vendors</option>
+                  <option value="admins">Admins</option>
+                  <option value="specific_user">Specific user</option>
+                </select>
+              </label>
+              <label class="adm-field" id="notif-target-wrap" style="display:none"><span class="label">Recipient email</span><input class="field" name="target_email" placeholder="user@example.com"></label>
+              <div class="adm-field--span2 flex items-center gap-3">
+                <button class="button button-primary" type="submit">Send notification</button>
+                <p id="notif-feedback" class="status-line text-xs my-0"></p>
+              </div>
+            </form>
+          </div>
+          <div class="adm-panel hidden" id="notif-history-panel">
+            <h3>Sent history</h3>
+            <div id="notif-history-table" class="mt-4"></div>
+          </div>
+        </section>
+
+        <!-- Admins & tiers (super_admin-gated management, everyone with is_admin() can view) -->
+        <section class="adm-tab-panel" data-adm-panel="admins">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">GOVERNANCE</span><h2>Admins &amp; permission tiers</h2><p>Manage who holds administrator access and at which tier.</p></div>
+          </div>
+          <div id="admins-gate"></div>
+          <div id="admins-content" class="hidden flex flex-col gap-6">
+            <div class="adm-panel"><div id="admins-table"></div></div>
+          </div>
+        </section>
+
+        <!-- A10 Site settings -->
+        <section class="adm-tab-panel" data-adm-panel="settings">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">SITE SETTINGS</span><h2>Global store configuration</h2><p>These values drive the storefront header, footer, checkout and announcement banner.</p></div>
+          </div>
+          <div class="adm-panel">
+            <form id="settings-form" class="adm-settings-form">
+              <label class="adm-field adm-field--span2"><span class="label">Store title</span><input name="site_title" class="field"></label>
+              <label class="adm-field"><span class="label">Support email</span><input name="support_email" type="email" class="field"></label>
+              <label class="adm-field"><span class="label">Default currency</span><input name="default_currency" class="field" maxlength="3" style="text-transform:uppercase"></label>
+              <label class="adm-field adm-field--span2"><span class="label">Tagline</span><input name="tagline" class="field" maxlength="140"></label>
+              <label class="adm-field adm-field--span2"><span class="label">Announcement banner</span><textarea name="announcement" class="field" rows="2"></textarea></label>
+              <label class="adm-field"><span class="label">Announcement active</span>
+                <select name="announcement_active" class="field"><option value="false">Off</option><option value="true">On</option></select>
+              </label>
+              <label class="adm-field"><span class="label">Announcement ends</span><input name="announcement_ends_at" type="datetime-local" class="field"></label>
+              <label class="adm-field adm-field--span2"><span class="label">Checkout note</span><textarea name="checkout_note" class="field" rows="2"></textarea></label>
+              <label class="adm-field"><span class="label">Twitter / X URL</span><input name="social_twitter" class="field"></label>
+              <label class="adm-field"><span class="label">Instagram URL</span><input name="social_instagram" class="field"></label>
+              <div class="adm-field--span2 flex items-center gap-3">
+                <button class="button button-primary" type="submit">Save settings</button>
+                <p id="settings-feedback" class="status-line text-xs my-0"></p>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- A11 Audit log -->
+        <section class="adm-tab-panel" data-adm-panel="audit">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">ACCOUNTABILITY</span><h2>Audit log</h2><p>An append-only record of every administrative action taken on the platform.</p></div>
+            <button id="refresh-audit" class="button" type="button">Refresh</button>
+          </div>
+          <div class="adm-panel">
+            <div class="adm-filter-row">
+              <input id="audit-search" class="field" type="search" placeholder="Search action, entity, actor…" style="max-width:260px">
+              <select id="audit-entity-filter" class="field" style="max-width:170px"><option value="">All entities</option></select>
+            </div>
+            <div id="audit-table" class="mt-4"></div>
+          </div>
+        </section>
       </div>
     </div>
-  </dialog>
+  </main>
+
+  <footer id="site-footer"></footer>
 
   <script type="module" src="./js/admin.js"></script>
 </body>

@@ -1,41 +1,15 @@
 /**
  * Category presentation.
  *
- * One source of truth for the icon/accent each category carries and for the
- * card markup, so the home jumbotron and the dedicated page cannot drift apart.
+ * One source of truth for the icon each category carries (`category-look.js`)
+ * so the homepage strip and this dedicated page cannot drift apart. Every
+ * category shows the same gold icon-circle treatment (Figma uses one uniform
+ * accent for all categories, not a rainbow per category), and every count/
+ * description is real — no per-tile placeholder copy or invented item counts.
  */
 import { supabase } from './client.js';
-import { escapeHtml, icon, renderIcons, mountHeader, mountFooter, finishPageLoader } from './ui.js';
-
-/**
- * Icon + accent per category slug. Falls back to a neutral tile, so seeding a
- * new category never renders a blank card.
- */
-const LOOKS = {
-  'ebooks-guides': { icon: 'book-open', accent: 'amber' },
-  'online-courses': { icon: 'graduation-cap', accent: 'violet' },
-  'templates-themes': { icon: 'layout-template', accent: 'sky' },
-  'software-apps': { icon: 'app-window', accent: 'indigo' },
-  'design-graphics': { icon: 'palette', accent: 'rose' },
-  'photography-presets': { icon: 'camera', accent: 'teal' },
-  'audio-music': { icon: 'music', accent: 'fuchsia' },
-  'video-motion': { icon: 'clapperboard', accent: 'red' },
-  'fonts-typography': { icon: 'type', accent: 'slate' },
-  'ui-kits-wireframes': { icon: 'component', accent: 'cyan' },
-  'productivity-templates': { icon: 'list-checks', accent: 'emerald' },
-  'stock-media-assets': { icon: 'images', accent: 'orange' },
-  'plugins-extensions': { icon: 'puzzle', accent: 'lime' },
-  'game-assets': { icon: 'gamepad-2', accent: 'purple' },
-  '3d-models-assets': { icon: 'box', accent: 'blue' },
-  'marketing-ad-creatives': { icon: 'megaphone', accent: 'pink' },
-  'business-legal-documents': { icon: 'scale', accent: 'stone' },
-  'spreadsheets-models': { icon: 'table-2', accent: 'green' },
-  'printables-planners': { icon: 'printer', accent: 'yellow' },
-  'ai-prompts-models': { icon: 'sparkles', accent: 'brand' },
-};
-
-export const categoryLook = (slug) => LOOKS[slug] || { icon: 'folder', accent: 'slate' };
-const lookFor = categoryLook;
+import { escapeHtml, icon, renderIcons, mountHeader, mountFooter, finishPageLoader, setButtonLoading, toast } from './ui.js';
+import { categoryLook } from './category-look.js';
 
 /** Categories plus a live product count, cheapest way: one products read. */
 export async function loadCategories() {
@@ -54,94 +28,64 @@ export async function loadCategories() {
   return (categoriesResult.data || []).map((category) => ({
     ...category,
     count: counts.get(category.name) || 0,
-    ...lookFor(category.slug),
+    ...categoryLook(category.slug),
   }));
 }
 
-export function categoryCard(category) {
-  const href = `./store?category=${encodeURIComponent(category.name)}`;
-  return `
-    <a class="catcard catcard--${escapeHtml(category.accent)}" href="${href}">
-      <span class="catcard__icon">${icon(category.icon, 22)}</span>
-      <span class="catcard__body">
-        <strong class="catcard__name">${escapeHtml(category.name)}</strong>
-        <span class="catcard__count">${category.count} ${category.count === 1 ? 'product' : 'products'}</span>
-        ${category.description ? `<span class="catcard__desc">${escapeHtml(category.description)}</span>` : ''}
-      </span>
-      <span class="catcard__go">${icon('arrow-right', 15)}</span>
-    </a>`;
-}
-
-/**
- * Bare icon, no tile. The name rides in a tooltip so the strip costs one row
- * of icons rather than a grid of boxes — the tiles were still too heavy on
- * small screens.
- */
-export function categoryIcon(category) {
-  const href = `./store?category=${encodeURIComponent(category.name)}`;
-  return `
-    <a class="caticon caticon--${escapeHtml(category.accent)}" href="${href}"
-       data-tip="${escapeHtml(category.name)}" aria-label="${escapeHtml(category.name)}">
-      ${icon(category.icon, 20)}
-    </a>`;
-}
-
-/**
- * The home-page strip: every category as one icon on a single centred line.
- *
- * Nothing is capped — at this size the full set fits a desktop row, and the
- * line only scrolls when the viewport genuinely cannot hold it. Ordering is
- * busiest-first so that when it does scroll, what people actually buy is the
- * part already on screen.
- */
-export function renderCategoryJumbotron(host, categories) {
-  if (!host) return;
-  const ranked = [...categories].sort((a, b) => b.count - a.count);
-
-  host.innerHTML = `
-    <div class="catstrip">
-      <div class="catstrip__scroll">
-        ${ranked.map(categoryIcon).join('')}
-        <a class="catstrip__more" href="./categories" data-tip="All categories" aria-label="View all categories">
-          ${icon('arrow-right', 18)}
-        </a>
-      </div>
-    </div>`;
-  renderIcons();
-}
-
 /* ==========================================================================
-   Dedicated page
+   Dedicated page (Figma "04 — Categories", node 3:2343)
    ========================================================================== */
+
+function categoryTileHtml(category) {
+  const href = `./store?category=${encodeURIComponent(category.name)}`;
+  return `
+    <a class="cat-tile" href="${href}">
+      <div class="cat-tile__top">
+        <span class="cat-tile__icon">${icon(category.icon, 24)}</span>
+        <span class="cat-tile__count">${category.count.toLocaleString()} item${category.count === 1 ? '' : 's'}</span>
+      </div>
+      <div>
+        <h3 class="cat-tile__name">${escapeHtml(category.name)}</h3>
+        ${category.description ? `<p class="cat-tile__desc">${escapeHtml(category.description)}</p>` : ''}
+      </div>
+      <span class="cat-tile__cta">
+        <span>Explore Marketplace</span>
+        ${icon('arrow-right', 14)}
+      </span>
+    </a>`;
+}
 
 async function initPage() {
   const grid = document.querySelector('#all-categories');
   if (!grid) return;
 
+  mountHeader();
   mountFooter();
+
   const categories = await loadCategories();
 
-  const totalProducts = categories.reduce((sum, c) => sum + c.count, 0);
-  document.querySelector('#cat-count').textContent =
-    `${categories.length} categories · ${totalProducts} products`;
+  grid.innerHTML = categories.length
+    ? categories.map(categoryTileHtml).join('')
+    : '<p class="col-span-full py-12 text-center text-sm" style="color:var(--text-muted)">No categories published yet.</p>';
+  renderIcons();
 
-  const render = (list) => {
-    grid.innerHTML = list.length
-      ? list.map(categoryCard).join('')
-      : '<p class="col-span-full py-12 text-center text-sm text-slate-500">No category matches that search.</p>';
-    renderIcons();
-  };
-
-  render(categories);
-
-  const search = document.querySelector('#cat-search');
-  search?.addEventListener('input', () => {
-    const query = search.value.trim().toLowerCase();
-    render(!query ? categories : categories.filter((c) =>
-      c.name.toLowerCase().includes(query) || (c.description || '').toLowerCase().includes(query)));
+  document.querySelector('#subscribe-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = new FormData(e.currentTarget).get('email');
+    const button = e.currentTarget.querySelector('button');
+    setButtonLoading(button, true, 'Subscribing…');
+    const { error } = await supabase.from('subscribers').insert({ email });
+    setButtonLoading(button, false);
+    const status = document.querySelector('#subscribe-status');
+    if (error && error.code !== '23505') {
+      if (status) { status.textContent = 'Unable to subscribe. Please try again.'; status.className = 'status-line error px-6 pb-4'; }
+      toast('Unable to subscribe. Please try again.', 'error');
+    } else {
+      if (status) { status.textContent = 'Thank you for subscribing to DigiStore updates!'; status.className = 'status-line success px-6 pb-4'; }
+      e.currentTarget.reset();
+    }
   });
 
-  await mountHeader();
   finishPageLoader();
 }
 

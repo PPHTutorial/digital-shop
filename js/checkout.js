@@ -1,50 +1,50 @@
 import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, getAccount, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 import { convertAmount, formatCurrency, getExchangeRates } from './currency.js';
+import { refreshCartBadges } from './cart-actions.js';
+import { enhanceSelects } from './select.js';
+import { enhanceRadios } from './form-controls.js';
+
+enhanceSelects('#flw-currency-select, #flw-method-select, #crypto-currency-select', {
+  'flw-currency-select': 'Pay in your currency',
+  'flw-method-select': 'Payment channel',
+  'crypto-currency-select': 'Cryptocurrency',
+});
+enhanceRadios('input[name="payment_provider"]');
 
 const params = new URLSearchParams(location.search);
-let productId = params.get('product') || params.get('id') || params.get('slug');
+const directSlug = params.get('product') || params.get('id') || params.get('slug');
+const directQty = Math.max(1, Math.min(20, parseInt(params.get('qty') || '1', 10) || 1));
 
 /**
- * A promotion code may ride along on the product link
- * (checkout?product=slug&promo=CODE) so a campaign or affiliate link
- * lands with the discount already applied. `code` and `coupon` are accepted
- * as aliases because those are what people tend to hand-write.
+ * A promotion code may ride along on the checkout link
+ * (checkout?promo=CODE) so a campaign or affiliate link
+ * lands with the discount already applied.
  */
 const linkPromoCode = (params.get('promo') || params.get('code') || params.get('coupon') || '').trim();
 
-if (productId) {
-  sessionStorage.setItem('last_selected_product', productId);
-} else {
-  productId = sessionStorage.getItem('last_selected_product');
-}
-
-let product = null;
+// Each entry: { cart_row_id?, product_id, slug, title, cover_url, currency, unit_price, quantity }
+let items = [];
+let fromCart = false;
+let baseCurrency = 'USD';
 let promotion = null;
 let exchangeRates = null;
 let selectedProvider = 'flutterwave';
 
-// Modal elements
-const descModal = document.querySelector('#description-modal');
-const descContent = document.querySelector('#modal-desc-content');
-const descTitle = document.querySelector('#modal-book-title');
+function subtotalBase() {
+  return items.reduce((sum, it) => sum + Number(it.unit_price) * it.quantity, 0);
+}
 
 function getActiveCurrency() {
-  if (!product) return 'USD';
   if (selectedProvider === 'flutterwave') {
-    return document.querySelector('#flw-currency-select')?.value || product.currency || 'USD';
+    return document.querySelector('#flw-currency-select')?.value || baseCurrency;
   }
-  return product.currency || 'USD';
+  return baseCurrency;
 }
 
 function getCalculatedTotals() {
-  if (!product) {
-    return { basePrice: 0, baseDiscount: 0, baseTotal: 0, convPrice: 0, convDiscount: 0, convTotal: 0, activeCurrency: 'USD' };
-  }
-  const baseCurrency = (product.currency || 'USD').toUpperCase();
   const activeCurrency = getActiveCurrency().toUpperCase();
-
-  const basePrice = Number(product.price || 0);
+  const basePrice = subtotalBase();
   const baseDiscount = Number(promotion?.discount_amount || 0);
   const baseTotal = Math.max(0, basePrice - baseDiscount);
 
@@ -55,22 +55,22 @@ function getCalculatedTotals() {
   return { basePrice, baseDiscount, baseTotal, convPrice, convDiscount, convTotal, activeCurrency, baseCurrency };
 }
 
+function renderSummaryItems() {
+  document.querySelector('#checkout-summary-items').innerHTML = items.map((it) => `
+    <div class="checkout-summary-item">
+      ${it.cover_url ? `<img src="${escapeHtml(it.cover_url)}" alt="${escapeHtml(it.title)}">` : `<span></span>`}
+      <div class="checkout-summary-item__meta">
+        <strong>${escapeHtml(it.title)}</strong>
+        <span>${it.quantity} × ${formatCurrency(Number(it.unit_price), it.currency)}</span>
+      </div>
+      <span class="checkout-summary-item__price">${formatCurrency(Number(it.unit_price) * it.quantity, it.currency)}</span>
+    </div>`).join('');
+}
+
 function renderTotals() {
-  if (!product) return;
-  const { basePrice, baseDiscount, baseTotal, convPrice, convDiscount, convTotal, activeCurrency, baseCurrency } = getCalculatedTotals();
+  if (!items.length) return;
+  const { baseDiscount, baseTotal, convPrice, convDiscount, convTotal, activeCurrency, baseCurrency: bc } = getCalculatedTotals();
 
-  // Summary box price
-  document.querySelector('#summary-price').textContent = formatCurrency(convPrice, activeCurrency);
-  const origPriceEl = document.querySelector('#summary-orig-price');
-  if (product.original_price && Number(product.original_price) > Number(product.price)) {
-    const convOrig = convertAmount(Number(product.original_price), baseCurrency, activeCurrency, exchangeRates);
-    origPriceEl.textContent = formatCurrency(convOrig, activeCurrency);
-    origPriceEl.classList.remove('hidden');
-  } else {
-    origPriceEl.classList.add('hidden');
-  }
-
-  // Totals breakdown
   document.querySelector('#subtotal').textContent = formatCurrency(convPrice, activeCurrency);
   document.querySelector('#total').textContent = formatCurrency(convTotal, activeCurrency);
 
@@ -79,11 +79,10 @@ function renderTotals() {
   discountRow.classList.toggle('flex', Boolean(baseDiscount));
   document.querySelector('#discount').textContent = `−${formatCurrency(convDiscount, activeCurrency)}`;
 
-  // Conversion note if currency is converted from base
   const noteEl = document.querySelector('#conversion-note');
   if (noteEl) {
-    if (activeCurrency !== baseCurrency) {
-      noteEl.textContent = `Converted from ${formatCurrency(baseTotal, baseCurrency)}`;
+    if (activeCurrency !== bc) {
+      noteEl.textContent = `Converted from ${formatCurrency(baseTotal, bc)}`;
       noteEl.classList.remove('hidden');
     } else {
       noteEl.classList.add('hidden');
@@ -122,209 +121,92 @@ function updatePayButtonLabel() {
   }
 }
 
-function setupImageGallery(coverUrl, galleryUrls = []) {
-  const allImages = [];
-  if (coverUrl) allImages.push(coverUrl);
-  if (Array.isArray(galleryUrls)) {
-    galleryUrls.forEach((url) => {
-      if (url && !allImages.includes(url)) allImages.push(url);
-    });
-  }
-
-  const mainImg = document.querySelector('#main-book-img');
-  const placeholder = document.querySelector('#main-book-placeholder');
-  const strip = document.querySelector('#thumbnail-strip');
-
-  if (allImages.length > 0) {
-    mainImg.src = allImages[0];
-    mainImg.classList.remove('hidden');
-    placeholder.classList.add('hidden');
-
-    if (allImages.length > 1) {
-      strip.innerHTML = allImages.map((url, idx) => `
-        <button type="button" class="thumb-btn ${idx === 0 ? 'active' : ''}" data-src="${escapeHtml(url)}">
-          <img src="${escapeHtml(url)}" alt="Thumbnail ${idx + 1}">
-        </button>
-      `).join('');
-      strip.classList.remove('hidden');
-
-      strip.querySelectorAll('.thumb-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          strip.querySelectorAll('.thumb-btn').forEach((b) => b.classList.remove('active'));
-          btn.classList.add('active');
-          mainImg.src = btn.dataset.src;
-        });
-      });
-    } else {
-      strip.classList.add('hidden');
-    }
-
-    // Lightbox modal setup
-    const lightbox = document.querySelector('#image-lightbox-modal');
-    const lightboxImg = document.querySelector('#lightbox-img');
-    const lightboxTitle = document.querySelector('#lightbox-title');
-    const closeLightbox = document.querySelector('#close-lightbox-btn');
-
-    document.querySelector('#main-image-wrapper').onclick = () => {
-      if (mainImg.src && !mainImg.classList.contains('hidden') && lightbox && lightboxImg) {
-        lightboxImg.src = mainImg.src;
-        if (lightboxTitle) lightboxTitle.textContent = product?.title || 'Product Image Preview';
-        lightbox.showModal();
-      }
-    };
-
-    closeLightbox?.addEventListener('click', () => lightbox?.close());
-    lightbox?.addEventListener('click', (e) => {
-      if (e.target === lightbox) lightbox.close();
-    });
-  } else {
-    mainImg.classList.add('hidden');
-    placeholder.classList.remove('hidden');
-    placeholder.innerHTML = '<span>Digital Product</span>';
-    strip.classList.add('hidden');
-  }
-}
-
-function setupDescription(text, title) {
-  const preview = document.querySelector('#description-preview');
-  const readMoreBtn = document.querySelector('#read-more-btn');
-  const trimmed = (text || '').trim();
-
-  if (!trimmed) {
-    preview.textContent = 'Digital product download with instant access upon payment completion.';
-    readMoreBtn.classList.add('hidden');
-    return;
-  }
-
-  preview.textContent = trimmed;
-
-  if (trimmed.length > 250 || trimmed.split('\n').length > 5) {
-    readMoreBtn.classList.remove('hidden');
-    readMoreBtn.onclick = () => {
-      descTitle.textContent = title || 'Book Details';
-      descContent.textContent = trimmed;
-      descModal.showModal();
-    };
-  } else {
-    readMoreBtn.classList.add('hidden');
-  }
+function showEmpty(hadDirectSlug) {
+  document.querySelector('#checkout-progress').classList.add('hidden');
+  document.querySelector('#checkout-grid').classList.add('hidden');
+  document.querySelector('#checkout-empty-copy').textContent = hadDirectSlug
+    ? 'That product could not be found or is no longer published.'
+    : 'Add a digital product before checking out.';
+  document.querySelector('#checkout-empty').classList.remove('hidden');
 }
 
 async function load() {
   await mountHeader();
   mountFooter();
   const { user } = await getAccount();
-  document.querySelector('#checkout-status').textContent = user
-    ? `Signed in as ${user.email} (Encrypted session).`
-    : 'Browsing as a guest — you will sign in when you pay.';
 
-  if (!productId) {
-    document.querySelector('#product-title').textContent = 'No product selected';
-    document.querySelector('#description-preview').innerHTML = '<p class="text-slate-500">Please choose a book from the <a href="./#store" class="text-orange-600 underline font-bold">catalog</a> first.</p>';
+  if (directSlug) {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(directSlug);
+    let query = supabase.from('products').select('id,slug,title,price,currency,cover_url,is_published');
+    query = isUUID ? query.eq('id', directSlug) : query.eq('slug', directSlug);
+    const { data } = await query.maybeSingle();
+    if (data && data.is_published) {
+      items = [{
+        product_id: data.id, slug: data.slug, title: data.title, cover_url: data.cover_url,
+        currency: (data.currency || 'USD').toUpperCase(), unit_price: Number(data.price), quantity: directQty,
+      }];
+      fromCart = false;
+    }
+  } else if (user) {
+    const { data } = await supabase
+      .from('cart_items')
+      .select('id,quantity,product:products(id,slug,title,price,currency,cover_url,is_published)')
+      .eq('user_id', user.id)
+      .order('added_at', { ascending: false });
+    items = (data || [])
+      .filter((r) => r.product?.is_published)
+      .map((r) => ({
+        cart_row_id: r.id, product_id: r.product.id, slug: r.product.slug, title: r.product.title,
+        cover_url: r.product.cover_url, currency: (r.product.currency || 'USD').toUpperCase(),
+        unit_price: Number(r.product.price), quantity: r.quantity,
+      }));
+    fromCart = true;
+  }
+
+  if (!items.length) {
+    showEmpty(Boolean(directSlug));
     finishPageLoader();
     return;
   }
 
-  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
-  let query = supabase
-    .from('products')
-    .select('id,title,slug,category,description,price,original_price,currency,cover_url,gallery_urls,is_published');
-
-  if (isUUID) {
-    query = query.eq('id', productId);
-  } else {
-    query = query.eq('slug', productId);
+  // create_order requires every line item to share one currency — enforce it
+  // here too so the customer sees why, instead of hitting an RPC error at submit.
+  baseCurrency = items[0].currency;
+  const mixedCount = items.filter((it) => it.currency !== baseCurrency).length;
+  if (mixedCount) {
+    items = items.filter((it) => it.currency === baseCurrency);
+    toast(`${mixedCount} item${mixedCount === 1 ? '' : 's'} priced in a different currency stayed in your cart — checkout one currency at a time.`);
   }
 
-  const { data, error } = await query.maybeSingle();
+  renderSummaryItems();
 
-  if (error || !data) {
-    document.querySelector('#product-title').textContent = 'Product unavailable';
-    document.querySelector('#description-preview').innerHTML = '<p class="text-red-600">This book could not be loaded or is not published yet. <a href="./#store" class="text-orange-600 underline font-bold ml-1">Browse catalog</a></p>';
-    finishPageLoader();
-    return;
-  }
-
-  product = data;
-  productId = data.id;
-  sessionStorage.setItem('last_selected_product', data.id);
-
-  // Update address bar with clean shareable URL. A promo code that arrived on
-  // the link is kept, so the address bar stays a working shareable link.
-  const canonicalKey = data.slug || data.id;
-  const promoSuffix = linkPromoCode ? `&promo=${encodeURIComponent(linkPromoCode)}` : '';
-  if (!location.search.includes(canonicalKey)) {
-    history.replaceState(null, '', `checkout?product=${encodeURIComponent(canonicalKey)}${promoSuffix}`);
-  }
-
-  // Wire share button — shares whichever promotion is currently applied, so a
-  // discount can be passed on simply by sharing the page.
-  const shareBtn = document.querySelector('#share-checkout-btn');
-  if (shareBtn) {
-    shareBtn.onclick = async () => {
-      const activePromo = promotion?.code ? `&promo=${encodeURIComponent(promotion.code)}` : '';
-      const canonicalUrl = `${window.location.origin}/checkout?product=${encodeURIComponent(canonicalKey)}${activePromo}`;
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: data.title, url: canonicalUrl });
-          return;
-        } catch {}
-      }
-      navigator.clipboard.writeText(canonicalUrl);
-      toast(activePromo ? 'Link copied — the promotion is included!' : 'Shareable product link copied to clipboard!');
-    };
-  }
-
-  // Left Column
-  document.querySelector('#product-title').textContent = data.title;
-  setupImageGallery(data.cover_url, data.gallery_urls || []);
-  setupDescription(data.description, data.title);
-
-  // Category Tag
-  const categoryTag = document.querySelector('#product-category-tag');
-  if (categoryTag) {
-    categoryTag.textContent = data.category || 'Digital Edition';
-  }
-
-  // Discount badge
-  const discountBadge = document.querySelector('#discount-badge');
-  if (data.original_price && Number(data.original_price) > Number(data.price)) {
-    const pct = Math.round((1 - Number(data.price) / Number(data.original_price)) * 100);
-    discountBadge.textContent = `${pct}% OFF`;
-    discountBadge.classList.remove('hidden');
-  } else {
-    discountBadge.classList.add('hidden');
-  }
-
-  // Right Column Summary
-  document.querySelector('#summary-title').textContent = data.title;
-
-  const summaryThumb = document.querySelector('#summary-thumb');
-  if (data.cover_url) {
-    summaryThumb.src = data.cover_url;
-    summaryThumb.classList.remove('hidden');
-  }
-
-  // Pre-fetch live exchange rates
   try {
-    exchangeRates = await getExchangeRates(data.currency || 'USD');
+    exchangeRates = await getExchangeRates(baseCurrency);
   } catch {
     exchangeRates = null;
   }
 
-  // Set default currency selection in Flutterwave dropdown if matching
   const curSelect = document.querySelector('#flw-currency-select');
-  if (curSelect && data.currency) {
-    const hasOption = Array.from(curSelect.options).some((o) => o.value.toUpperCase() === data.currency.toUpperCase());
-    if (hasOption) curSelect.value = data.currency.toUpperCase();
+  if (curSelect) {
+    const hasOption = Array.from(curSelect.options).some((o) => o.value.toUpperCase() === baseCurrency);
+    if (hasOption) curSelect.value = baseCurrency;
   }
+
+  if (user) {
+    const { data: profile } = await supabase.from('profiles').select('full_name,country').eq('id', user.id).maybeSingle();
+    document.querySelector('#billing-name').value = profile?.full_name || '';
+    document.querySelector('#billing-email').value = user.email || '';
+    document.querySelector('#billing-country').value = profile?.country || '';
+  }
+
+  document.querySelector('#checkout-progress').classList.remove('hidden');
+  document.querySelector('#checkout-grid').classList.remove('hidden');
+  document.querySelector('#checkout-empty').classList.add('hidden');
 
   renderTotals();
   renderIcons();
   finishPageLoader();
 
-  // A code carried on the link applies itself once the product (and therefore
-  // its price) is known. Runs last so a failure never blocks the page.
   if (linkPromoCode) {
     document.querySelector('#promo-code').value = linkPromoCode;
     await applyPromoCode(linkPromoCode, { fromLink: true });
@@ -392,7 +274,6 @@ function syncCurrencyAndMethod(source) {
   const method = flwMethodSelect.value;
 
   if (source === 'method') {
-    // User changed the payment channel → auto-switch currency if needed
     const supportedCurrencies = Object.entries(currencyChannelMap)
       .filter(([, channels]) => channels.includes(method))
       .map(([cur]) => cur);
@@ -403,7 +284,6 @@ function syncCurrencyAndMethod(source) {
       toast(`Currency switched to ${defaultCur} for ${method === 'mobilemoney' ? 'Mobile Money' : method === 'ussd' ? 'USSD' : 'Bank Transfer'} compatibility.`);
     }
   } else if (source === 'currency') {
-    // User changed currency → auto-switch channel if current channel is incompatible
     const allowed = currencyChannelMap[currency] || ['all', 'card'];
     if (!allowed.includes(method)) {
       flwMethodSelect.value = 'all';
@@ -411,7 +291,6 @@ function syncCurrencyAndMethod(source) {
     }
   }
 
-  // Disable incompatible method options for current currency
   const allowed = currencyChannelMap[currency] || ['all', 'card'];
   Array.from(flwMethodSelect.options).forEach((opt) => {
     opt.disabled = !allowed.includes(opt.value);
@@ -430,27 +309,15 @@ flwMethodSelect?.addEventListener('change', () => {
 
 cryptoCurrencySelect?.addEventListener('change', () => updatePayButtonLabel());
 
-// Wire modal close buttons
-[document.querySelector('#close-desc-modal'), document.querySelector('#close-desc-modal-btn')].forEach((btn) => {
-  btn?.addEventListener('click', () => descModal.close());
-});
-
-descModal?.addEventListener('click', (e) => {
-  if (e.target === descModal) descModal.close();
-});
-
 // Promotion Code Application
 /**
- * Validates a code against the current product and applies it to the total.
- *
- * The database is the authority here as everywhere else: `quote_promo` decides
- * whether the code is live and what it is worth. Shared by the Apply button and
- * by the `?promo=` link parameter, so a link-applied code is checked exactly as
- * strictly as a typed one — an expired or fully-redeemed code in a link fails
- * the same way, it just fails quietly rather than shouting at a fresh visitor.
+ * Validates a code against the full basket and applies it to the total.
+ * `quote_promo_for_items` is the database's authority on whether the code is
+ * live and what it's worth against this exact set of items — shared by the
+ * Apply button and by the `?promo=` link parameter.
  */
 async function applyPromoCode(code, { button = null, fromLink = false } = {}) {
-  if (!product) return false;
+  if (!items.length) return false;
 
   const feedback = document.querySelector('#promo-feedback');
   const input = document.querySelector('#promo-code');
@@ -463,35 +330,31 @@ async function applyPromoCode(code, { button = null, fromLink = false } = {}) {
   }
 
   if (button) setButtonLoading(button, true, 'Applying…');
-  const { data, error } = await supabase.rpc('quote_promo', {
+  const { data, error } = await supabase.rpc('quote_promo_for_items', {
     p_code: trimmed,
-    p_product_id: product.id,
+    p_items: items.map((it) => ({ product_id: it.product_id, quantity: it.quantity })),
   });
   if (button) setButtonLoading(button, false);
 
-  const quote = Array.isArray(data) ? data[0] : data;
-
-  if (error || !quote?.valid) {
+  if (error || !data?.valid) {
     promotion = null;
     renderTotals();
-    // A dud code in a shared link is not the visitor's fault — say it plainly
-    // and let them carry on at the normal price.
     feedback.textContent = fromLink
       ? `The code in this link (${trimmed}) is no longer available.`
-      : quote?.message || error?.message || 'That promotion code is not available.';
+      : data?.message || error?.message || 'That promotion code is not available.';
     feedback.className = 'status-line error mt-2 text-xs';
     return false;
   }
 
-  promotion = { code: quote.code, discount_amount: Number(quote.discount_amount) };
-  if (input) input.value = quote.code;
+  promotion = { code: data.code, discount_amount: Number(data.discount_amount) };
+  if (input) input.value = data.code;
   renderTotals();
 
   feedback.textContent = fromLink
-    ? `✓ Code ${quote.code} applied automatically.`
-    : `✓ Code ${quote.code} applied: Saved!`;
+    ? `✓ Code ${data.code} applied automatically.`
+    : `✓ Code ${data.code} applied: Saved!`;
   feedback.className = 'status-line success mt-2 text-xs';
-  toast(fromLink ? `Promotion ${quote.code} applied automatically!` : 'Promotion applied successfully!');
+  toast(fromLink ? `Promotion ${data.code} applied automatically!` : 'Promotion applied successfully!');
   return true;
 }
 
@@ -499,54 +362,71 @@ document.querySelector('#apply-promo').addEventListener('click', (event) => {
   applyPromoCode(document.querySelector('#promo-code').value, { button: event.currentTarget });
 });
 
-// Enter in the code field applies it, the same as pressing Apply. The field
-// sits outside #checkout-form, so this cannot fall through to starting payment.
 document.querySelector('#promo-code')?.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter') return;
   event.preventDefault();
   const button = document.querySelector('#apply-promo');
-  if (button?.disabled) return; // already applying
+  if (button?.disabled) return;
   applyPromoCode(event.currentTarget.value, { button });
 });
 
 // Checkout Form Submission
 document.querySelector('#checkout-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!product) return;
+  if (!items.length) return;
 
   const submitBtn = document.querySelector('#pay-submit-btn');
   const feedback = document.querySelector('#checkout-feedback');
   const { user } = await getAccount();
 
   if (!user) {
-    location.href = `./auth?mode=signin&next=${encodeURIComponent(`checkout?product=${product.id}`)}`;
+    location.href = `./auth?mode=signin&next=${encodeURIComponent(`checkout${location.search}`)}`;
     return;
   }
+
+  const nameEl = document.querySelector('#billing-name');
+  const emailEl = document.querySelector('#billing-email');
+  const countryEl = document.querySelector('#billing-country');
+  if (!nameEl.reportValidity() || !emailEl.reportValidity() || !countryEl.reportValidity()) return;
 
   setButtonLoading(submitBtn, true, 'Preparing payment…');
   feedback.textContent = 'Securing transaction session…';
   feedback.className = 'status-line mt-3 text-xs';
 
-  const { baseTotal, convTotal, activeCurrency } = getCalculatedTotals();
+  const { activeCurrency } = getCalculatedTotals();
 
   const clientSiteUrl = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
     ? window.location.origin
     : 'https://digistore.codeinktechnologies.com';
 
-  if (selectedProvider === 'nowpayments') {
-    // The database prices the order — the client only ever sends what was picked.
-    const { data: order, error } = await supabase.rpc('create_order', {
-      p_items: [{ product_id: product.id, quantity: 1 }],
-      p_promo_code: promotion?.code || null,
-    });
+  const p_items = items.map((it) => ({ product_id: it.product_id, quantity: it.quantity }));
+  const p_billing = { name: nameEl.value.trim(), email: emailEl.value.trim(), country: countryEl.value.trim() };
 
-    if (error) {
-      setButtonLoading(submitBtn, false);
-      feedback.textContent = error.message;
-      feedback.className = 'status-line error mt-3 text-xs';
-      return;
+  // The database prices the order — the client only ever sends what was picked.
+  const { data: order, error } = await supabase.rpc('create_order', {
+    p_items,
+    p_promo_code: promotion?.code || null,
+    p_billing,
+  });
+
+  if (error) {
+    setButtonLoading(submitBtn, false);
+    feedback.textContent = error.message;
+    feedback.className = 'status-line error mt-3 text-xs';
+    return;
+  }
+
+  // The order is now committed server-side — clear the matching cart rows so
+  // a customer mid-payment doesn't see (and risk re-buying) the same items.
+  if (fromCart) {
+    const cartRowIds = items.map((it) => it.cart_row_id).filter(Boolean);
+    if (cartRowIds.length) {
+      await supabase.from('cart_items').delete().in('id', cartRowIds);
+      refreshCartBadges();
     }
+  }
 
+  if (selectedProvider === 'nowpayments') {
     const chosenCrypto = document.querySelector('#crypto-currency-select')?.value || 'any';
     const payload = {
       order_id: order.id,
@@ -567,20 +447,7 @@ document.querySelector('#checkout-form').addEventListener('submit', async (event
 
     location.href = payment.payment_url;
   } else {
-    // Flutterwave uses converted amount and selected currency
     const paymentOption = document.querySelector('#flw-method-select')?.value || 'all';
-
-    const { data: order, error } = await supabase.rpc('create_order', {
-      p_items: [{ product_id: product.id, quantity: 1 }],
-      p_promo_code: promotion?.code || null,
-    });
-
-    if (error) {
-      setButtonLoading(submitBtn, false);
-      feedback.textContent = error.message;
-      feedback.className = 'status-line error mt-3 text-xs';
-      return;
-    }
 
     const payload = {
       order_id: order.id,

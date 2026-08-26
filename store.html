@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="./css/app.css">
 </head>
 
-<body class="bg-slate-50 text-slate-900 flex flex-col min-h-screen selection:bg-orange-500 selection:text-white">
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
   <!-- Initial Instant Page Loader -->
   <div id="page-loader" class="page-loader">
     <div class="loader-card">
@@ -21,79 +21,123 @@
     </div>
   </div>
 
-  <header id="site-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur shadow-sm"></header>
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
 
-  <main class="shell py-10 lg:py-14 flex-1">
+  <main class="shell py-8 lg:py-10 flex-1">
     <!-- Vendor storefront header — only rendered for ?vendor=<slug> -->
     <section id="vendor-header" class="soft-panel mb-8 hidden overflow-hidden">
-      <div id="vendor-banner" class="h-28 bg-gradient-to-r from-[#142c55] to-[#24476f]"></div>
+      <div id="vendor-banner" class="h-28" style="background:linear-gradient(120deg,var(--ink-950),var(--ink-800))"></div>
       <div class="flex flex-wrap items-end justify-between gap-5 p-6 pt-0">
         <div class="flex items-end gap-4">
           <span id="vendor-logo" class="avatar !-mt-8 !h-20 !w-20 !border-4 !border-white !text-2xl shadow-lg"></span>
           <div class="pb-1">
-            <h1 id="vendor-title" class="text-2xl font-black text-[#142c55]"></h1>
-            <p id="vendor-meta" class="text-xs font-bold text-slate-500"></p>
+            <h1 id="vendor-title" class="text-2xl font-black" style="color:var(--text)"></h1>
+            <p id="vendor-meta" class="text-xs font-bold" style="color:var(--text-muted)"></p>
           </div>
         </div>
         <a class="button shrink-0" href="./store">← All products</a>
       </div>
-      <p id="vendor-bio" class="px-6 pb-6 text-sm leading-relaxed text-slate-600"></p>
+      <p id="vendor-bio" class="px-6 pb-6 text-sm leading-relaxed" style="color:var(--text-muted)"></p>
     </section>
 
-    <!-- Header Banner -->
-    <div id="store-header" class="flex flex-wrap items-end justify-between gap-4 mb-8">
+    <!-- Breadcrumb + heading -->
+    <div id="store-header">
+      <nav class="store-crumb" aria-label="Breadcrumb">
+        <a href="./index.html">Home</a>
+        <span class="store-crumb__sep">›</span>
+        <a href="./store">Shop</a>
+        <span id="store-crumb-current" class="hidden">
+          <span class="store-crumb__sep">›</span>
+          <span id="store-crumb-current-label"></span>
+        </span>
+      </nav>
+      <h1 id="store-heading" class="store-heading">All Products &amp; Assets</h1>
+    </div>
+
+    <div id="store-layout" class="store-layout">
+      <!-- Sidebar filters -->
+      <aside class="store-sidebar" aria-label="Filter products">
+        <div class="store-filter">
+          <div class="store-filter__label">
+            <span>Price range</span>
+            <button type="button" id="filter-price-clear" class="store-filter__clear">Reset</button>
+          </div>
+          <div class="store-price-slider">
+            <div class="store-price-slider__track"></div>
+            <div id="price-slider-fill" class="store-price-slider__fill"></div>
+            <input id="price-min-range" type="range" min="0" max="500" value="0" step="1" aria-label="Minimum price">
+            <input id="price-max-range" type="range" min="0" max="500" value="500" step="1" aria-label="Maximum price">
+          </div>
+          <div class="store-price-slider__values">
+            <span id="price-min-label">$0</span>
+            <span id="price-max-label">$500</span>
+          </div>
+        </div>
+
+        <div class="store-filter">
+          <div class="store-filter__label">
+            <span>Category</span>
+            <button type="button" id="filter-category-clear" class="store-filter__clear hidden">Clear</button>
+          </div>
+          <div id="filter-category-list" class="store-check-list"></div>
+        </div>
+
+        <div class="store-filter">
+          <div class="store-filter__label">
+            <span>File type</span>
+            <button type="button" id="filter-filetype-clear" class="store-filter__clear hidden">Clear</button>
+          </div>
+          <div id="filter-filetype-list" class="store-check-list"></div>
+        </div>
+
+        <div class="store-filter">
+          <div class="store-filter__label">
+            <span>Average rating</span>
+            <button type="button" id="filter-rating-clear" class="store-filter__clear hidden">Clear</button>
+          </div>
+          <div id="filter-rating-list" class="store-check-list"></div>
+        </div>
+      </aside>
+
+      <!-- Catalog content -->
       <div>
-        <span class="eyebrow">EXPLORE STOREFRONT</span>
-        <h1 id="store-heading" class="text-3xl sm:text-4xl font-black tracking-tight text-[#142c55]">All Products</h1>
-        <p id="store-subtitle" class="text-sm text-slate-500 mt-1">Browse our complete collection of verified digital assets, ebooks, and tools.</p>
-      </div>
-      <p id="product-count" class="text-sm font-bold text-slate-500"></p>
-    </div>
-
-    <!-- Unified Top Filter Bar -->
-    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 mb-8">
-      <!-- Categories: a dropdown on small screens, pills from md up. With 20+
-           categories a wrapping pill row swallows the whole first screen. -->
-      <div class="catfilter">
-        <label class="catfilter__compact">
-          <span class="catfilter__label">Browse category</span>
-          <select id="catalog-category-select" class="field !mt-1 !py-2.5 text-sm"></select>
-        </label>
-        <div id="catalog-category-pills" class="catfilter__pills"></div>
-      </div>
-
-      <!-- Search & Sorting Row -->
-      <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-        <div class="relative flex-1 min-w-[260px]">
-          <i data-lucide="search" width="16" height="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
-          <input id="store-search-input" type="text" placeholder="Search by title, description, keywords, or topics…" class="field !mt-0 !py-2.5 !pl-10 text-xs w-full bg-slate-50 border-slate-200">
+        <!-- Search & Sorting Row -->
+        <div id="store-search-row" class="bg-white p-4 rounded-2xl border shadow-sm space-y-0 mb-6" style="background:var(--surface);border-color:var(--border)">
+          <div class="relative">
+            <i data-lucide="search" width="16" height="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style="color:var(--text-soft)"></i>
+            <input id="store-search-input" type="text" placeholder="Search by title, description, keywords, or topics…" class="field !mt-0 !py-2.5 !pl-10 text-xs w-full" style="background:var(--surface-sunken);border-color:var(--border)">
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <label for="store-sort-select" class="text-xs font-bold text-slate-500 whitespace-nowrap">Sort by:</label>
-          <select id="store-sort-select" class="field !mt-0 !py-2 text-xs bg-slate-50 border-slate-200">
-            <option value="newest">Newest First</option>
-            <option value="price-low">Price: Low to High</option>
-            <option value="price-high">Price: High to Low</option>
-            <option value="title">Alphabetical (A-Z)</option>
-          </select>
+
+        <div class="store-toolbar">
+          <div>
+            <p id="product-count" class="store-toolbar__count"></p>
+            <div id="store-filter-chips" class="store-toolbar__chips"></div>
+          </div>
+          <div id="store-sort-row" class="flex items-center gap-2">
+            <label for="store-sort-select" class="text-xs font-bold whitespace-nowrap" style="color:var(--text-muted)">Sort by:</label>
+            <select id="store-sort-select" class="field !mt-0 !py-2 text-xs" style="background:var(--surface-sunken);border-color:var(--border)">
+              <option value="bestselling">Bestselling</option>
+              <option value="newest">Newest First</option>
+              <option value="price-low">Price: Low to High</option>
+              <option value="price-high">Price: High to Low</option>
+              <option value="title">Alphabetical (A-Z)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Product Grid -->
+        <div id="product-grid" class="grid gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"></div>
+
+        <!-- Numbered pagination -->
+        <div id="store-pagination" class="store-pagination"></div>
+
+        <!-- Product Loading State -->
+        <div id="product-loading" class="mt-8 hidden">
+          <div class="progress-track max-w-xs mx-auto"></div>
+          <p class="mt-3 text-center text-sm font-semibold" style="color:var(--text-muted)">Loading catalog items…</p>
         </div>
       </div>
-    </div>
-
-    <!-- Product Grid (Full Width) -->
-    <div id="product-grid" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"></div>
-
-    <!-- Load More Button Container -->
-    <div id="load-more-container" class="mt-10 text-center hidden">
-      <button id="load-more-btn" type="button" class="button !py-3 !px-8 text-sm font-bold shadow-md hover:shadow-lg transition">
-        Load more products
-      </button>
-    </div>
-
-    <!-- Product Loading State -->
-    <div id="product-loading" class="mt-8 hidden">
-      <div class="progress-track max-w-xs mx-auto"></div>
-      <p class="mt-3 text-center text-sm font-semibold text-slate-500">Loading catalog items…</p>
     </div>
   </main>
 

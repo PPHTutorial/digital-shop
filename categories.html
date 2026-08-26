@@ -1,52 +1,53 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="Browse every category of digital product on DigiStore — ebooks, courses, templates, software, design assets and more.">
-  <title>All Categories | DigiStore</title>
+  <title>Browse by Category | DigiStore</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="./css/app.css">
 </head>
-<body class="bg-slate-50 text-slate-900 flex flex-col min-h-screen">
 
-  <header id="site-header" class="sticky top-0 z-40 bg-white/95 backdrop-blur shadow-sm"></header>
-
-  <main class="shell py-10 lg:py-14 flex-1">
-    <div class="cathero">
-      <span class="eyebrow">EVERY CATEGORY</span>
-      <h1 class="cathero__title">Browse the whole catalogue</h1>
-      <p class="cathero__sub">
-        Every kind of digital product sold on DigiStore. Pick a category to see what's inside —
-        or open your own store and start selling into one.
-      </p>
-      <div class="cathero__actions">
-        <div class="cathero__search">
-          <i data-lucide="search" width="16" height="16"></i>
-          <input id="cat-search" type="search" placeholder="Search categories…" aria-label="Search categories">
-        </div>
-        <a class="button button-primary" href="./vendor">
-          <i data-lucide="store" width="15" height="15"></i><span>Sell in a category</span>
-        </a>
-      </div>
-      <p id="cat-count" class="cathero__count"></p>
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
     </div>
+  </div>
 
-    <div id="all-categories" class="catgrid catgrid--page mt-9"></div>
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
 
-    <section class="seller-band mt-14">
-      <div>
-        <span class="seller-band__eyebrow">BECOME A SELLER</span>
-        <h2 class="seller-band__title">Your work belongs in one of these</h2>
-        <p class="seller-band__body">
-          Publish once and sell to buyers worldwide. We handle checkout, payment verification and
-          secure delivery — you keep the majority of every sale and withdraw to your bank or mobile money.
-        </p>
+  <main class="flex-1">
+    <section class="cat-hero">
+      <span class="cat-hero__badge">Explore our curated collections</span>
+      <h1 class="cat-hero__title">Browse by Category</h1>
+      <p class="cat-hero__sub">
+        Find tools, ebooks, templates, and assets to streamline your development and creative
+        process — every category below reflects what's actually published on DigiStore right now.
+      </p>
+    </section>
+
+    <section class="cat-grid-section">
+      <div id="all-categories" class="cat-grid"></div>
+    </section>
+
+    <section class="newsletter-band">
+      <div class="newsletter-panel">
+        <div>
+          <h2>Subscribe to our Newsletter</h2>
+          <p>New releases, tools, and digital insights — occasionally, never spam.</p>
+        </div>
+        <form id="subscribe-form" class="newsletter-form">
+          <input name="email" required type="email" placeholder="Your email address…">
+          <button type="submit">Submit</button>
+        </form>
       </div>
-      <a class="seller-band__cta" href="./vendor">
-        <i data-lucide="arrow-right" width="16" height="16"></i><span>Start selling</span>
-      </a>
+      <p id="subscribe-status" class="status-line px-6 pb-4" aria-live="polite"></p>
     </section>
   </main>
 
@@ -54,4 +55,5 @@
 
   <script type="module" src="./js/categories.js"></script>
 </body>
+
 </html>

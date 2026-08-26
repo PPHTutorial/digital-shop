@@ -8,15 +8,21 @@
  */
 import { supabase } from './client.js';
 import {
-  escapeHtml, finishPageLoader, getAccount, icon, renderIcons,
-  setButtonLoading, toast,
+  escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader,
+  renderIcons, setButtonLoading, toast,
 } from './ui.js';
+import {
+  confirmDialog, emptyState, openModal, renderDataTable, setButtonBusy,
+  statusBadge,
+} from './uikit.js';
+import { enhanceSelect, refreshSelect } from './select.js';
 
 let account = null;
 let dashboard = null;
 let vendor = null;
 let categories = [];
 let myProducts = [];
+let wallet = null;
 
 /** Mirrors the minimum enforced by create_ad_funding() in the database. */
 const MIN_TOPUP = 25;
@@ -66,11 +72,8 @@ function methodsFor(countryCode) {
   return methods;
 }
 
-function fillCountrySelect(select, selected = 'GH') {
-  if (!select) return;
-  select.innerHTML = COUNTRIES
-    .map((c) => `<option value="${c.code}" ${c.code === selected ? 'selected' : ''}>${escapeHtml(c.name)}</option>`)
-    .join('');
+function countryOptions(selected = 'GH') {
+  return COUNTRIES.map((c) => `<option value="${c.code}" ${c.code === selected ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
 }
 
 /* ==========================================================================
@@ -83,29 +86,8 @@ const money = (value, currency = 'USD') =>
 const shortDate = (value) =>
   new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-const STATUS_PILL = {
-  pending: 'bg-amber-50 text-amber-700',
-  available: 'bg-green-50 text-green-700',
-  paid: 'bg-blue-50 text-blue-700',
-  reversed: 'bg-red-50 text-red-700',
-  requested: 'bg-amber-50 text-amber-700',
-  processing: 'bg-blue-50 text-blue-700',
-  failed: 'bg-red-50 text-red-700',
-  cancelled: 'bg-slate-100 text-slate-600',
-  draft: 'bg-slate-100 text-slate-600',
-  active: 'bg-green-50 text-green-700',
-  paused: 'bg-amber-50 text-amber-700',
-  completed: 'bg-slate-100 text-slate-600',
-  rejected: 'bg-red-50 text-red-700',
-};
-
-const pill = (status) =>
-  `<span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold capitalize ${STATUS_PILL[status] || 'bg-slate-100 text-slate-600'}">${escapeHtml(status)}</span>`;
-
-const empty = (message) => `<p class="py-6 text-center text-sm text-slate-500">${escapeHtml(message)}</p>`;
-
 /* ==========================================================================
-   Screen routing (mirrors the admin console)
+   Screen routing
    ========================================================================== */
 
 const SCREEN_TITLES = {
@@ -114,36 +96,24 @@ const SCREEN_TITLES = {
   sales: 'Sales & earnings',
   payouts: 'Payouts',
   boost: 'Boost & ads',
+  wallet: 'Ad wallet',
+  team: 'Team',
   settings: 'Store settings',
 };
 
 function activateScreen() {
   const key = location.hash.replace('#', '') || 'overview';
   const valid = SCREEN_TITLES[key] ? key : 'overview';
-  document.querySelectorAll('.admin-screen').forEach((screen) => {
-    screen.classList.toggle('is-active', screen.id === valid);
+  document.querySelectorAll('.vnd-tab-panel').forEach((panel) => {
+    panel.classList.toggle('is-active', panel.dataset.vndPanel === valid);
   });
-  document.querySelectorAll('.admin-link').forEach((link) => {
-    link.classList.toggle('active', link.getAttribute('href') === `#${valid}`);
+  document.querySelectorAll('[data-vnd-link]').forEach((link) => {
+    link.classList.toggle('is-active', link.dataset.vndLink === valid);
   });
-  const title = document.querySelector('#vendor-page-title');
-  if (title) title.textContent = SCREEN_TITLES[valid];
   window.scrollTo(0, 0);
 }
 
 window.addEventListener('hashchange', activateScreen);
-
-/* --- Mobile drawer (same markup contract as the admin console) ------------- */
-function setDrawer(open) {
-  const sidebar = document.querySelector('#admin-sidebar');
-  const scrim = document.querySelector('#admin-scrim');
-  if (!sidebar || !scrim) return;
-  sidebar.classList.toggle('is-open', open);
-  scrim.classList.toggle('is-open', open);
-  scrim.hidden = !open;
-  document.querySelector('#admin-menu-button')?.setAttribute('aria-expanded', String(open));
-  document.body.style.overflow = open ? 'hidden' : '';
-}
 
 /* ==========================================================================
    Views
@@ -174,7 +144,7 @@ function showStatusScreen(status, reason) {
     },
   }[status];
 
-  document.querySelector('#status-icon').innerHTML = icon(copy.icon, 26);
+  document.querySelector('#status-icon').innerHTML = icon(copy.icon, 24);
   document.querySelector('#status-title').textContent = copy.title;
   document.querySelector('#status-copy').textContent = copy.body;
   show('vendor-status');
@@ -189,34 +159,48 @@ function renderOverview() {
   const counts = dashboard.counts || {};
   const currency = balance.currency || vendor.payout_currency || 'USD';
 
-  document.querySelector('#m-available').textContent = money(balance.available, currency);
-  document.querySelector('#m-pending').textContent = money(balance.pending, currency);
+  document.querySelector('#vnd-welcome-title').textContent = `Welcome back, ${vendor.display_name}`;
+  document.querySelector('#vnd-welcome-sub').textContent = vendor.approved_at
+    ? `Selling since ${shortDate(vendor.approved_at)}.`
+    : 'A snapshot of how your store is performing.';
+
   document.querySelector('#m-lifetime').textContent = money(balance.lifetime, currency);
   document.querySelector('#m-commission').textContent = `${money(balance.commission, currency)} platform commission`;
+  document.querySelector('#m-sales-count').textContent = counts.sales ?? 0;
   document.querySelector('#m-products').textContent = counts.published_products ?? 0;
-  document.querySelector('#m-sales-count').textContent = `${counts.sales ?? 0} sale${counts.sales === 1 ? '' : 's'} all time`;
-  document.querySelector('#m-available-note').textContent =
-    Number(balance.available) > 0 ? 'Ready to withdraw now' : 'Nothing matured yet';
+
+  const ratingTotals = myProducts.reduce((acc, p) => ({
+    sum: acc.sum + Number(p.rating_sum || 0),
+    count: acc.count + Number(p.rating_count || 0),
+  }), { sum: 0, count: 0 });
+  document.querySelector('#m-rating').textContent = ratingTotals.count
+    ? (ratingTotals.sum / ratingTotals.count).toFixed(1)
+    : '—';
+  document.querySelector('#m-rating-note').textContent = ratingTotals.count
+    ? `From ${ratingTotals.count} review${ratingTotals.count === 1 ? '' : 's'}`
+    : 'No reviews yet';
+
+  document.querySelector('#vnd-sidebar-balance').textContent = money(balance.available, currency);
 
   renderChart(dashboard.daily_net || []);
   renderChecklist();
   renderRecentSales(dashboard.recent_sales || [], currency);
 }
 
-/** Minimal inline bar chart — no dependency, matches the account page. */
+/** Minimal inline bar chart — no dependency. */
 function renderChart(daily) {
   const host = document.querySelector('#vendor-chart');
   if (!daily.length) {
-    host.innerHTML = '<p class="grid h-full place-items-center text-sm text-slate-500">Your revenue will chart here after your first sale.</p>';
+    host.innerHTML = '<div class="vnd-chart-empty">Your revenue will chart here after your first sale.</div>';
     return;
   }
   const max = Math.max(...daily.map((d) => Number(d.net)), 1);
   host.innerHTML = `
-    <div class="flex h-full items-end gap-1.5">
+    <div class="vnd-chart-bars">
       ${daily.map((d) => `
-        <div class="flex flex-1 flex-col items-center gap-1.5" title="${escapeHtml(shortDate(d.day))}: ${money(d.net)}">
-          <div class="w-full rounded-t bg-orange-500" style="height:${Math.max(6, (Number(d.net) / max) * 130)}px"></div>
-          <small class="text-[9px] text-slate-400">${new Date(d.day).getDate()}</small>
+        <div class="vnd-chart-bar" title="${escapeHtml(shortDate(d.day))}: ${money(d.net)}">
+          <div class="vnd-chart-bar__fill" style="height:${Math.max(4, (Number(d.net) / max) * 150)}px"></div>
+          <small>${new Date(d.day).getDate()}</small>
         </div>`).join('')}
     </div>`;
 }
@@ -228,17 +212,16 @@ function renderChecklist() {
     { done: (counts.products ?? 0) > 0, label: 'Add your first product', hint: 'Nothing can sell until you publish something.', href: '#products' },
     { done: (counts.payout_accounts ?? 0) > 0, label: 'Add a payout account', hint: 'Required before you can withdraw.', href: '#payouts' },
     { done: (counts.sales ?? 0) > 0, label: 'Make your first sale', hint: 'Boost a product to reach more buyers.', href: '#boost' },
+    { done: (counts.campaigns ?? 0) > 0, label: 'Configure your first ad campaign', hint: 'Get in front of more buyers.', href: '#boost' },
   ];
 
   document.querySelector('#vendor-checklist').innerHTML = steps.map((step) => `
-    <div class="flex items-start gap-3">
-      <span class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${step.done ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}">
-        ${step.done ? icon('check', 12) : icon('circle', 12)}
-      </span>
+    <div class="vnd-check-row ${step.done ? 'is-done' : ''}">
+      <span class="vnd-check-row__dot">${step.done ? icon('check', 12) : icon('circle', 10)}</span>
       <span class="min-w-0">
-        <strong class="block text-sm ${step.done ? 'text-slate-400 line-through' : 'text-[#142c55]'}">${escapeHtml(step.label)}</strong>
-        ${step.done ? '' : `<span class="text-xs text-slate-500">${escapeHtml(step.hint)}</span>`}
-        ${!step.done && step.href ? ` <a class="text-xs font-bold text-orange-600" href="${step.href}">Go →</a>` : ''}
+        <strong>${escapeHtml(step.label)}</strong>
+        ${step.done ? '' : `<span class="vnd-check-hint">${escapeHtml(step.hint)}</span>`}
+        ${!step.done && step.href ? `<a href="${step.href}">Go →</a>` : ''}
       </span>
     </div>`).join('');
 }
@@ -246,87 +229,98 @@ function renderChecklist() {
 function renderRecentSales(sales, currency) {
   const host = document.querySelector('#recent-sales');
   if (!sales.length) {
-    host.innerHTML = empty('No sales yet. Once a buyer completes checkout it appears here.');
+    host.innerHTML = emptyState({ icon: 'receipt', title: 'No sales yet', body: 'Once a buyer completes checkout it appears here.' });
     return;
   }
   host.innerHTML = sales.map((sale) => `
-    <div class="flex items-center justify-between gap-4 border-t border-slate-100 py-3 first:border-t-0">
-      <div class="min-w-0">
-        <strong class="block truncate text-sm text-[#142c55]">${escapeHtml(sale.title || 'Product')}</strong>
-        <span class="text-xs text-slate-500">${escapeHtml(shortDate(sale.created_at))}</span>
+    <div class="vnd-activity-row">
+      <div class="vnd-activity-row__meta">
+        <strong>${escapeHtml(sale.title || 'Product')}</strong>
+        <span>${escapeHtml(shortDate(sale.created_at))}</span>
       </div>
-      <div class="shrink-0 text-right">
-        <strong class="block text-sm">${money(sale.net_amount, sale.currency || currency)}</strong>
-        <span class="mt-0.5 block">${pill(sale.status)}</span>
+      <div class="vnd-activity-row__value">
+        <strong>${money(sale.net_amount, sale.currency || currency)}</strong>
+        ${statusBadge(sale.status)}
       </div>
     </div>`).join('');
 }
 
 /* --- Products -------------------------------------------------------------- */
 
+let productsPage = 1;
+const PRODUCTS_PAGE_SIZE = 10;
+
 async function loadProducts() {
   const { data, error } = await supabase
     .from('products')
-    .select('id,title,slug,category,price,original_price,currency,cover_url,is_published,purchase_count,created_at')
+    .select('id,title,slug,category,price,original_price,currency,cover_url,is_published,purchase_count,rating_sum,rating_count,created_at')
     .eq('vendor_id', vendor.id)
     .order('created_at', { ascending: false });
 
   myProducts = data || [];
   const host = document.querySelector('#vendor-products-table');
+  if (!host) return;
 
   if (error) {
-    host.innerHTML = empty(error.message);
+    host.innerHTML = emptyState({ icon: 'triangle-alert', title: 'Could not load products', body: error.message });
     return;
   }
   if (!myProducts.length) {
-    host.innerHTML = `
-      <div class="py-10 text-center">
-        <p class="text-sm text-slate-500">You have not added a product yet.</p>
-        <button class="button button-primary mt-4" type="button" data-new-product>Add your first product</button>
-      </div>`;
+    host.innerHTML = emptyState({
+      icon: 'package',
+      title: 'You have not added a product yet',
+      body: 'Publish your first digital product to start selling.',
+      ctaLabel: 'Add your first product',
+      ctaHref: '#',
+    });
+    host.querySelector('.uk-empty__cta')?.addEventListener('click', (e) => { e.preventDefault(); openProductModal(); });
     return;
   }
 
-  host.innerHTML = `
-    <div class="scroll-x">
-      <table class="w-full text-sm">
-        <thead class="text-left text-xs uppercase tracking-wide text-slate-400">
-          <tr>
-            <th class="pb-3">Product</th>
-            <th class="pb-3">Price</th>
-            <th class="pb-3">Sales</th>
-            <th class="pb-3">Status</th>
-            <th class="pb-3"></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${myProducts.map((p) => `
-            <tr class="border-t border-slate-100">
-              <td class="py-3 pr-3">
-                <div class="flex items-center gap-3">
-                  ${p.cover_url
-                    ? `<img src="${escapeHtml(p.cover_url)}" alt="" class="h-10 w-14 rounded-lg object-cover">`
-                    : '<span class="grid h-10 w-14 place-items-center rounded-lg bg-slate-100 text-[10px] text-slate-400">No image</span>'}
-                  <div class="min-w-0">
-                    <strong class="block truncate text-[#142c55]">${escapeHtml(p.title)}</strong>
-                    <span class="text-xs text-slate-400">${escapeHtml(p.category || 'General')}</span>
-                  </div>
-                </div>
-              </td>
-              <td class="py-3 pr-3 font-bold">${money(p.price, p.currency)}</td>
-              <td class="py-3 pr-3">${p.purchase_count ?? 0}</td>
-              <td class="py-3 pr-3">${p.is_published ? pill('active') : pill('draft')}</td>
-              <td class="py-3 text-right">
-                <button class="button !min-h-8 !px-3 text-xs" type="button" data-edit="${p.id}">Edit</button>
-                <button class="button !min-h-8 !px-3 text-xs !text-red-600" type="button" data-delete="${p.id}">Delete</button>
-              </td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
+  paintProductsTable();
+}
+
+function paintProductsTable() {
+  const host = document.querySelector('#vendor-products-table');
+  const start = (productsPage - 1) * PRODUCTS_PAGE_SIZE;
+  const pageRows = myProducts.slice(start, start + PRODUCTS_PAGE_SIZE);
+
+  renderDataTable(host, {
+    columns: [
+      {
+        key: 'title', label: 'Product', render: (p) => `
+          <div class="flex items-center gap-3">
+            ${p.cover_url
+              ? `<img src="${escapeHtml(p.cover_url)}" alt="" style="width:52px;height:38px;border-radius:6px;object-fit:cover">`
+              : `<span style="display:grid;place-items:center;width:52px;height:38px;border-radius:6px;background:var(--surface-sunken);font-size:9px;color:var(--text-soft)">No image</span>`}
+            <span class="min-w-0">
+              <strong style="display:block;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px">${escapeHtml(p.title)}</strong>
+              <span style="font-size:.72rem;color:var(--text-muted)">${escapeHtml(p.category || 'General')}</span>
+            </span>
+          </div>`,
+      },
+      { key: 'price', label: 'Price', render: (p) => `<strong>${money(p.price, p.currency)}</strong>` },
+      { key: 'purchase_count', label: 'Sales', render: (p) => p.purchase_count ?? 0 },
+      { key: 'rating', label: 'Rating', render: (p) => p.rating_count ? `${(p.rating_sum / p.rating_count).toFixed(1)} ★ (${p.rating_count})` : '—' },
+      { key: 'status', label: 'Status', render: (p) => statusBadge(p.is_published ? 'published' : 'draft') },
+    ],
+    rows: pageRows,
+    page: productsPage,
+    pageSize: PRODUCTS_PAGE_SIZE,
+    total: myProducts.length,
+    onPage: (p) => { productsPage = p; paintProductsTable(); },
+    rowActions: (p) => `
+      <button class="button !min-h-8 !px-3 text-xs" type="button" data-edit="${p.id}">Edit</button>
+      <button class="button !min-h-8 !px-3 text-xs button-danger" type="button" data-delete="${p.id}">Delete</button>`,
+    emptyMessage: 'You have not added a product yet.',
+  });
 }
 
 /* --- Sales ----------------------------------------------------------------- */
+
+let salesRows = [];
+let salesPage = 1;
+const SALES_PAGE_SIZE = 10;
 
 async function loadSales() {
   const { data, error } = await supabase
@@ -337,38 +331,57 @@ async function loadSales() {
     .limit(200);
 
   const host = document.querySelector('#vendor-sales-table');
-  if (error) return void (host.innerHTML = empty(error.message));
-  if (!data?.length) return void (host.innerHTML = empty('No sales recorded yet.'));
+  if (!host) return;
+  if (error) { host.innerHTML = emptyState({ icon: 'triangle-alert', title: 'Could not load sales', body: error.message }); return; }
 
-  const totalNet = data.reduce((sum, row) => sum + Number(row.net_amount), 0);
-  document.querySelector('#sales-insight').textContent =
-    `${data.length} sale${data.length === 1 ? '' : 's'} · ${money(totalNet, data[0].currency)} net`;
+  salesRows = data || [];
 
-  host.innerHTML = `
-    <div class="scroll-x">
-      <table class="w-full text-sm">
-        <thead class="text-left text-xs uppercase tracking-wide text-slate-400">
-          <tr>
-            <th class="pb-3">Product</th><th class="pb-3">Date</th><th class="pb-3">Gross</th>
-            <th class="pb-3">Commission</th><th class="pb-3">You earn</th><th class="pb-3">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${data.map((row) => `
-            <tr class="border-t border-slate-100">
-              <td class="py-3 pr-3"><strong class="text-[#142c55]">${escapeHtml(row.products?.title || 'Product')}</strong></td>
-              <td class="py-3 pr-3 text-slate-500">${escapeHtml(shortDate(row.created_at))}</td>
-              <td class="py-3 pr-3">${money(row.gross_amount, row.currency)}</td>
-              <td class="py-3 pr-3 text-slate-500">−${money(row.commission_amount, row.currency)} <span class="text-[11px] text-slate-400">(${row.commission_rate}%)</span></td>
-              <td class="py-3 pr-3 font-bold text-[#142c55]">${money(row.net_amount, row.currency)}</td>
-              <td class="py-3">${pill(row.status)}${row.status === 'pending' ? `<span class="mt-1 block text-[10px] text-slate-400">clears ${escapeHtml(shortDate(row.available_at))}</span>` : ''}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
+  const currency = salesRows[0]?.currency || vendor.payout_currency || 'USD';
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const recent = salesRows.filter((r) => new Date(r.created_at).getTime() >= cutoff);
+  const gross30 = recent.reduce((sum, r) => sum + Number(r.gross_amount), 0);
+  const net30 = recent.reduce((sum, r) => sum + Number(r.net_amount), 0);
+  const commission30 = recent.reduce((sum, r) => sum + Number(r.commission_amount), 0);
+  document.querySelector('#s-gross').textContent = money(gross30, currency);
+  document.querySelector('#s-net').textContent = money(net30, currency);
+  document.querySelector('#s-commission').textContent = money(commission30, currency);
+  document.querySelector('#s-commission-label').textContent = `Commission (${vendor.commission_rate}%, 30d)`;
+
+  salesPage = 1;
+  paintSalesTable();
+}
+
+function paintSalesTable() {
+  const host = document.querySelector('#vendor-sales-table');
+  const start = (salesPage - 1) * SALES_PAGE_SIZE;
+  const pageRows = salesRows.slice(start, start + SALES_PAGE_SIZE);
+
+  renderDataTable(host, {
+    columns: [
+      { key: 'product', label: 'Product', render: (r) => `<strong>${escapeHtml(r.products?.title || 'Product')}</strong>` },
+      { key: 'created_at', label: 'Date', render: (r) => shortDate(r.created_at) },
+      { key: 'gross_amount', label: 'Gross', render: (r) => money(r.gross_amount, r.currency) },
+      { key: 'commission_amount', label: 'Comm.', render: (r) => `−${money(r.commission_amount, r.currency)} (${r.commission_rate}%)` },
+      { key: 'net_amount', label: 'Net', render: (r) => `<strong>${money(r.net_amount, r.currency)}</strong>` },
+      {
+        key: 'status', label: 'Status', render: (r) => `
+          ${statusBadge(r.status, r.status === 'available' ? 'Available' : undefined)}
+          ${r.status === 'pending' ? `<div style="font-size:.66rem;color:var(--text-soft);margin-top:2px">clears ${escapeHtml(shortDate(r.available_at))}</div>` : ''}`,
+      },
+    ],
+    rows: pageRows,
+    page: salesPage,
+    pageSize: SALES_PAGE_SIZE,
+    total: salesRows.length,
+    onPage: (p) => { salesPage = p; paintSalesTable(); },
+    emptyMessage: 'No sales recorded yet.',
+  });
 }
 
 /* --- Payouts --------------------------------------------------------------- */
+
+let payoutAccounts = [];
+let payoutHistory = [];
 
 async function loadPayouts() {
   const balance = dashboard.balance || {};
@@ -389,11 +402,11 @@ async function loadPayouts() {
       .eq('vendor_id', vendor.id).order('requested_at', { ascending: false }).limit(50),
   ]);
 
-  const accounts = accountsResult.data || [];
+  payoutAccounts = accountsResult.data || [];
   const accountsHost = document.querySelector('#payout-accounts-list');
 
-  accountsHost.innerHTML = accounts.length
-    ? accounts.map((a) => {
+  accountsHost.innerHTML = payoutAccounts.length
+    ? payoutAccounts.map((a) => {
         const label = {
           bank_transfer: `${a.bank_name || 'Bank'} ····${a.account_last4 || ''}`,
           mobile_money: `${a.momo_provider || 'Mobile money'} ····${a.account_last4 || ''}`,
@@ -401,56 +414,65 @@ async function loadPayouts() {
           crypto: `${a.crypto_asset || 'Crypto'} ····${a.account_last4 || ''}`,
         }[a.method];
         return `
-          <div class="flex items-center justify-between gap-4 border-t border-slate-100 py-3 first:border-t-0">
-            <div class="min-w-0">
-              <strong class="block truncate text-sm text-[#142c55]">${escapeHtml(label)}</strong>
-              <span class="text-xs text-slate-500">${escapeHtml(a.account_name)} · ${escapeHtml(a.country)}</span>
+          <div class="vnd-account-row">
+            <div class="vnd-account-row__meta">
+              <strong>${escapeHtml(label)}</strong>
+              <span>${escapeHtml(a.account_name)} · ${escapeHtml(a.country)}</span>
             </div>
-            <div class="flex shrink-0 items-center gap-2">
-              ${a.is_default ? '<span class="tag">Default</span>' : ''}
-              ${a.is_verified ? pill('available') : pill('pending')}
-              <button class="button !min-h-8 !px-3 text-xs !text-red-600" type="button" data-delete-account="${a.id}">Remove</button>
+            <div class="vnd-account-row__actions">
+              ${a.is_default ? '<span class="uk-badge uk-badge--info">Default</span>' : ''}
+              ${statusBadge(a.is_verified ? 'verified' : 'pending')}
+              <button class="button !min-h-8 !px-3 text-xs button-danger" type="button" data-delete-account="${a.id}">Remove</button>
             </div>
           </div>`;
       }).join('')
-    : empty('No payout account yet. Add one before requesting a withdrawal.');
+    : emptyState({ icon: 'landmark', title: 'No payout account yet', body: 'Add one before requesting a withdrawal.' });
 
-  const history = historyResult.data || [];
-  document.querySelector('#payouts-history').innerHTML = history.length
-    ? history.map((p) => `
-        <div class="flex items-center justify-between gap-4 border-t border-slate-100 py-3 first:border-t-0">
-          <div>
-            <strong class="block text-sm text-[#142c55]">${money(p.amount, p.currency)}</strong>
-            <span class="text-xs text-slate-500">Requested ${escapeHtml(shortDate(p.requested_at))}${p.reference ? ` · ${escapeHtml(p.reference)}` : ''}</span>
-            ${p.failure_reason ? `<span class="block text-xs text-red-600">${escapeHtml(p.failure_reason)}</span>` : ''}
-          </div>
-          ${pill(p.status)}
-        </div>`).join('')
-    : empty('No withdrawals yet.');
+  payoutHistory = historyResult.data || [];
+  const historyHost = document.querySelector('#payouts-history');
+  renderDataTable(historyHost, {
+    columns: [
+      { key: 'amount', label: 'Amount', render: (p) => `<strong>${money(p.amount, p.currency)}</strong>` },
+      { key: 'reference', label: 'Reference', render: (p) => p.reference ? `<span style="font-family:var(--font-mono);font-size:.78rem">${escapeHtml(p.reference)}</span>` : '—' },
+      { key: 'requested_at', label: 'Requested', render: (p) => shortDate(p.requested_at) },
+      {
+        key: 'status', label: 'Status', render: (p) => `
+          ${statusBadge(p.status)}
+          ${p.failure_reason ? `<div style="font-size:.66rem;color:var(--danger);margin-top:2px">${escapeHtml(p.failure_reason)}</div>` : ''}`,
+      },
+    ],
+    rows: payoutHistory,
+    page: 1,
+    pageSize: payoutHistory.length || 1,
+    total: payoutHistory.length,
+    emptyMessage: 'No withdrawals yet.',
+  });
 
-  return accounts;
+  return payoutAccounts;
 }
 
-/* --- Campaigns ------------------------------------------------------------- */
-
-/* --- Ad wallet ------------------------------------------------------------- */
-
-let wallet = null;
+/* --- Ad wallet --------------------------------------------------------------- */
 
 async function loadWallet() {
   const { data } = await supabase
     .from('ad_wallets').select('balance,currency,lifetime_topup,lifetime_spend')
     .eq('vendor_id', vendor.id).maybeSingle();
 
-  wallet = data || { balance: 0, currency: vendor.payout_currency || 'USD', lifetime_spend: 0 };
+  wallet = data || { balance: 0, currency: vendor.payout_currency || 'USD', lifetime_topup: 0, lifetime_spend: 0 };
 
   document.querySelector('#wallet-balance').textContent = money(wallet.balance, wallet.currency);
-  document.querySelector('#wallet-note').textContent = Number(wallet.balance) > 0
+  document.querySelector('#wallet-balance-mini').textContent = money(wallet.balance, wallet.currency);
+  document.querySelector('#wallet-lifetime-topup').textContent = money(wallet.lifetime_topup, wallet.currency);
+  document.querySelector('#wallet-lifetime-spend').textContent = money(wallet.lifetime_spend, wallet.currency);
+
+  const baseNote = Number(wallet.balance) > 0
     ? `${money(wallet.lifetime_spend, wallet.currency)} spent on ads so far.`
     : 'Top up before your campaigns can run.';
+  document.querySelector('#wallet-note').textContent = baseNote;
+  document.querySelector('#wallet-note-mini').textContent = baseNote;
 
-  // A crypto payment can sit unconfirmed for a while; surface it so the seller
-  // is not left wondering where their money went.
+  // A crypto/bank payment can sit unconfirmed for a while; surface it so the
+  // seller is not left wondering where their money went.
   const { data: inFlight } = await supabase
     .from('ad_funding_payments').select('amount,currency,provider,created_at')
     .eq('vendor_id', vendor.id).eq('status', 'pending')
@@ -458,90 +480,127 @@ async function loadWallet() {
 
   if (inFlight?.length) {
     const total = inFlight.reduce((sum, r) => sum + Number(r.amount), 0);
-    document.querySelector('#wallet-note').textContent +=
-      ` ${money(total, wallet.currency)} awaiting payment confirmation.`;
+    const extra = ` ${money(total, wallet.currency)} awaiting payment confirmation.`;
+    document.querySelector('#wallet-note').textContent += extra;
+    document.querySelector('#wallet-note-mini').textContent += extra;
   }
 }
 
 async function loadWalletHistory() {
   const host = document.querySelector('#wallet-history');
+  if (!host) return;
   const { data } = await supabase
     .from('ad_wallet_transactions')
     .select('type,amount,balance_after,currency,description,created_at')
-    .eq('vendor_id', vendor.id).order('created_at', { ascending: false }).limit(30);
+    .eq('vendor_id', vendor.id).order('created_at', { ascending: false }).limit(50);
 
-  host.innerHTML = data?.length
-    ? data.map((t) => `
-        <div class="flex items-center justify-between gap-3 border-t border-slate-100 py-2 text-xs first:border-t-0">
-          <div class="min-w-0">
-            <strong class="block truncate text-[#142c55]">${escapeHtml(t.description || t.type)}</strong>
-            <span class="text-slate-400">${escapeHtml(shortDate(t.created_at))}</span>
-          </div>
-          <span class="shrink-0 font-bold ${Number(t.amount) < 0 ? 'text-red-600' : 'text-green-700'}">
+  renderDataTable(host, {
+    columns: [
+      { key: 'created_at', label: 'Date', render: (t) => shortDate(t.created_at) },
+      { key: 'type', label: 'Type', render: (t) => statusBadge(t.type === 'topup' ? 'active' : t.type === 'refund' ? 'available' : t.type === 'charge' ? 'pending' : t.type, t.type) },
+      { key: 'description', label: 'Description', render: (t) => escapeHtml(t.description || '—') },
+      {
+        key: 'amount', label: 'Amount', render: (t) => `
+          <strong style="color:${Number(t.amount) < 0 ? 'var(--danger)' : '#2dab66'}">
             ${Number(t.amount) < 0 ? '' : '+'}${money(t.amount, t.currency)}
-          </span>
-        </div>`).join('')
-    : empty('No wallet activity yet.');
+          </strong>`,
+      },
+      { key: 'balance_after', label: 'Wallet bal.', render: (t) => money(t.balance_after, t.currency) },
+    ],
+    rows: data || [],
+    page: 1,
+    pageSize: (data || []).length || 1,
+    total: (data || []).length,
+    emptyMessage: 'No wallet activity yet.',
+  });
 }
 
-document.querySelector('#wallet-history-btn')?.addEventListener('click', async () => {
-  const host = document.querySelector('#wallet-history');
-  host.classList.toggle('hidden');
-  if (!host.classList.contains('hidden')) await loadWalletHistory();
-});
+/* --- Wallet top-up modal ----------------------------------------------------- */
 
-document.querySelector('#topup-btn')?.addEventListener('click', () => {
-  document.querySelector('#topup-form').reset();
-  document.querySelector('#topup-feedback').textContent = '';
-  document.querySelector('#topup-modal').showModal();
-});
+function openTopupModal() {
+  const { dialog } = openModal({
+    id: 'topup-modal',
+    title: 'Add funds to your ad wallet',
+    body: `
+      <p style="margin-bottom:16px">Your wallet is credited automatically as soon as the payment clears.</p>
+      <form id="topup-form">
+        <span class="label">Amount</span>
+        <div class="mt-1 flex flex-wrap gap-2" id="topup-presets">
+          ${[25, 50, 100, 250].map((n) => `<button type="button" class="button !min-h-9 !px-4 text-xs" data-amount="${n}">$${n}</button>`).join('')}
+        </div>
+        <input class="field mt-3 font-bold" name="amount" type="number" step="1" min="${MIN_TOPUP}" value="${MIN_TOPUP}" required>
+        <small class="help">Minimum $${MIN_TOPUP}. Enter any higher amount you like.</small>
 
-document.querySelector('#cancel-topup')?.addEventListener('click', () =>
-  document.querySelector('#topup-modal').close());
-
-// Preset buttons just fill the field; the field remains the source of truth.
-document.querySelector('#topup-presets')?.addEventListener('click', (event) => {
-  const button = event.target.closest('[data-amount]');
-  if (!button) return;
-  document.querySelector('#topup-form').elements.amount.value = button.dataset.amount;
-});
-
-document.querySelector('#topup-form')?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const feedback = document.querySelector('#topup-feedback');
-  const button = form.querySelector('button[type="submit"]');
-  const amount = Number(form.elements.amount.value);
-
-  if (!Number.isFinite(amount) || amount < MIN_TOPUP) {
-    feedback.textContent = `The minimum top-up is $${MIN_TOPUP}.`;
-    feedback.className = 'status-line error mt-3 text-xs';
-    return;
-  }
-
-  const provider = form.querySelector('input[name="provider"]:checked')?.value || 'flutterwave';
-
-  setBusy(button, true, 'Opening payment…');
-  feedback.textContent = 'Preparing a secure payment page…';
-  feedback.className = 'status-line mt-3 text-xs';
-
-  const siteUrl = /localhost|127\.0\.0\.1/.test(window.location.origin)
-    ? window.location.origin
-    : 'https://digistore.codeinktechnologies.com';
-
-  const { data, error } = await supabase.functions.invoke('create-ad-funding-payment', {
-    body: { amount, provider, site_url: siteUrl },
+        <div class="mt-4">
+          <span class="label">Pay with</span>
+          <div class="mt-2 grid gap-2">
+            <label class="vnd-check-line" style="align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:var(--radius-md)">
+              <input type="radio" name="provider" value="flutterwave" checked>
+              <span>
+                <strong style="display:block">Card, bank transfer or mobile money</strong>
+                <span style="font-size:.76rem;color:var(--text-muted)">Visa, Mastercard, bank transfer, MTN MoMo, M-Pesa</span>
+              </span>
+            </label>
+            <label class="vnd-check-line" style="align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:var(--radius-md)">
+              <input type="radio" name="provider" value="nowpayments">
+              <span>
+                <strong style="display:block">Cryptocurrency</strong>
+                <span style="font-size:.76rem;color:var(--text-muted)">Bitcoin, Ethereum, USDT and 300+ coins</span>
+              </span>
+            </label>
+          </div>
+        </div>
+        <p id="topup-feedback" class="status-line mt-3 text-xs"></p>
+      </form>`,
+    footer: `
+      <button type="button" class="button" data-uk-cancel>Cancel</button>
+      <button type="submit" form="topup-form" class="button button-primary">Continue to payment</button>`,
   });
 
-  if (error || !data?.payment_url) {
-    setBusy(button, false);
-    feedback.textContent = data?.error || error?.message || 'The payment page could not be opened.';
-    feedback.className = 'status-line error mt-3 text-xs';
-    return;
-  }
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
+  dialog.querySelector('#topup-presets').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-amount]');
+    if (!button) return;
+    dialog.querySelector('#topup-form').elements.amount.value = button.dataset.amount;
+  });
 
-  window.location.href = data.payment_url;
-});
+  dialog.querySelector('#topup-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const feedback = dialog.querySelector('#topup-feedback');
+    const button = dialog.querySelector('button[form="topup-form"]');
+    const amount = Number(form.elements.amount.value);
+
+    if (!Number.isFinite(amount) || amount < MIN_TOPUP) {
+      feedback.textContent = `The minimum top-up is $${MIN_TOPUP}.`;
+      feedback.className = 'status-line error mt-3 text-xs';
+      return;
+    }
+
+    const provider = form.querySelector('input[name="provider"]:checked')?.value || 'flutterwave';
+
+    setBusy(button, true, 'Opening payment…');
+    feedback.textContent = 'Preparing a secure payment page…';
+    feedback.className = 'status-line mt-3 text-xs';
+
+    const siteUrl = /localhost|127\.0\.0\.1/.test(window.location.origin)
+      ? window.location.origin
+      : 'https://digistore.codeinktechnologies.com';
+
+    const { data, error } = await supabase.functions.invoke('create-ad-funding-payment', {
+      body: { amount, provider, site_url: siteUrl },
+    });
+
+    if (error || !data?.payment_url) {
+      setBusy(button, false);
+      feedback.textContent = data?.error || error?.message || 'The payment page could not be opened.';
+      feedback.className = 'status-line error mt-3 text-xs';
+      return;
+    }
+
+    window.location.href = data.payment_url;
+  });
+}
 
 /**
  * The funding callback returns here with ?funding=<state>. The wallet is
@@ -566,6 +625,8 @@ function reportFundingOutcome() {
   history.replaceState(null, '', url.toString());
 }
 
+/* --- Campaigns --------------------------------------------------------------- */
+
 async function loadCampaigns() {
   const { data, error } = await supabase
     .from('ad_campaigns')
@@ -575,76 +636,158 @@ async function loadCampaigns() {
 
   // Show the live rate card from whatever campaign exists, else the defaults.
   const rates = data?.[0] || { cpm_rate: 2.5, cpc_rate: 0.35, cpa_percent: 3 };
+  const rateCurrency = wallet?.currency || vendor.payout_currency || 'USD';
   const rateHost = document.querySelector('#rate-card');
   if (rateHost) {
     rateHost.innerHTML = `
       <div class="grid grid-cols-3 gap-2 text-center">
-        <div class="rounded-xl bg-slate-50 p-3">
-          <strong class="block text-sm font-black text-[#142c55]">${money(rates.cpm_rate, wallet?.currency)}</strong>
-          <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">per 1,000 views</span>
+        <div style="border-radius:var(--radius-md);background:var(--surface-sunken);padding:12px">
+          <strong style="display:block;font-family:var(--font-display);color:var(--text)">${money(rates.cpm_rate, rateCurrency)}</strong>
+          <span style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:var(--text-soft)">per 1,000 views</span>
         </div>
-        <div class="rounded-xl bg-slate-50 p-3">
-          <strong class="block text-sm font-black text-[#142c55]">${money(rates.cpc_rate, wallet?.currency)}</strong>
-          <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">per click</span>
+        <div style="border-radius:var(--radius-md);background:var(--surface-sunken);padding:12px">
+          <strong style="display:block;font-family:var(--font-display);color:var(--text)">${money(rates.cpc_rate, rateCurrency)}</strong>
+          <span style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:var(--text-soft)">per click</span>
         </div>
-        <div class="rounded-xl bg-slate-50 p-3">
-          <strong class="block text-sm font-black text-[#142c55]">${rates.cpa_percent}%</strong>
-          <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">per sale</span>
+        <div style="border-radius:var(--radius-md);background:var(--surface-sunken);padding:12px">
+          <strong style="display:block;font-family:var(--font-display);color:var(--text)">${rates.cpa_percent}%</strong>
+          <span style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:var(--text-soft)">per sale</span>
         </div>
       </div>`;
   }
 
-  const host = document.querySelector('#campaigns-table');
-  if (error) return void (host.innerHTML = empty(error.message));
+  const host = document.querySelector('#campaigns-list');
+  if (!host) return;
+  if (error) { host.innerHTML = emptyState({ icon: 'triangle-alert', title: 'Could not load campaigns', body: error.message }); return; }
   if (!data?.length) {
-    host.innerHTML = `
-      <div class="py-10 text-center">
-        <p class="text-sm text-slate-500">No campaigns yet. Boosting puts a product in front of more buyers.</p>
-        <button class="button button-primary mt-4" type="button" data-new-campaign>Create a campaign</button>
-      </div>`;
+    host.innerHTML = emptyState({
+      icon: 'megaphone',
+      title: 'No campaigns yet',
+      body: 'Boosting puts a product in front of more buyers.',
+      ctaLabel: 'Create a campaign',
+      ctaHref: '#',
+    });
+    host.querySelector('.uk-empty__cta')?.addEventListener('click', (e) => { e.preventDefault(); openCampaignModal(); });
     return;
   }
 
-  host.innerHTML = `
-    <div class="scroll-x">
-      <table class="w-full text-sm">
-        <thead class="text-left text-xs uppercase tracking-wide text-slate-400">
-          <tr><th class="pb-3">Campaign</th><th class="pb-3">Product</th><th class="pb-3">Placement</th>
-              <th class="pb-3">Budget used</th><th class="pb-3">Clicks</th><th class="pb-3">Status</th><th class="pb-3"></th></tr>
-        </thead>
-        <tbody>
-          ${data.map((c) => {
-            const used = Math.min(100, (Number(c.spend) / Number(c.budget)) * 100);
-            return `
-            <tr class="border-t border-slate-100">
-              <td class="py-3 pr-3"><strong class="text-[#142c55]">${escapeHtml(c.name)}</strong></td>
-              <td class="py-3 pr-3 text-slate-500">${escapeHtml(c.products?.title || '—')}</td>
-              <td class="py-3 pr-3 capitalize text-slate-500">${escapeHtml(c.placement)}</td>
-              <td class="py-3 pr-3">
-                <span class="block text-xs">${money(c.spend, c.currency)} / ${money(c.budget, c.currency)}</span>
-                <span class="mt-1 block h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
-                  <span class="block h-full rounded-full bg-orange-500" style="width:${used}%"></span>
-                </span>
-              </td>
-              <td class="py-3 pr-3">${c.clicks} <span class="text-[11px] text-slate-400">/ ${c.impressions} views · ${c.conversions} sold</span></td>
-              <td class="py-3 pr-3">
-                ${c.review_status === 'pending'
-                  ? '<span class="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">In review</span>'
-                  : c.review_status === 'rejected'
-                    ? `<span class="inline-flex rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-bold text-red-700">Rejected</span>
-                       ${c.review_note ? `<span class="mt-1 block text-[10px] text-slate-400">${escapeHtml(c.review_note)}</span>` : ''}`
-                    : pill(c.status)}
-              </td>
-              <td class="py-3 text-right">
-                ${c.review_status === 'approved' && ['active', 'paused'].includes(c.status)
-                  ? `<button class="button !min-h-8 !px-3 text-xs" type="button" data-toggle-campaign="${c.id}" data-status="${c.status}">${c.status === 'active' ? 'Pause' : 'Resume'}</button>`
-                  : ''}
-              </td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
+  host.innerHTML = data.map((c) => {
+    const used = Math.min(100, (Number(c.spend) / Number(c.budget || 1)) * 100);
+    const statusChip = c.review_status === 'pending'
+      ? statusBadge('pending', 'In review')
+      : c.review_status === 'rejected'
+        ? statusBadge('rejected')
+        : statusBadge(c.status);
+    return `
+      <div class="vnd-campaign-card">
+        <div class="vnd-campaign-card__head">
+          <div class="min-w-0">
+            <strong>${escapeHtml(c.name)}</strong>
+            <div class="vnd-campaign-card__sub">Targeting: ${escapeHtml(c.products?.title || '—')}</div>
+          </div>
+          ${statusChip}
+        </div>
+        ${c.review_status === 'rejected' && c.review_note ? `<div style="margin-top:6px;font-size:.72rem;color:var(--text-soft)">${escapeHtml(c.review_note)}</div>` : ''}
+        <div class="vnd-campaign-bar"><div class="vnd-campaign-bar__fill" style="width:${used}%"></div></div>
+        <div class="vnd-campaign-spend">${money(c.spend, c.currency)} / ${money(c.budget, c.currency)} spent · ${escapeHtml(c.placement)}</div>
+        <div class="vnd-campaign-stats">
+          <div><strong>${Number(c.impressions).toLocaleString()}</strong><span>Views</span></div>
+          <div><strong>${Number(c.clicks).toLocaleString()}</strong><span>Clicks</span></div>
+          <div><strong>${Number(c.conversions).toLocaleString()}</strong><span>Sold</span></div>
+        </div>
+        ${c.review_status === 'approved' && ['active', 'paused'].includes(c.status)
+          ? `<div class="vnd-campaign-card__actions"><button class="button !min-h-8 !px-3 text-xs" type="button" data-toggle-campaign="${c.id}" data-status="${c.status}">${c.status === 'active' ? 'Pause' : 'Resume'}</button></div>`
+          : ''}
+      </div>`;
+  }).join('');
+
+  renderIcons();
+}
+
+function openCampaignModal() {
+  const sellable = myProducts.filter((p) => p.is_published);
+  if (!sellable.length) {
+    toast('Publish a product before boosting it.', 'error');
+    location.hash = '#products';
+    return;
+  }
+
+  const { dialog } = openModal({
+    id: 'campaign-modal',
+    title: 'Promote a product',
+    body: `
+      <form id="campaign-form">
+        <label class="vnd-field vnd-field--span2">
+          <span class="label">Campaign name</span>
+          <input class="field" name="name" required placeholder="e.g. Launch week push">
+        </label>
+        <label class="vnd-field vnd-field--span2" style="margin-top:14px">
+          <span class="label">Product</span>
+          <select class="field" name="product_id" required>
+            ${sellable.map((p) => `<option value="${p.id}">${escapeHtml(p.title)}</option>`).join('')}
+          </select>
+        </label>
+        <div class="vnd-modal-grid" style="margin-top:14px">
+          <label class="vnd-field">
+            <span class="label">Placement</span>
+            <select class="field" name="placement">
+              <option value="featured">Featured — home page rails</option>
+              <option value="search">Search — weighted in results</option>
+              <option value="category">Category — top of its category</option>
+            </select>
+          </label>
+          <label class="vnd-field">
+            <span class="label">Budget</span>
+            <input class="field" name="budget" type="number" step=".01" min="1" required placeholder="50.00">
+          </label>
+          <label class="vnd-field">
+            <span class="label">Starts</span>
+            <input class="field" name="starts_at" type="date" value="${new Date().toISOString().slice(0, 10)}">
+          </label>
+          <label class="vnd-field">
+            <span class="label">Ends <span class="vnd-optional">(optional)</span></span>
+            <input class="field" name="ends_at" type="date">
+          </label>
+        </div>
+        <p class="vnd-callout" style="margin-top:14px">
+          Campaigns start as a draft and are reviewed before going live. Spend is drawn from your ad wallet balance.
+        </p>
+        <p id="campaign-feedback" class="status-line text-xs my-0"></p>
+      </form>`,
+    footer: `
+      <button type="button" class="button" data-uk-cancel>Cancel</button>
+      <button type="submit" form="campaign-form" class="button button-primary">Create campaign</button>`,
+  });
+
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
+  dialog.querySelector('#campaign-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const feedback = dialog.querySelector('#campaign-feedback');
+    const button = dialog.querySelector('button[form="campaign-form"]');
+
+    setBusy(button, true, 'Creating…');
+    const { error } = await supabase.from('ad_campaigns').insert({
+      vendor_id: vendor.id,
+      product_id: form.elements.product_id.value,
+      name: form.elements.name.value.trim(),
+      placement: form.elements.placement.value,
+      budget: Number(form.elements.budget.value),
+      currency: vendor.payout_currency || 'USD',
+      starts_at: form.elements.starts_at.value || new Date().toISOString(),
+      ends_at: form.elements.ends_at.value || null,
+    });
+    setBusy(button, false);
+
+    if (error) {
+      feedback.textContent = error.message;
+      feedback.className = 'status-line error text-xs my-0';
+      return;
+    }
+    dialog.close();
+    toast('Campaign submitted — it goes live once our team approves it.');
+    await loadCampaigns();
+  });
 }
 
 /* ==========================================================================
@@ -663,7 +806,7 @@ function vendorPath(kind, fileName) {
 async function uploadTo(bucket, kind, file, statusEl) {
   if (statusEl) {
     statusEl.textContent = 'Uploading…';
-    statusEl.className = 'help text-slate-400';
+    statusEl.className = 'help';
   }
   const { data, error } = await supabase.storage
     .from(bucket)
@@ -672,13 +815,15 @@ async function uploadTo(bucket, kind, file, statusEl) {
   if (error) {
     if (statusEl) {
       statusEl.textContent = error.message;
-      statusEl.className = 'help text-red-600';
+      statusEl.className = 'help';
+      statusEl.style.color = 'var(--danger)';
     }
     return null;
   }
   if (statusEl) {
     statusEl.textContent = `✓ ${file.name}`;
-    statusEl.className = 'help text-green-700';
+    statusEl.className = 'help';
+    statusEl.style.color = '#2dab66';
   }
   return data.path;
 }
@@ -687,8 +832,6 @@ async function uploadTo(bucket, kind, file, statusEl) {
    Product editor
    ========================================================================== */
 
-const productModal = document.querySelector('#product-modal');
-
 function slugify(value) {
   return (value || '').toLowerCase().trim()
     .replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '')
@@ -696,282 +839,358 @@ function slugify(value) {
 }
 
 function openProductModal(product = null) {
-  const form = document.querySelector('#product-form');
-  form.reset();
-  document.querySelector('#product-feedback').textContent = '';
-  document.querySelector('#v-cover-preview').classList.add('hidden');
-  document.querySelector('#v-cover-status').textContent = '';
-  document.querySelector('#v-file-status').textContent = '';
+  const { dialog } = openModal({
+    id: 'product-modal',
+    title: product ? 'Edit product' : 'New product',
+    body: `
+      <form id="product-form">
+        <input type="hidden" name="id" value="${product?.id || ''}">
+        <label class="vnd-field vnd-field--span2">
+          <span class="label">Title</span>
+          <input class="field" name="title" id="v-title" required placeholder="e.g. The 24-Hour Product Launch Kit" value="${escapeHtml(product?.title || '')}">
+        </label>
+        <div class="vnd-modal-grid" style="margin-top:14px">
+          <label class="vnd-field">
+            <span class="label">Category</span>
+            <select class="field" name="category" id="v-category">
+              ${categories.map((c) => `<option value="${escapeHtml(c.name)}" ${product?.category === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+            </select>
+          </label>
+          <label class="vnd-field">
+            <span class="label">URL slug</span>
+            <input class="field font-mono text-xs" name="slug" id="v-slug" required value="${escapeHtml(product?.slug || '')}">
+          </label>
+          <label class="vnd-field">
+            <span class="label">Price</span>
+            <input class="field font-bold" name="price" type="number" step=".01" min="0" required placeholder="0.00" value="${product?.price ?? ''}">
+          </label>
+          <label class="vnd-field">
+            <span class="label">Compare-at price <span class="vnd-optional">(optional)</span></span>
+            <input class="field" name="original_price" type="number" step=".01" min="0" placeholder="0.00" value="${product?.original_price ?? ''}">
+          </label>
+        </div>
+        <label class="vnd-field vnd-field--span2" style="margin-top:14px">
+          <span class="label">Short description</span>
+          <input class="field" name="short_description" maxlength="160" placeholder="One line shown on the product card" value="${escapeHtml(product?.short_description || '')}">
+        </label>
+        <label class="vnd-field vnd-field--span2" style="margin-top:14px">
+          <span class="label">Full description</span>
+          <textarea class="field" name="description" rows="4" placeholder="What's included, who it's for, what they'll achieve…">${escapeHtml(product?.description || '')}</textarea>
+        </label>
+        <div class="vnd-modal-grid" style="margin-top:14px">
+          <div>
+            <span class="label">Cover image</span>
+            <div class="vnd-upload mt-1">
+              <input type="file" id="v-cover-file" accept="image/*" class="text-xs">
+              <img id="v-cover-preview" class="${product?.cover_url ? '' : 'hidden'}" src="${escapeHtml(product?.cover_url || '')}" alt="">
+            </div>
+            <input type="hidden" name="cover_url" id="v-cover-url" value="${escapeHtml(product?.cover_url || '')}">
+            <small id="v-cover-status" class="help"></small>
+          </div>
+          <div>
+            <span class="label">Product file <span class="vnd-optional">(what buyers download)</span></span>
+            <div class="vnd-upload mt-1">
+              <input type="file" id="v-product-file" class="text-xs">
+            </div>
+            <input type="hidden" name="file_path" id="v-file-path" value="${escapeHtml(product?.file_path || '')}">
+            <small id="v-file-status" class="help"></small>
+          </div>
+          <label class="vnd-field">
+            <span class="label">File type</span>
+            <input class="field" name="file_type" placeholder="e.g. PDF, ZIP, MP4" value="${escapeHtml(product?.file_type || '')}">
+          </label>
+          <label class="vnd-field">
+            <span class="label">Licence</span>
+            <select class="field" name="license_type">
+              <option value="personal" ${product?.license_type === 'personal' ? 'selected' : ''}>Personal use</option>
+              <option value="commercial" ${product?.license_type === 'commercial' ? 'selected' : ''}>Commercial use</option>
+              <option value="extended" ${product?.license_type === 'extended' ? 'selected' : ''}>Extended licence</option>
+            </select>
+          </label>
+        </div>
+        <label class="vnd-check-line" style="margin-top:14px">
+          <input type="checkbox" name="is_published" ${!product || product.is_published ? 'checked' : ''}>
+          Publish to the storefront
+        </label>
+        <p id="product-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
+      </form>`,
+    footer: `
+      <button type="button" class="button" data-uk-cancel>Cancel</button>
+      <button type="submit" form="product-form" class="button button-primary">Save product</button>`,
+  });
+  dialog.classList.add('uk-modal--wide');
 
-  document.querySelector('#v-category').innerHTML = categories
-    .map((c) => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
 
-  document.querySelector('#product-modal-title').textContent = product ? 'Edit product' : 'New product';
-  form.elements.id.value = product?.id || '';
-
-  if (product) {
-    form.elements.title.value = product.title || '';
-    form.elements.slug.value = product.slug || '';
-    form.elements.price.value = product.price ?? '';
-    form.elements.original_price.value = product.original_price ?? '';
-    form.elements.short_description.value = product.short_description || '';
-    form.elements.description.value = product.description || '';
-    form.elements.file_type.value = product.file_type || '';
-    form.elements.is_published.checked = Boolean(product.is_published);
-    document.querySelector('#v-cover-url').value = product.cover_url || '';
-    document.querySelector('#v-file-path').value = product.file_path || '';
-    if (product.category) document.querySelector('#v-category').value = product.category;
-    if (product.license_type) form.elements.license_type.value = product.license_type;
-    if (product.cover_url) {
-      const preview = document.querySelector('#v-cover-preview');
-      preview.src = product.cover_url;
-      preview.classList.remove('hidden');
+  dialog.querySelector('#v-title').addEventListener('input', (event) => {
+    const slugField = dialog.querySelector('#v-slug');
+    // Only auto-fill the slug while creating; never rewrite a published URL.
+    if (!dialog.querySelector('#product-form').elements.id.value) {
+      slugField.value = slugify(event.target.value);
     }
-  }
+  });
 
-  productModal.showModal();
+  dialog.querySelector('#v-cover-file').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const path = await uploadTo('product-images', 'covers', file, dialog.querySelector('#v-cover-status'));
+    if (!path) return;
+    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+    dialog.querySelector('#v-cover-url').value = data.publicUrl;
+    const preview = dialog.querySelector('#v-cover-preview');
+    preview.src = data.publicUrl;
+    preview.classList.remove('hidden');
+  });
+
+  dialog.querySelector('#v-product-file').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const path = await uploadTo('books', 'files', file, dialog.querySelector('#v-file-status'));
+    if (!path) return;
+    dialog.querySelector('#v-file-path').value = path;
+    // Offer the extension as the file type when the seller has not set one.
+    const typeField = dialog.querySelector('#product-form').elements.file_type;
+    if (!typeField.value) typeField.value = (file.name.split('.').pop() || '').toUpperCase();
+  });
+
+  dialog.querySelector('#product-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = dialog.querySelector('button[form="product-form"]');
+    const feedback = dialog.querySelector('#product-feedback');
+    const id = form.elements.id.value;
+
+    const filePath = dialog.querySelector('#v-file-path').value;
+    if (!filePath) {
+      feedback.textContent = 'Upload the file buyers will download.';
+      feedback.className = 'status-line error text-xs my-0';
+      return;
+    }
+
+    const payload = {
+      vendor_id: vendor.id,
+      title: form.elements.title.value.trim(),
+      slug: slugify(form.elements.slug.value) || slugify(form.elements.title.value),
+      category: dialog.querySelector('#v-category').value,
+      price: Number(form.elements.price.value),
+      original_price: form.elements.original_price.value ? Number(form.elements.original_price.value) : null,
+      short_description: form.elements.short_description.value.trim() || null,
+      description: form.elements.description.value.trim() || null,
+      cover_url: dialog.querySelector('#v-cover-url').value || null,
+      file_path: filePath,
+      file_type: form.elements.file_type.value.trim() || null,
+      license_type: form.elements.license_type.value,
+      is_published: form.elements.is_published.checked,
+      currency: vendor.payout_currency || 'USD',
+    };
+
+    setBusy(button, true, 'Saving…');
+    const { error } = id
+      ? await supabase.from('products').update(payload).eq('id', id)
+      : await supabase.from('products').insert(payload);
+    setBusy(button, false);
+
+    if (error) {
+      feedback.textContent = error.message;
+      feedback.className = 'status-line error text-xs my-0';
+      return;
+    }
+
+    dialog.close();
+    toast(id ? 'Product updated.' : 'Product published.');
+    await loadProducts();
+    await refreshDashboard();
+  });
+
   renderIcons();
 }
-
-document.querySelector('#v-title')?.addEventListener('input', (event) => {
-  const slugField = document.querySelector('#v-slug');
-  // Only auto-fill the slug while creating; never rewrite a published URL.
-  if (!document.querySelector('#product-form').elements.id.value) {
-    slugField.value = slugify(event.target.value);
-  }
-});
-
-document.querySelector('#v-cover-file')?.addEventListener('change', async (event) => {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  const path = await uploadTo('product-images', 'covers', file, document.querySelector('#v-cover-status'));
-  if (!path) return;
-  const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-  document.querySelector('#v-cover-url').value = data.publicUrl;
-  const preview = document.querySelector('#v-cover-preview');
-  preview.src = data.publicUrl;
-  preview.classList.remove('hidden');
-});
-
-document.querySelector('#v-product-file')?.addEventListener('change', async (event) => {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  const path = await uploadTo('books', 'files', file, document.querySelector('#v-file-status'));
-  if (!path) return;
-  document.querySelector('#v-file-path').value = path;
-  // Offer the extension as the file type when the seller has not set one.
-  const typeField = document.querySelector('#product-form').elements.file_type;
-  if (!typeField.value) typeField.value = (file.name.split('.').pop() || '').toUpperCase();
-});
-
-document.querySelector('#product-form')?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const button = document.querySelector('#save-product');
-  const feedback = document.querySelector('#product-feedback');
-  const id = form.elements.id.value;
-
-  const filePath = document.querySelector('#v-file-path').value;
-  if (!filePath) {
-    feedback.textContent = 'Upload the file buyers will download.';
-    feedback.className = 'status-line error text-xs my-0';
-    return;
-  }
-
-  const payload = {
-    vendor_id: vendor.id,
-    title: form.elements.title.value.trim(),
-    slug: slugify(form.elements.slug.value) || slugify(form.elements.title.value),
-    category: document.querySelector('#v-category').value,
-    price: Number(form.elements.price.value),
-    original_price: form.elements.original_price.value ? Number(form.elements.original_price.value) : null,
-    short_description: form.elements.short_description.value.trim() || null,
-    description: form.elements.description.value.trim() || null,
-    cover_url: document.querySelector('#v-cover-url').value || null,
-    file_path: filePath,
-    file_type: form.elements.file_type.value.trim() || null,
-    license_type: form.elements.license_type.value,
-    is_published: form.elements.is_published.checked,
-    currency: vendor.payout_currency || 'USD',
-  };
-
-  setBusy(button, true, 'Saving…');
-  const { error } = id
-    ? await supabase.from('products').update(payload).eq('id', id)
-    : await supabase.from('products').insert(payload);
-  setBusy(button, false);
-
-  if (error) {
-    feedback.textContent = error.message;
-    feedback.className = 'status-line error text-xs my-0';
-    return;
-  }
-
-  productModal.close();
-  toast(id ? 'Product updated.' : 'Product published.');
-  await loadProducts();
-  await refreshDashboard();
-});
 
 /* ==========================================================================
    Payout account editor
    ========================================================================== */
 
-const payoutModal = document.querySelector('#payout-modal');
+function openPayoutModal() {
+  const { dialog } = openModal({
+    id: 'payout-modal',
+    title: 'Payout account',
+    body: `
+      <form id="payout-form">
+        <div class="vnd-modal-grid">
+          <label class="vnd-field">
+            <span class="label">Country</span>
+            <select class="field" name="country" id="payout-country">${countryOptions(vendor.country)}</select>
+          </label>
+          <label class="vnd-field">
+            <span class="label">Method</span>
+            <select class="field" name="method" id="payout-method"></select>
+          </label>
+        </div>
+        <label class="vnd-field vnd-field--span2" style="margin-top:14px">
+          <span class="label">Account holder name</span>
+          <input class="field" name="account_name" required placeholder="Name exactly as it appears on the account">
+        </label>
 
-function syncPayoutMethodFields() {
-  const country = document.querySelector('#payout-country').value;
-  const methodSelect = document.querySelector('#payout-method');
-  const available = methodsFor(country);
-  const current = methodSelect.value;
+        <div id="fields-bank" class="hidden vnd-modal-grid" style="margin-top:14px">
+          <label class="vnd-field vnd-field--span2">
+            <span class="label">Bank name</span>
+            <input class="field" name="bank_name" placeholder="e.g. GCB Bank">
+          </label>
+          <label class="vnd-field">
+            <span class="label">Account number</span>
+            <input class="field font-mono" name="account_number" inputmode="numeric" autocomplete="off">
+          </label>
+          <label class="vnd-field">
+            <span class="label">Branch / sort code <span class="vnd-optional">(optional)</span></span>
+            <input class="field" name="branch_code">
+          </label>
+          <label class="vnd-field">
+            <span class="label">SWIFT / BIC <span class="vnd-optional">(optional)</span></span>
+            <input class="field" name="swift_code">
+          </label>
+          <label class="vnd-field">
+            <span class="label">IBAN <span class="vnd-optional">(optional)</span></span>
+            <input class="field" name="iban">
+          </label>
+        </div>
 
-  methodSelect.innerHTML = available
-    .map((m) => `<option value="${m.value}">${escapeHtml(m.label)}</option>`).join('');
-  if (available.some((m) => m.value === current)) methodSelect.value = current;
+        <div id="fields-momo" class="hidden vnd-modal-grid" style="margin-top:14px">
+          <label class="vnd-field">
+            <span class="label">Provider</span>
+            <select class="field" name="momo_provider" id="momo-provider"></select>
+          </label>
+          <label class="vnd-field">
+            <span class="label">Mobile money number</span>
+            <input class="field font-mono" name="momo_number" inputmode="tel" placeholder="e.g. 024 123 4567">
+          </label>
+        </div>
 
-  const method = methodSelect.value;
-  document.querySelector('#fields-bank').classList.toggle('hidden', method !== 'bank_transfer');
-  document.querySelector('#fields-momo').classList.toggle('hidden', method !== 'mobile_money');
-  document.querySelector('#fields-paypal').classList.toggle('hidden', method !== 'paypal');
-  document.querySelector('#fields-crypto').classList.toggle('hidden', method !== 'crypto');
+        <div id="fields-paypal" class="hidden" style="margin-top:14px">
+          <label class="vnd-field">
+            <span class="label">PayPal email</span>
+            <input class="field" name="paypal_email" type="email" placeholder="you@example.com">
+          </label>
+        </div>
 
-  const providers = MOMO_PROVIDERS[country] || [];
-  document.querySelector('#momo-provider').innerHTML = providers
-    .map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
-}
+        <div id="fields-crypto" class="hidden vnd-modal-grid" style="margin-top:14px">
+          <label class="vnd-field">
+            <span class="label">Asset</span>
+            <select class="field" name="crypto_asset">
+              <option value="USDT">USDT</option>
+              <option value="BTC">BTC</option>
+              <option value="ETH">ETH</option>
+              <option value="USDC">USDC</option>
+            </select>
+          </label>
+          <label class="vnd-field">
+            <span class="label">Wallet address</span>
+            <input class="field font-mono text-xs" name="crypto_address">
+          </label>
+        </div>
 
-document.querySelector('#payout-country')?.addEventListener('change', syncPayoutMethodFields);
-document.querySelector('#payout-method')?.addEventListener('change', syncPayoutMethodFields);
+        <label class="vnd-check-line" style="margin-top:14px">
+          <input type="checkbox" name="is_default" checked>
+          Use as my default payout account
+        </label>
 
-document.querySelector('#payout-form')?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const feedback = document.querySelector('#payout-feedback');
-  const method = document.querySelector('#payout-method').value;
-  const country = document.querySelector('#payout-country').value;
-
-  const payload = {
-    vendor_id: vendor.id,
-    method,
-    country,
-    currency: COUNTRIES.find((c) => c.code === country)?.currency || 'USD',
-    account_name: form.elements.account_name.value.trim(),
-    is_default: form.elements.is_default.checked,
-  };
-
-  if (method === 'bank_transfer') {
-    Object.assign(payload, {
-      bank_name: form.elements.bank_name.value.trim(),
-      account_number: form.elements.account_number.value.trim(),
-      branch_code: form.elements.branch_code.value.trim() || null,
-      swift_code: form.elements.swift_code.value.trim() || null,
-      iban: form.elements.iban.value.trim() || null,
-    });
-  } else if (method === 'mobile_money') {
-    Object.assign(payload, {
-      momo_provider: document.querySelector('#momo-provider').value,
-      momo_number: form.elements.momo_number.value.trim(),
-    });
-  } else if (method === 'paypal') {
-    payload.paypal_email = form.elements.paypal_email.value.trim();
-  } else {
-    Object.assign(payload, {
-      crypto_asset: form.elements.crypto_asset.value,
-      crypto_address: form.elements.crypto_address.value.trim(),
-    });
-  }
-
-  // Only one account can be the default; clear the others first.
-  if (payload.is_default) {
-    await supabase.from('payout_accounts').update({ is_default: false }).eq('vendor_id', vendor.id);
-  }
-
-  const { error } = await supabase.from('payout_accounts').insert(payload);
-  if (error) {
-    feedback.textContent = error.message;
-    feedback.className = 'status-line error text-xs my-0';
-    return;
-  }
-
-  payoutModal.close();
-  toast('Payout account saved.');
-  await loadPayouts();
-  await refreshDashboard();
-});
-
-document.querySelector('#request-payout-btn')?.addEventListener('click', async (event) => {
-  const accounts = await loadPayouts();
-  const target = accounts.find((a) => a.is_default) || accounts[0];
-
-  if (!target) {
-    toast('Add a payout account first.', 'error');
-    location.hash = '#payouts';
-    return;
-  }
-  if (!window.confirm(`Request a withdrawal of your available balance to ${target.account_name}?`)) return;
-
-  setBusy(event.currentTarget, true, 'Requesting…');
-  const { data, error } = await supabase.rpc('request_payout', { p_payout_account_id: target.id });
-  setBusy(event.currentTarget, false);
-
-  if (error) {
-    toast(error.message, 'error');
-    return;
-  }
-  toast(`Payout of ${money(data.amount, data.currency)} requested.`);
-  await refreshDashboard();
-  await loadPayouts();
-});
-
-/* ==========================================================================
-   Campaigns
-   ========================================================================== */
-
-const campaignModal = document.querySelector('#campaign-modal');
-
-function openCampaignModal() {
-  const form = document.querySelector('#campaign-form');
-  form.reset();
-  document.querySelector('#campaign-feedback').textContent = '';
-
-  const sellable = myProducts.filter((p) => p.is_published);
-  if (!sellable.length) {
-    toast('Publish a product before boosting it.', 'error');
-    location.hash = '#products';
-    return;
-  }
-  document.querySelector('#campaign-product').innerHTML = sellable
-    .map((p) => `<option value="${p.id}">${escapeHtml(p.title)}</option>`).join('');
-  form.elements.starts_at.value = new Date().toISOString().slice(0, 10);
-  campaignModal.showModal();
-  renderIcons();
-}
-
-document.querySelector('#campaign-form')?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const feedback = document.querySelector('#campaign-feedback');
-
-  const { error } = await supabase.from('ad_campaigns').insert({
-    vendor_id: vendor.id,
-    product_id: document.querySelector('#campaign-product').value,
-    name: form.elements.name.value.trim(),
-    placement: form.elements.placement.value,
-    budget: Number(form.elements.budget.value),
-    currency: vendor.payout_currency || 'USD',
-    starts_at: form.elements.starts_at.value || new Date().toISOString(),
-    ends_at: form.elements.ends_at.value || null,
+        <p class="vnd-callout" style="margin-top:14px">
+          Your payout details are visible only to you and our payments team. They are never shown on your
+          public store or shared with buyers.
+        </p>
+        <p id="payout-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
+      </form>`,
+    footer: `
+      <button type="button" class="button" data-uk-cancel>Cancel</button>
+      <button type="submit" form="payout-form" class="button button-primary">Save account</button>`,
   });
+  dialog.classList.add('uk-modal--wide');
 
-  if (error) {
-    feedback.textContent = error.message;
-    feedback.className = 'status-line error text-xs my-0';
-    return;
+  function syncPayoutMethodFields() {
+    const country = dialog.querySelector('#payout-country').value;
+    const methodSelect = dialog.querySelector('#payout-method');
+    const available = methodsFor(country);
+    const current = methodSelect.value;
+
+    methodSelect.innerHTML = available.map((m) => `<option value="${m.value}">${escapeHtml(m.label)}</option>`).join('');
+    if (available.some((m) => m.value === current)) methodSelect.value = current;
+    refreshSelect(methodSelect);
+
+    const method = methodSelect.value;
+    dialog.querySelector('#fields-bank').classList.toggle('hidden', method !== 'bank_transfer');
+    dialog.querySelector('#fields-momo').classList.toggle('hidden', method !== 'mobile_money');
+    dialog.querySelector('#fields-paypal').classList.toggle('hidden', method !== 'paypal');
+    dialog.querySelector('#fields-crypto').classList.toggle('hidden', method !== 'crypto');
+
+    const providers = MOMO_PROVIDERS[country] || [];
+    const momoSelect = dialog.querySelector('#momo-provider');
+    momoSelect.innerHTML = providers.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+    refreshSelect(momoSelect);
   }
-  campaignModal.close();
-  toast('Campaign submitted — it goes live once our team approves it.');
-  await loadCampaigns();
-});
+
+  dialog.querySelector('#payout-country').addEventListener('change', syncPayoutMethodFields);
+  dialog.querySelector('#payout-method').addEventListener('change', syncPayoutMethodFields);
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
+  syncPayoutMethodFields();
+
+  dialog.querySelector('#payout-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const feedback = dialog.querySelector('#payout-feedback');
+    const button = dialog.querySelector('button[form="payout-form"]');
+    const method = dialog.querySelector('#payout-method').value;
+    const country = dialog.querySelector('#payout-country').value;
+
+    const payload = {
+      vendor_id: vendor.id,
+      method,
+      country,
+      currency: COUNTRIES.find((c) => c.code === country)?.currency || 'USD',
+      account_name: form.elements.account_name.value.trim(),
+      is_default: form.elements.is_default.checked,
+    };
+
+    if (method === 'bank_transfer') {
+      Object.assign(payload, {
+        bank_name: form.elements.bank_name.value.trim(),
+        account_number: form.elements.account_number.value.trim(),
+        branch_code: form.elements.branch_code.value.trim() || null,
+        swift_code: form.elements.swift_code.value.trim() || null,
+        iban: form.elements.iban.value.trim() || null,
+      });
+    } else if (method === 'mobile_money') {
+      Object.assign(payload, {
+        momo_provider: dialog.querySelector('#momo-provider').value,
+        momo_number: form.elements.momo_number.value.trim(),
+      });
+    } else if (method === 'paypal') {
+      payload.paypal_email = form.elements.paypal_email.value.trim();
+    } else {
+      Object.assign(payload, {
+        crypto_asset: form.elements.crypto_asset.value,
+        crypto_address: form.elements.crypto_address.value.trim(),
+      });
+    }
+
+    setBusy(button, true, 'Saving…');
+    // Only one account can be the default; clear the others first.
+    if (payload.is_default) {
+      await supabase.from('payout_accounts').update({ is_default: false }).eq('vendor_id', vendor.id);
+    }
+
+    const { error } = await supabase.from('payout_accounts').insert(payload);
+    setBusy(button, false);
+
+    if (error) {
+      feedback.textContent = error.message;
+      feedback.className = 'status-line error text-xs my-0';
+      return;
+    }
+
+    dialog.close();
+    toast('Payout account saved.');
+    await loadPayouts();
+    await refreshDashboard();
+  });
+}
 
 /* ==========================================================================
    Store settings
@@ -984,14 +1203,16 @@ document.querySelector('#logo-file')?.addEventListener('change', async (event) =
   if (!path) return;
   const { data } = supabase.storage.from('product-images').getPublicUrl(path);
   document.querySelector('#logo-url').value = data.publicUrl;
-  document.querySelector('#logo-preview').innerHTML = `<img src="${escapeHtml(data.publicUrl)}" alt="" class="h-full w-full object-cover">`;
+  document.querySelector('#logo-preview').innerHTML = `<img src="${escapeHtml(data.publicUrl)}" alt="">`;
 });
 
 document.querySelector('#vendor-settings-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
   const feedback = document.querySelector('#settings-feedback');
+  const button = form.querySelector('button[type="submit"]');
 
+  setBusy(button, true, 'Saving…');
   const { error } = await supabase.from('vendors').update({
     display_name: form.elements.display_name.value.trim(),
     bio: form.elements.bio.value.trim() || null,
@@ -1000,13 +1221,176 @@ document.querySelector('#vendor-settings-form')?.addEventListener('submit', asyn
     logo_url: document.querySelector('#logo-url').value || null,
     updated_at: new Date().toISOString(),
   }).eq('id', vendor.id);
+  setBusy(button, false);
 
   feedback.textContent = error ? error.message : '✓ Saved.';
   feedback.className = `status-line text-xs my-0 ${error ? 'error' : 'success'}`;
   if (!error) {
     toast('Store settings saved.');
     await refreshDashboard();
+    fillSettings();
   }
+});
+
+/* ==========================================================================
+   Team (store_members) — visible to the owner (and, once RLS is extended,
+   to manager-tier teammates). Only owner-tier callers (the original owner,
+   an active 'owner' row, or an admin) may invite/change-role/remove — a
+   'manager' may only bring on staff/support, matching store_member_invite's
+   own server-side rule. See the schema task's scope-boundary note: staff and
+   support do not yet inherit access to products/earnings/payouts/campaigns.
+   ========================================================================== */
+
+let teamMembers = [];
+/** The signed-in user's own role on THIS store, if they have one via store_members. */
+let myTeamRole = null;
+
+function isTeamOwnerTier() {
+  return vendor.user_id === account.user.id || myTeamRole === 'owner';
+}
+
+async function loadTeam() {
+  const { data, error } = await supabase
+    .from('store_members')
+    .select('id,vendor_id,user_id,invited_email,role,status,invited_at,accepted_at')
+    .eq('vendor_id', vendor.id)
+    .order('invited_at', { ascending: true });
+  if (error) {
+    document.querySelector('#team-list').innerHTML = emptyState({ icon: 'triangle-alert', title: 'Could not load team', body: error.message });
+    return;
+  }
+  teamMembers = data || [];
+  // store_members.user_id references auth.users, not public.profiles, so
+  // PostgREST can't auto-embed a profiles relationship here — fetch names
+  // in a second small query keyed by id instead.
+  const userIds = [...new Set(teamMembers.map((m) => m.user_id).filter(Boolean))];
+  if (userIds.length) {
+    const { data: names } = await supabase.from('profiles').select('id,full_name').in('id', userIds);
+    const nameMap = new Map((names || []).map((p) => [p.id, p.full_name]));
+    teamMembers.forEach((m) => { m.full_name = m.user_id ? nameMap.get(m.user_id) : null; });
+  }
+  myTeamRole = teamMembers.find((m) => m.user_id === account.user.id && m.status === 'active')?.role || null;
+  paintTeam();
+}
+
+function paintTeam() {
+  const host = document.querySelector('#team-list');
+  if (!host) return;
+  const canManage = isTeamOwnerTier() || myTeamRole === 'manager';
+  const canGrantOwnerManager = isTeamOwnerTier();
+
+  if (!teamMembers.length) {
+    host.innerHTML = emptyState({ icon: 'users-round', title: 'No team members yet', body: 'Invite someone to help run this store.' });
+    return;
+  }
+
+  host.innerHTML = teamMembers.map((m) => {
+    const isOriginalOwner = m.user_id === vendor.user_id;
+    const label = m.full_name || m.invited_email || (m.user_id ? m.user_id.slice(0, 8) : 'Pending');
+    const roleChangeAllowed = canManage && !isOriginalOwner && (canGrantOwnerManager || !['owner', 'manager'].includes(m.role));
+    const removeAllowed = canManage && !isOriginalOwner && (canGrantOwnerManager || !['owner', 'manager'].includes(m.role));
+    return `
+      <div class="vnd-team-row">
+        <div class="vnd-team-row__meta">
+          <strong>${escapeHtml(label)}${isOriginalOwner ? ' (original owner)' : ''}</strong>
+          <span>${statusBadge(m.role)} ${statusBadge(m.status)} · invited ${shortDate(m.invited_at)}${m.accepted_at ? ` · accepted ${shortDate(m.accepted_at)}` : ''}</span>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          ${roleChangeAllowed ? `<button class="button !min-h-8 !px-3 text-xs" type="button" data-team-role="${m.id}">Change role</button>` : ''}
+          ${removeAllowed && m.status !== 'removed' ? `<button class="button button-danger !min-h-8 !px-3 text-xs" type="button" data-team-remove="${m.id}">Remove</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  host.querySelectorAll('[data-team-role]').forEach((btn) => btn.addEventListener('click', () => {
+    const member = teamMembers.find((m) => m.id === btn.dataset.teamRole);
+    if (member) openTeamRoleModal(member, canGrantOwnerManager);
+  }));
+  host.querySelectorAll('[data-team-remove]').forEach((btn) => btn.addEventListener('click', async () => {
+    const member = teamMembers.find((m) => m.id === btn.dataset.teamRemove);
+    const ok = await confirmDialog({
+      title: `Remove ${member?.profiles?.full_name || member?.invited_email || 'this member'}?`,
+      body: 'They immediately lose access to this store\'s team screens.',
+      confirmLabel: 'Remove member',
+    });
+    if (!ok) return;
+    const { error } = await supabase.rpc('store_member_remove', { p_member_id: member.id });
+    if (error) { toast(error.message, 'error'); return; }
+    toast('Removed from team.');
+    await loadTeam();
+  }));
+  renderIcons();
+}
+
+function openTeamRoleModal(member, canGrantOwnerManager) {
+  const { dialog } = openModal({
+    id: 'team-role-modal',
+    title: `Change role for ${member.full_name || member.invited_email || 'this member'}`,
+    body: `
+      <form id="team-role-form">
+        <label class="vnd-field"><span class="label">Role</span>
+          <select class="field" name="role">
+            ${canGrantOwnerManager ? '<option value="manager">Manager — can invite/manage staff &amp; support</option>' : ''}
+            <option value="staff">Staff</option>
+            <option value="support">Support</option>
+          </select>
+        </label>
+        <p id="team-role-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
+      </form>`,
+    footer: `<button type="button" class="button" data-uk-cancel>Cancel</button><button type="submit" form="team-role-form" class="button button-primary">Save role</button>`,
+  });
+  if (['staff', 'support', 'manager'].includes(member.role)) dialog.querySelector('select[name="role"]').value = member.role;
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
+  dialog.querySelector('#team-role-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = dialog.querySelector('button[form="team-role-form"]');
+    const feedback = dialog.querySelector('#team-role-feedback');
+    setBusy(button, true, 'Saving…');
+    const { error } = await supabase.rpc('store_member_update_role', { p_member_id: member.id, p_role: event.currentTarget.elements.role.value });
+    setBusy(button, false);
+    if (error) { feedback.textContent = error.message; feedback.className = 'status-line error text-xs my-0'; return; }
+    dialog.close();
+    toast('Role updated.');
+    await loadTeam();
+  });
+}
+
+document.querySelector('#invite-member')?.addEventListener('click', () => {
+  const canGrantOwnerManager = isTeamOwnerTier();
+  const { dialog } = openModal({
+    id: 'invite-modal',
+    title: 'Invite a team member',
+    body: `
+      <form id="invite-form">
+        <label class="vnd-field"><span class="label">Email</span><input class="field" name="email" type="email" required placeholder="teammate@example.com"></label>
+        <label class="vnd-field" style="margin-top:14px"><span class="label">Role</span>
+          <select class="field" name="role">
+            ${canGrantOwnerManager ? '<option value="manager">Manager — can invite/manage staff &amp; support</option>' : ''}
+            <option value="staff" selected>Staff</option>
+            <option value="support">Support</option>
+          </select>
+        </label>
+        <p style="margin-top:10px;font-size:.76rem;color:var(--text-muted)">If they haven't signed up yet, the invite is queued silently and links to their account the moment they register with this exact email — no email is sent automatically.</p>
+        <p id="invite-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
+      </form>`,
+    footer: `<button type="button" class="button" data-uk-cancel>Cancel</button><button type="submit" form="invite-form" class="button button-primary">Send invite</button>`,
+  });
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
+  dialog.querySelector('#invite-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = dialog.querySelector('button[form="invite-form"]');
+    const feedback = dialog.querySelector('#invite-feedback');
+    setBusy(button, true, 'Sending…');
+    const { error } = await supabase.rpc('store_member_invite', {
+      p_vendor_id: vendor.id, p_email: form.elements.email.value.trim(), p_role: form.elements.role.value,
+    });
+    setBusy(button, false);
+    if (error) { feedback.textContent = error.message; feedback.className = 'status-line error text-xs my-0'; return; }
+    dialog.close();
+    toast('Invite sent.');
+    await loadTeam();
+  });
 });
 
 /* ==========================================================================
@@ -1019,14 +1403,14 @@ document.querySelector('#apply-form')?.addEventListener('submit', async (event) 
   const button = form.querySelector('button[type="submit"]');
   const feedback = document.querySelector('#apply-feedback');
 
-  setBusy(button, true, 'Submitting…');
+  setButtonLoading(button, true, 'Submitting…');
   const { error } = await supabase.rpc('apply_as_vendor', {
     p_display_name: form.elements.display_name.value.trim(),
     p_country: form.elements.country.value,
     p_bio: form.elements.bio.value.trim() || null,
     p_payout_currency: form.elements.payout_currency.value,
   });
-  setBusy(button, false);
+  setButtonLoading(button, false);
 
   if (error) {
     feedback.textContent = error.message;
@@ -1041,18 +1425,14 @@ document.querySelector('#apply-form')?.addEventListener('submit', async (event) 
    Wiring
    ========================================================================== */
 
-/** setButtonLoading, but tolerant of buttons that contain markup. */
 function setBusy(button, busy, label) {
-  setButtonLoading(button, busy, label);
+  setButtonBusy(button, busy, label);
 }
 
 function wireDelegates() {
   document.addEventListener('click', async (event) => {
-    const target = event.target.closest('[data-edit],[data-delete],[data-new-product],[data-new-campaign],[data-delete-account],[data-toggle-campaign]');
+    const target = event.target.closest('[data-edit],[data-delete],[data-delete-account],[data-toggle-campaign]');
     if (!target) return;
-
-    if (target.dataset.newProduct !== undefined) return void openProductModal();
-    if (target.dataset.newCampaign !== undefined) return void openCampaignModal();
 
     if (target.dataset.edit) {
       const { data } = await supabase.from('products').select('*').eq('id', target.dataset.edit).single();
@@ -1061,7 +1441,12 @@ function wireDelegates() {
     }
 
     if (target.dataset.delete) {
-      if (!window.confirm('Delete this product? Buyers who already bought it keep their download.')) return;
+      const ok = await confirmDialog({
+        title: 'Delete this product?',
+        body: 'Buyers who already bought it keep their download. This cannot be undone.',
+        confirmLabel: 'Delete product',
+      });
+      if (!ok) return;
       const { error } = await supabase.from('products').delete().eq('id', target.dataset.delete);
       toast(error ? error.message : 'Product deleted.', error ? 'error' : 'success');
       if (!error) { await loadProducts(); await refreshDashboard(); }
@@ -1069,7 +1454,12 @@ function wireDelegates() {
     }
 
     if (target.dataset.deleteAccount) {
-      if (!window.confirm('Remove this payout account?')) return;
+      const ok = await confirmDialog({
+        title: 'Remove this payout account?',
+        body: 'You will need to add it again before requesting a withdrawal to it.',
+        confirmLabel: 'Remove account',
+      });
+      if (!ok) return;
       const { error } = await supabase.from('payout_accounts').delete().eq('id', target.dataset.deleteAccount);
       toast(error ? error.message : 'Account removed.', error ? 'error' : 'success');
       if (!error) await loadPayouts();
@@ -1084,29 +1474,40 @@ function wireDelegates() {
     }
   });
 
-  document.querySelector('#admin-menu-button')?.addEventListener('click', () => setDrawer(true));
-  document.querySelector('#admin-menu-close')?.addEventListener('click', () => setDrawer(false));
-  document.querySelector('#admin-scrim')?.addEventListener('click', () => setDrawer(false));
-  document.querySelectorAll('.admin-link').forEach((link) => link.addEventListener('click', () => setDrawer(false)));
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setDrawer(false); });
-
   document.querySelector('#new-product-btn')?.addEventListener('click', () => openProductModal());
-  document.querySelector('#new-product-btn-2')?.addEventListener('click', () => openProductModal());
-  document.querySelector('#new-payout-account')?.addEventListener('click', () => {
-    document.querySelector('#payout-form').reset();
-    fillCountrySelect(document.querySelector('#payout-country'), vendor.country);
-    syncPayoutMethodFields();
-    payoutModal.showModal();
-    renderIcons();
-  });
-  document.querySelector('#new-campaign')?.addEventListener('click', openCampaignModal);
+  document.querySelector('#new-payout-account')?.addEventListener('click', () => openPayoutModal());
+  document.querySelector('#new-campaign')?.addEventListener('click', () => openCampaignModal());
+  document.querySelector('#topup-btn')?.addEventListener('click', () => openTopupModal());
 
-  document.querySelector('#close-product-modal')?.addEventListener('click', () => productModal.close());
-  document.querySelector('#cancel-product')?.addEventListener('click', () => productModal.close());
-  document.querySelector('#close-payout-modal')?.addEventListener('click', () => payoutModal.close());
-  document.querySelector('#cancel-payout')?.addEventListener('click', () => payoutModal.close());
-  document.querySelector('#close-campaign-modal')?.addEventListener('click', () => campaignModal.close());
-  document.querySelector('#cancel-campaign')?.addEventListener('click', () => campaignModal.close());
+  document.querySelector('#request-payout-btn')?.addEventListener('click', async (event) => {
+    const accounts = await loadPayouts();
+    const target = accounts.find((a) => a.is_default) || accounts[0];
+
+    if (!target) {
+      toast('Add a payout account first.', 'error');
+      return;
+    }
+    const ok = await confirmDialog({
+      title: 'Request a payout?',
+      body: `Your available balance will be sent to ${target.account_name}.`,
+      confirmLabel: 'Request payout',
+      danger: false,
+    });
+    if (!ok) return;
+
+    setBusy(event.currentTarget, true, 'Requesting…');
+    const { data, error } = await supabase.rpc('request_payout', { p_payout_account_id: target.id });
+    setBusy(event.currentTarget, false);
+
+    if (error) {
+      toast(error.message, 'error');
+      return;
+    }
+    toast(`Payout of ${money(data.amount, data.currency)} requested.`);
+    await refreshDashboard();
+    await loadPayouts();
+  });
+
 }
 
 async function refreshDashboard() {
@@ -1121,21 +1522,58 @@ function fillSettings() {
   form.elements.display_name.value = vendor.display_name || '';
   form.elements.bio.value = vendor.bio || '';
   form.elements.support_email.value = vendor.support_email || '';
-  fillCountrySelect(document.querySelector('#settings-country'), vendor.country);
+  const settingsCountry = document.querySelector('#settings-country');
+  settingsCountry.innerHTML = countryOptions(vendor.country);
+  enhanceSelect(settingsCountry, { label: 'Country' });
+  refreshSelect(settingsCountry);
+  enhanceSelect(document.querySelector('select[name="payout_currency"]'), { label: 'Payout currency' });
   document.querySelector('#logo-url').value = vendor.logo_url || '';
 
   const initial = (vendor.display_name || '?').trim().charAt(0).toUpperCase();
   const avatarMarkup = vendor.logo_url
-    ? `<img src="${escapeHtml(vendor.logo_url)}" alt="" class="h-full w-full object-cover">`
+    ? `<img src="${escapeHtml(vendor.logo_url)}" alt="">`
     : escapeHtml(initial);
   document.querySelector('#logo-preview').innerHTML = avatarMarkup;
   document.querySelector('#vendor-avatar').innerHTML = avatarMarkup;
   document.querySelector('#vendor-name').textContent = vendor.display_name;
+  document.querySelector('#vendor-tier').textContent = `${vendor.commission_rate}% commission`;
   const storeLink = document.querySelector('#vendor-view-store');
   storeLink.href = `./store?vendor=${encodeURIComponent(vendor.slug)}`;
 }
 
+/* ==========================================================================
+   Dashboard sidebar (mobile off-canvas drawer)
+   Mirrors the `setDrawer`-style open/close pattern in js/ui.js, scoped to the
+   dashboard's own sidebar nav below the 980px breakpoint it already switches
+   layout at.
+   ========================================================================== */
+
+function wireDashSidebar() {
+  const sidebar = document.querySelector('#dash-sidebar');
+  const menuButton = document.querySelector('#dash-menu-button');
+  const closeButton = document.querySelector('#dash-sidebar-close');
+  const scrim = document.querySelector('#dash-scrim');
+  if (!sidebar || !menuButton) return;
+
+  const setOpen = (open) => {
+    sidebar.classList.toggle('is-open', open);
+    scrim?.classList.toggle('is-open', open);
+    menuButton.setAttribute('aria-expanded', String(open));
+    document.body.style.overflow = open ? 'hidden' : '';
+  };
+
+  menuButton.addEventListener('click', () => setOpen(true));
+  closeButton?.addEventListener('click', () => setOpen(false));
+  scrim?.addEventListener('click', () => setOpen(false));
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') setOpen(false);
+  });
+  sidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setOpen(false)));
+}
+
 async function boot() {
+  mountHeader();
+  mountFooter();
   account = await getAccount();
 
   if (!account.user) {
@@ -1147,7 +1585,10 @@ async function boot() {
   dashboard = data;
 
   if (!data?.is_vendor) {
-    fillCountrySelect(document.querySelector('#apply-country'));
+    const applyCountry = document.querySelector('#apply-country');
+    applyCountry.innerHTML = countryOptions();
+    enhanceSelect(applyCountry, { label: 'Country' });
+    enhanceSelect(document.querySelector('select[name="payout_currency"]'), { label: 'Payout currency' });
     show('vendor-apply');
     renderIcons();
     finishPageLoader();
@@ -1166,13 +1607,14 @@ async function boot() {
   categories = cats || [];
 
   show('vendor-shell');
+  wireDashSidebar();
   activateScreen();
-  renderOverview();
   fillSettings();
 
   await loadWallet();
   reportFundingOutcome();
-  await Promise.all([loadProducts(), loadSales(), loadPayouts(), loadCampaigns()]);
+  await Promise.all([loadProducts(), loadSales(), loadPayouts(), loadCampaigns(), loadWalletHistory(), loadTeam()]);
+  renderOverview();
 
   renderIcons();
   finishPageLoader();
