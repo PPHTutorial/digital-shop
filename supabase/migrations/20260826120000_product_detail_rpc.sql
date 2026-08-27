@@ -46,7 +46,7 @@ as $$
     limit 4
   )
   select jsonb_build_object(
-    'product', (select to_jsonb(prod) from prod),
+    'product', (select to_jsonb(prod) from prod), 
     'vendor', (select to_jsonb(vend) from vend),
     'reviews', (select coalesce(jsonb_agg(to_jsonb(reviews_base) order by reviews_base.created_at desc), '[]'::jsonb) from reviews_base),
     'rating_breakdown', (select coalesce(jsonb_object_agg(breakdown.rating, breakdown.n), '{}'::jsonb) from breakdown),

@@ -17,3 +17,6 @@ export const CONFIG = {
 // supabase functions deploy nowpayments-ipn --project-ref synnepvvxpluoydkmphb --use-api --debug
 // supabase functions deploy search-index --project-ref synnepvvxpluoydkmphb --use-api --debug
 // supabase functions deploy sitemap --project-ref synnepvvxpluoydkmphb --use-api --debug
+// supabase functions deploy sitemap --project-ref synnepvvxpluoydkmphb --use-api --debug
+// supabase functions deploy ad-funding-callback --project-ref synnepvvxpluoydkmphb --use-api --debug
+// supabase functions deploy ad-funding-ipn --project-ref synnepvvxpluoydkmphb --use-api --debug
