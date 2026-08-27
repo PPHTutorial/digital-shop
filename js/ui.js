@@ -98,6 +98,21 @@ export function toast(message,type='success'){let r=document.querySelector('#toa
 export function setButtonLoading(b,loading,label='Please wait…'){if(!b)return;if(loading){b.dataset.label=b.textContent;b.disabled=true;b.innerHTML=`<span class="spinner"></span>${label}`}else{b.disabled=false;b.textContent=b.dataset.label||b.textContent}}
 export async function getAccount(){const{data:{user}}=await supabase.auth.getUser();if(!user)return{user:null,profile:null};const{data:profile}=await supabase.from('profiles').select('full_name,role,phone,address,country,occupation,age,created_at,admin_tier,account_status,account_status_reason').eq('id',user.id).maybeSingle();return{user,profile}}
 export const icon = (name, size = 18) => `<i data-lucide="${name}" width="${size}" height="${size}"></i>`;
+
+// Social handles stored in site_settings.social (jsonb). Edited on the admin
+// Settings screen, rendered in the footer. `icon` is a lucide name — brand
+// glyphs that lucide lacks fall back to a close-enough generic.
+export const SOCIAL_LINKS = [
+  { key: 'twitter', label: 'X / Twitter', icon: 'twitter', placeholder: 'https://x.com/yourhandle' },
+  { key: 'instagram', label: 'Instagram', icon: 'instagram', placeholder: 'https://instagram.com/yourhandle' },
+  { key: 'facebook', label: 'Facebook', icon: 'facebook', placeholder: 'https://facebook.com/yourpage' },
+  { key: 'linkedin', label: 'LinkedIn', icon: 'linkedin', placeholder: 'https://linkedin.com/company/…' },
+  { key: 'youtube', label: 'YouTube', icon: 'youtube', placeholder: 'https://youtube.com/@yourchannel' },
+  { key: 'tiktok', label: 'TikTok', icon: 'music-2', placeholder: 'https://tiktok.com/@yourhandle' },
+  { key: 'github', label: 'GitHub', icon: 'github', placeholder: 'https://github.com/yourorg' },
+  { key: 'discord', label: 'Discord', icon: 'message-circle', placeholder: 'https://discord.gg/invite' },
+  { key: 'whatsapp', label: 'WhatsApp', icon: 'phone', placeholder: 'https://wa.me/1234567890' },
+];
 export function renderIcons() {
   if (window.lucide) {
     window.lucide.createIcons();
@@ -604,6 +619,7 @@ export function mountFooter() {
         <div>
           <p>© ${year} <strong style="color:var(--text-muted)">Codeink Technologies</strong>. All rights reserved.</p>
           <p class="text-[11px] mt-0.5">DigiStore is a registered digital merchandise platform by Codeink Technologies.</p>
+          <div id="footer-social" class="footer-social"></div>
         </div>
         <div class="flex flex-wrap items-center gap-5 sm:gap-6">
           <div class="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition cursor-default" title="Flutterwave Verified Partner">
@@ -643,6 +659,19 @@ export function mountFooter() {
       </div>
     </div>`;
   renderIcons();
+
+  // Social handles come from site_settings.social (admin-editable). Only the
+  // ones that are filled in are shown.
+  supabase.from('site_settings').select('social').eq('id', 1).maybeSingle().then(({ data }) => {
+    const social = data?.social || {};
+    const host = document.querySelector('#footer-social');
+    if (!host) return;
+    host.innerHTML = SOCIAL_LINKS
+      .filter((s) => social[s.key])
+      .map((s) => `<a href="${escapeHtml(social[s.key])}" target="_blank" rel="noopener noreferrer" aria-label="${s.label}" title="${s.label}">${icon(s.icon, 16)}</a>`)
+      .join('');
+    renderIcons();
+  }, () => {});
 }
 
 export function initMotion(){document.body.classList.add('page-enter');const items=document.querySelectorAll('.reveal');if(!('IntersectionObserver'in window)){items.forEach(i=>i.classList.add('is-visible'));return}const o=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');o.unobserve(e.target)}}),{threshold:.12});items.forEach(i=>o.observe(i))}

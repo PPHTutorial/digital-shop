@@ -89,13 +89,9 @@ let activeViewer = null;
 
 export function closeFileViewer() {
   if (!activeViewer) return;
+  try { activeViewer.close(); } catch { /* noop */ }
   activeViewer.remove();
-  document.removeEventListener('keydown', onViewerKey);
   activeViewer = null;
-}
-
-function onViewerKey(event) {
-  if (event.key === 'Escape') closeFileViewer();
 }
 
 /**
@@ -104,13 +100,18 @@ function onViewerKey(event) {
 export function openFileViewer({ src, name = '', mime = '', category } = {}) {
   if (!src) return;
   closeFileViewer();
-  const cat = category || (mime.startsWith('image/') ? 'image'
-    : mime.startsWith('video/') ? 'video'
-      : mime.startsWith('audio/') ? 'audio'
-        : mime === 'application/pdf' ? 'pdf'
-          : fileCategory(name || src));
+  // Prefer an explicit category, then the MIME type, then the filename's
+  // extension, then the URL's extension. `name` is often a label with no
+  // extension (e.g. "Cover image"), so it must not win over `src`.
+  const byName = fileCategory(name);
+  const cat = category
+    || (mime.startsWith('image/') ? 'image'
+      : mime.startsWith('video/') ? 'video'
+        : mime.startsWith('audio/') ? 'audio'
+          : mime === 'application/pdf' ? 'pdf' : '')
+    || (byName !== 'file' ? byName : fileCategory(src));
 
-  const overlay = document.createElement('div');
+  const overlay = document.createElement('dialog');
   overlay.className = 'fviewer';
   overlay.innerHTML = `
     <div class="fviewer__bar">
@@ -127,11 +128,12 @@ export function openFileViewer({ src, name = '', mime = '', category } = {}) {
     <div class="fviewer__stage" data-stage></div>`;
   document.body.append(overlay);
   activeViewer = overlay;
+  overlay.showModal();
 
   const stage = overlay.querySelector('[data-stage]');
   overlay.querySelector('[data-close]').addEventListener('click', closeFileViewer);
   overlay.addEventListener('click', (e) => { if (e.target === overlay || e.target === stage) closeFileViewer(); });
-  document.addEventListener('keydown', onViewerKey);
+  overlay.addEventListener('cancel', (e) => { e.preventDefault(); closeFileViewer(); });
 
   if (cat === 'image') {
     mountZoomableImage(stage, src, overlay);

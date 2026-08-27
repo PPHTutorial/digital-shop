@@ -299,3 +299,169 @@ export function enhanceDateInput(input, { placeholder = 'Select date' } = {}) {
 export function enhanceDateInputs(selector, options = {}) {
   document.querySelectorAll(selector).forEach((el) => enhanceDateInput(el, options));
 }
+
+/* ==========================================================================
+   Date + time picker  (<input type="datetime-local">, value YYYY-MM-DDTHH:mm)
+   ========================================================================== */
+
+function parseDT(s) {
+  if (!s) return null;
+  const [d, t] = String(s).split('T');
+  const date = parseISO(d);
+  if (!date) return null;
+  const [h, m] = (t || '00:00').split(':').map(Number);
+  return { date, h: Number.isFinite(h) ? h : 0, m: Number.isFinite(m) ? m : 0 };
+}
+
+export function enhanceDateTimeInput(input, { placeholder = 'Select date & time', minuteStep = 5 } = {}) {
+  if (!input || input.dataset.enhanced === 'true') return null;
+  input.dataset.enhanced = 'true';
+  input.classList.add('xdate__native');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'xdate xdate--time';
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'xdate__trigger';
+  trigger.setAttribute('aria-haspopup', 'dialog');
+  const panel = document.createElement('div');
+  panel.className = 'xdate__panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-label', 'Choose date and time');
+
+  input.parentNode.insertBefore(wrap, input);
+  wrap.append(trigger, panel, input);
+
+  let cur = parseDT(input.value);
+  let hh = cur ? cur.h : 9;
+  let mm = cur ? cur.m : 0;
+  let viewDate = new Date((cur ? cur.date : new Date()).getFullYear(), (cur ? cur.date : new Date()).getMonth(), 1);
+
+  const instance = {
+    close() {
+      wrap.classList.remove('is-open');
+      trigger.setAttribute('aria-expanded', 'false');
+      if (openDateInstance === instance) openDateInstance = null;
+    },
+    open() {
+      closeOpenDate();
+      cur = parseDT(input.value);
+      if (cur) { hh = cur.h; mm = cur.m; viewDate = new Date(cur.date.getFullYear(), cur.date.getMonth(), 1); }
+      render();
+      wrap.classList.add('is-open');
+      trigger.setAttribute('aria-expanded', 'true');
+      openDateInstance = instance;
+    },
+  };
+
+  const commit = (date) => {
+    input.value = `${toISO(date)}T${pad2(hh)}:${pad2(mm)}`;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    renderTrigger();
+  };
+
+  function renderTrigger() {
+    const v = parseDT(input.value);
+    trigger.innerHTML = `
+      <span class="xdate__value${v ? '' : ' is-placeholder'}">${v
+        ? `${v.date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })} · ${pad2(v.h)}:${pad2(v.m)}`
+        : placeholder}</span>
+      <span class="xdate__icon" aria-hidden="true">${CALENDAR_SVG}</span>`;
+  }
+
+  function render() {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    const first = new Date(year, month, 1);
+    const startOffset = first.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const selected = parseDT(input.value)?.date || null;
+    const today = new Date();
+
+    let cells = '';
+    for (let i = 0; i < startOffset; i++) cells += '<span class="xdate__cell xdate__cell--empty"></span>';
+    for (let day = 1; day <= daysInMonth; day++) {
+      const cd = new Date(year, month, day);
+      cells += `<button type="button" class="xdate__cell${sameDay(cd, selected) ? ' is-selected' : ''}${sameDay(cd, today) ? ' is-today' : ''}" data-iso="${toISO(cd)}">${day}</button>`;
+    }
+
+    panel.innerHTML = `
+      <div class="xdate__head">
+        <button type="button" class="xdate__nav" data-nav="-1" aria-label="Previous month">${CHEVRON_LEFT}</button>
+        <strong>${first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</strong>
+        <button type="button" class="xdate__nav" data-nav="1" aria-label="Next month">${CHEVRON_RIGHT}</button>
+      </div>
+      <div class="xdate__weekdays">${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => `<span>${d}</span>`).join('')}</div>
+      <div class="xdate__grid">${cells}</div>
+      <div class="xdate__time">
+        <span>Time</span>
+        <div class="xdate__stepper">
+          <button type="button" data-t="h-">−</button>
+          <span data-hh>${pad2(hh)}</span>
+          <button type="button" data-t="h+">+</button>
+        </div>
+        <span class="xdate__colon">:</span>
+        <div class="xdate__stepper">
+          <button type="button" data-t="m-">−</button>
+          <span data-mm>${pad2(mm)}</span>
+          <button type="button" data-t="m+">+</button>
+        </div>
+      </div>
+      <div class="xdate__foot">
+        <button type="button" class="xdate__today" data-action="now">Now</button>
+        <button type="button" class="xdate__clear" data-action="clear">Clear</button>
+        <button type="button" class="xdate__today" data-action="done">Done</button>
+      </div>`;
+
+    panel.querySelector('[data-nav="-1"]').addEventListener('click', (e) => { e.stopPropagation(); viewDate = new Date(year, month - 1, 1); render(); });
+    panel.querySelector('[data-nav="1"]').addEventListener('click', (e) => { e.stopPropagation(); viewDate = new Date(year, month + 1, 1); render(); });
+    panel.querySelectorAll('.xdate__cell:not(.xdate__cell--empty)').forEach((cell) => {
+      cell.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const [y, mo, d] = cell.dataset.iso.split('-').map(Number);
+        commit(new Date(y, mo - 1, d));
+        render();
+      });
+    });
+    panel.querySelectorAll('[data-t]').forEach((btn) => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const k = btn.dataset.t;
+      if (k === 'h+') hh = (hh + 1) % 24;
+      if (k === 'h-') hh = (hh + 23) % 24;
+      if (k === 'm+') mm = (mm + minuteStep) % 60;
+      if (k === 'm-') mm = (mm + 60 - minuteStep) % 60;
+      panel.querySelector('[data-hh]').textContent = pad2(hh);
+      panel.querySelector('[data-mm]').textContent = pad2(mm);
+      const base = parseDT(input.value)?.date || new Date();
+      commit(new Date(base.getFullYear(), base.getMonth(), base.getDate()));
+    }));
+    panel.querySelector('[data-action="now"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const n = new Date();
+      hh = n.getHours();
+      mm = Math.round(n.getMinutes() / minuteStep) * minuteStep % 60;
+      commit(new Date(n.getFullYear(), n.getMonth(), n.getDate()));
+      instance.close();
+    });
+    panel.querySelector('[data-action="clear"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      input.value = '';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      renderTrigger();
+      instance.close();
+    });
+    panel.querySelector('[data-action="done"]').addEventListener('click', (e) => { e.stopPropagation(); instance.close(); });
+  }
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    wrap.classList.contains('is-open') ? instance.close() : instance.open();
+  });
+  input.addEventListener('change', renderTrigger);
+  renderTrigger();
+  return instance;
+}
+
+export function enhanceDateTimeInputs(selector, options = {}) {
+  document.querySelectorAll(selector).forEach((el) => enhanceDateTimeInput(el, options));
+}

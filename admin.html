@@ -185,9 +185,9 @@
             <div class="adm-filter-row">
               <input id="customer-search" class="field" type="search" placeholder="Search name or email…" style="max-width:280px">
               <select id="customer-role-filter" class="field">
-                <option value="">All roles</option>
-                <option value="customer">Customers</option>
-                <option value="admin">Admins</option>
+                <option value="customer" selected>Customers (no admins)</option>
+                <option value="admin">Admins only</option>
+                <option value="all">All users</option>
               </select>
             </div>
             <div id="users-table" class="mt-4"></div>
@@ -358,8 +358,10 @@
               </label>
               <label class="adm-field"><span class="label">Announcement ends</span><input name="announcement_ends_at" type="datetime-local" class="field"></label>
               <label class="adm-field adm-field--span2"><span class="label">Checkout note</span><textarea name="checkout_note" class="field" rows="2"></textarea></label>
-              <label class="adm-field"><span class="label">Twitter / X URL</span><input name="social_twitter" class="field"></label>
-              <label class="adm-field"><span class="label">Instagram URL</span><input name="social_instagram" class="field"></label>
+              <div class="adm-field--span2">
+                <span class="label">Social media handles <span class="help" style="font-weight:400">(full URLs; blank ones are hidden)</span></span>
+                <div id="settings-social" class="adm-modal-grid" style="margin-top:8px"></div>
+              </div>
               <label class="adm-field"><span class="label">Default vendor commission <span class="help" style="font-weight:400">(%, applied to new stores)</span></span><input name="default_commission_rate" type="number" step=".01" min="0" max="100" class="field"></label>
               <label class="adm-field"><span class="label">Standard refund rate <span class="help" style="font-weight:400">(%, shown in the refund policy)</span></span><input name="refund_rate_percent" type="number" step=".01" min="0" max="100" class="field"></label>
               <label class="adm-field"><span class="label">Min. ad-wallet balance <span class="help" style="font-weight:400">(USD, to publish an external-link listing)</span></span><input name="ad_min_wallet_balance" type="number" step="1" min="0" class="field"></label>

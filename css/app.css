@@ -2472,6 +2472,59 @@ body.xselect-locked {
   opacity: 1;
 }
 
+/* datetime-local variant: time steppers under the calendar grid */
+.xdate__time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.xdate__time > span:first-child {
+  margin-right: auto;
+}
+
+.xdate__colon {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.xdate__stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.xdate__stepper button {
+  border: 0;
+  background: var(--surface-sunken);
+  color: var(--text);
+  width: 26px;
+  height: 28px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.xdate__stepper button:hover {
+  background: var(--accent-wash);
+}
+
+.xdate__stepper span {
+  min-width: 30px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text);
+}
+
 @media (max-width: 640px) {
   .xdate__panel {
     position: fixed;
@@ -4844,6 +4897,63 @@ dialog[open].admin-modal-container {
   transform: none;
 }
 
+/* Row-action menu variant: positioned in viewport coords, appended to <body>
+   so a scrolling table container can't clip it. */
+.uk-popover--fixed {
+  position: fixed;
+  z-index: 600;
+}
+
+.uk-rowmenu {
+  display: inline-flex;
+}
+
+/* Footer social row (js/ui.js SOCIAL_LINKS + site_settings.social) */
+.footer-social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.footer-social:empty {
+  display: none;
+}
+
+.footer-social a {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  transition: background .15s ease, color .15s ease;
+}
+
+.footer-social a:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+  opacity: 1;
+}
+
+.uk-rowmenu__trigger {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.uk-rowmenu__trigger:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 .uk-popover a,
 .uk-popover button {
   display: flex;
@@ -5558,6 +5668,7 @@ dialog[open].admin-modal-container {
 }
 
 .pd-gallery-main {
+  position: relative;
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -5566,6 +5677,27 @@ dialog[open].admin-modal-container {
   background: var(--surface-sunken);
   overflow: hidden;
   cursor: zoom-in;
+}
+
+.pd-gallery-zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: rgba(7, 34, 32, .6);
+  color: #fff;
+  cursor: zoom-in;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+
+.pd-gallery-main:hover .pd-gallery-zoom {
+  opacity: 1;
 }
 
 .pd-gallery-main img {
@@ -8003,6 +8135,16 @@ dialog[open].admin-modal-container {
   transform: rotate(90deg);
 }
 
+.adm-collapse__dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
 .adm-collapse > *:not(summary) {
   margin-bottom: 12px;
 }
@@ -8759,15 +8901,27 @@ body.dash-wide #site-footer > .shell {
 }
 
 /* --- Universal file viewer (js/preview.js) --------------------------------- */
+/* A top-layer <dialog> so it sits above the product/CMS modals. */
 .fviewer {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  width: 100%;
+  height: 100%;
+  max-width: 100vw;
+  max-height: 100vh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(7, 34, 32, .86);
+  color: #fff;
   display: flex;
   flex-direction: column;
-  background: rgba(7, 34, 32, .82);
-  backdrop-filter: blur(4px);
   animation: uk-modal-in .15s ease both;
+}
+
+.fviewer::backdrop {
+  background: rgba(7, 34, 32, .4);
+  backdrop-filter: blur(4px);
 }
 
 .fviewer__bar {
@@ -8888,26 +9042,26 @@ body.dash-wide #site-footer > .shell {
 }
 
 /* --- Pre-upload image editor (js/imgedit.js) ----------------------------- */
+/* Full-screen top-layer <dialog> so it always sits above the product modal. */
 .imgedit {
   position: fixed;
   inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(7, 34, 32, .82);
-  backdrop-filter: blur(4px);
+  width: 100%;
+  height: 100%;
+  max-width: 100vw;
+  max-height: 100vh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--text);
   animation: uk-modal-in .15s ease both;
 }
 
-.imgedit__panel {
-  display: flex;
-  flex-direction: column;
-  width: min(94vw, 680px);
-  max-height: 92vh;
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  overflow: hidden;
+.imgedit::backdrop {
+  background: rgba(7, 34, 32, .5);
 }
 
 .imgedit__head {
@@ -8939,19 +9093,19 @@ body.dash-wide #site-footer > .shell {
 
 .imgedit__stage {
   position: relative;
-  flex: 1;
-  min-height: 260px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   background:
-    repeating-conic-gradient(var(--surface-sunken) 0% 25%, var(--surface) 0% 50%) 50% / 22px 22px;
+    repeating-conic-gradient(#e9eeed 0% 25%, #f7f9f8 0% 50%) 50% / 22px 22px;
   touch-action: none;
 }
 
 .imgedit__img {
   position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: 0 0;
+  left: 50%;
+  top: 50%;
+  max-width: none;
   cursor: grab;
   user-select: none;
   -webkit-user-drag: none;
@@ -8965,9 +9119,10 @@ body.dash-wide #site-footer > .shell {
   position: absolute;
   top: 50%;
   left: 50%;
+  z-index: 2;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 0 100vmax rgba(7, 34, 32, .55);
-  border: 1px solid rgba(255, 255, 255, .9);
+  box-shadow: 0 0 0 100vmax rgba(7, 34, 32, .58);
+  border: 1px solid rgba(255, 255, 255, .95);
   pointer-events: none;
 }
 
@@ -8988,8 +9143,15 @@ body.dash-wide #site-footer > .shell {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
   padding: 14px 18px;
   border-top: 1px solid var(--border);
+}
+
+.imgedit__row .xselect {
+  flex: 1;
 }
 
 .imgedit__row {
@@ -9480,6 +9642,9 @@ body.dash-wide #site-footer > .shell {
   padding: 16px 18px;
   max-height: 60vh;
   overflow-y: auto;
+  /* min-height comes from an inline style set by buildRte(); the editor opens
+     at that height and can be dragged taller. */
+  resize: vertical;
   font-size: .92rem;
   line-height: 1.7;
   color: var(--text);

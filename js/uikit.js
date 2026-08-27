@@ -167,6 +167,84 @@ export function attachPopover(trigger, contentHtml, { align = 'left' } = {}) {
 }
 
 /* ==========================================================================
+   Row-action menu — collapses a row of table-action buttons into a single
+   "⋯" trigger + a fixed-positioned menu (fixed, so `.uk-table-wrap`'s
+   `overflow: auto` cannot clip it). Pair `rowMenu()` (markup, used inside a
+   renderDataTable `rowActions`) with `wireRowMenus()` (behaviour, called on
+   the table host afterwards).
+   ========================================================================== */
+
+let openRowMenu = null;
+function closeRowMenu() {
+  if (!openRowMenu) return;
+  openRowMenu.panel.remove();
+  openRowMenu = null;
+}
+let rowMenuWired = false;
+
+/**
+ * @param {Array<{label?:string, icon?:string, act?:string, id?:string|number,
+ *   data?:Record<string,string|number>, danger?:boolean, sep?:boolean}>} items
+ */
+export function rowMenu(items = []) {
+  const body = items.filter(Boolean).map((it) => {
+    if (it.sep) return '<span class="uk-popover__sep"></span>';
+    const extra = Object.entries(it.data || {}).map(([k, v]) => `data-${k}="${escapeHtml(String(v))}"`).join(' ');
+    return `<button type="button" class="${it.danger ? 'is-danger' : ''}" data-act="${escapeHtml(it.act || '')}" data-id="${escapeHtml(String(it.id ?? ''))}" ${extra}>${it.icon ? icon(it.icon, 14) : ''}${escapeHtml(it.label || '')}</button>`;
+  }).join('');
+  return `<div class="uk-rowmenu">
+    <button type="button" class="uk-rowmenu__trigger" data-uk-rowmenu aria-label="Row actions">${icon('more-horizontal', 16)}</button>
+    <div class="uk-rowmenu__tpl" hidden>${body}</div>
+  </div>`;
+}
+
+/**
+ * @param {Element} host  the element renderDataTable rendered into
+ * @param {Record<string, (id:string, btn:HTMLButtonElement)=>void>} handlers
+ *        keyed by the item `act`; receives the item id and the clicked button
+ *        (read `btn.dataset.*` for any extra `data`).
+ */
+export function wireRowMenus(host, handlers = {}) {
+  closeRowMenu(); // drop any menu left open by a previous render of this table
+  if (!rowMenuWired) {
+    rowMenuWired = true;
+    document.addEventListener('click', closeRowMenu);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeRowMenu(); });
+    window.addEventListener('resize', closeRowMenu);
+    window.addEventListener('scroll', closeRowMenu, true);
+  }
+  host.querySelectorAll('.uk-rowmenu').forEach((menu) => {
+    const trigger = menu.querySelector('[data-uk-rowmenu]');
+    const tpl = menu.querySelector('.uk-rowmenu__tpl');
+    if (!trigger || !tpl) return;
+    const html = tpl.innerHTML;
+    tpl.remove();
+    trigger.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (openRowMenu?.trigger === trigger) { closeRowMenu(); return; }
+      closeRowMenu();
+      const panel = document.createElement('div');
+      panel.className = 'uk-popover uk-popover--fixed is-open';
+      panel.innerHTML = html;
+      document.body.append(panel);
+      const r = trigger.getBoundingClientRect();
+      let left = Math.max(8, r.right - panel.offsetWidth);
+      let top = r.bottom + 6;
+      if (top + panel.offsetHeight > window.innerHeight - 8) top = Math.max(8, r.top - panel.offsetHeight - 6);
+      panel.style.left = `${Math.round(left)}px`;
+      panel.style.top = `${Math.round(top)}px`;
+      panel.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-act]');
+        closeRowMenu();
+        if (btn) handlers[btn.dataset.act]?.(btn.dataset.id, btn);
+      });
+      renderIcons();
+      openRowMenu = { trigger, panel };
+    });
+  });
+}
+
+/* ==========================================================================
    Skeleton loaders
    ========================================================================== */
 

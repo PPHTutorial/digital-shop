@@ -16,6 +16,18 @@ import {
   statusBadge,
 } from './uikit.js';
 import { enhanceSelect, refreshSelect } from './select.js';
+import { countryOptions, currencyForCountry, currencyOptions } from './geo.js';
+import { buildRte, getRteValue, valueToHtml, wireRte } from './rte.js';
+import { buildDropzone, extOf, wireDropzone } from './filedrop.js';
+import { openImageEditor } from './imgedit.js';
+import { openFileViewer } from './preview.js';
+
+const editImage = (file) => new Promise((resolve) => openImageEditor(file, { maxBytes: 5 * 1024 * 1024, onApply: resolve }));
+
+async function adMinWalletBalance() {
+  const { data } = await supabase.from('site_settings').select('ad_min_wallet_balance').eq('id', 1).maybeSingle().then((r) => r, () => ({ data: null }));
+  return Number(data?.ad_min_wallet_balance ?? 100);
+}
 
 let account = null;
 let dashboard = null;
@@ -31,25 +43,8 @@ const MIN_TOPUP = 25;
    Jurisdiction — which payout rails exist where
    ========================================================================== */
 
-const COUNTRIES = [
-  { code: 'GH', name: 'Ghana', currency: 'GHS' },
-  { code: 'NG', name: 'Nigeria', currency: 'NGN' },
-  { code: 'KE', name: 'Kenya', currency: 'KES' },
-  { code: 'UG', name: 'Uganda', currency: 'UGX' },
-  { code: 'TZ', name: 'Tanzania', currency: 'TZS' },
-  { code: 'RW', name: 'Rwanda', currency: 'RWF' },
-  { code: 'ZA', name: 'South Africa', currency: 'ZAR' },
-  { code: 'CM', name: 'Cameroon', currency: 'XAF' },
-  { code: 'CI', name: "Côte d'Ivoire", currency: 'XOF' },
-  { code: 'SN', name: 'Senegal', currency: 'XOF' },
-  { code: 'GB', name: 'United Kingdom', currency: 'GBP' },
-  { code: 'US', name: 'United States', currency: 'USD' },
-  { code: 'CA', name: 'Canada', currency: 'CAD' },
-  { code: 'DE', name: 'Germany', currency: 'EUR' },
-  { code: 'FR', name: 'France', currency: 'EUR' },
-  { code: 'IN', name: 'India', currency: 'INR' },
-  { code: 'OTHER', name: 'Elsewhere', currency: 'USD' },
-];
+/* Country + currency lists now come from js/geo.js. Mobile-money availability
+   below is the payout-rail subset that still needs a bespoke provider list. */
 
 /** Mobile money is only offered where it is actually used. */
 const MOMO_PROVIDERS = {
@@ -72,9 +67,6 @@ function methodsFor(countryCode) {
   return methods;
 }
 
-function countryOptions(selected = 'GH') {
-  return COUNTRIES.map((c) => `<option value="${c.code}" ${c.code === selected ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
-}
 
 /* ==========================================================================
    Formatting
@@ -839,121 +831,185 @@ function slugify(value) {
 }
 
 function openProductModal(product = null) {
+  const gallery = Array.isArray(product?.gallery_urls) ? [...product.gallery_urls] : [];
+  const startAsLink = !!product?.external_url;
+  const cur = vendor.payout_currency || 'USD';
+
   const { dialog } = openModal({
     id: 'product-modal',
     title: product ? 'Edit product' : 'New product',
     body: `
-      <form id="product-form">
+      <form id="product-form" class="adm-form">
         <input type="hidden" name="id" value="${product?.id || ''}">
-        <label class="vnd-field vnd-field--span2">
-          <span class="label">Title</span>
-          <input class="field" name="title" id="v-title" required placeholder="e.g. The 24-Hour Product Launch Kit" value="${escapeHtml(product?.title || '')}">
+        <input type="hidden" name="cover_url" id="v-cover-url" value="${escapeHtml(product?.cover_url || '')}">
+        <input type="hidden" name="file_path" id="v-file-path" value="${escapeHtml(product?.file_path || '')}">
+        <input type="hidden" name="file_size_bytes" id="v-file-size" value="${product?.file_size_bytes ?? ''}">
+        <input type="hidden" name="file_type" id="v-file-type" value="${escapeHtml(product?.file_type || '')}">
+        <input type="hidden" name="gallery_urls" id="v-gallery-urls" value='${escapeHtml(JSON.stringify(gallery))}'>
+        <input type="hidden" name="delivery_mode" id="v-delivery-mode" value="${startAsLink ? 'link' : 'file'}">
+
+        <label class="adm-field"><span class="label">Title</span>
+          <span class="adm-title-wrap">
+            <input class="field" name="title" id="v-title" required placeholder="e.g. The 24-Hour Product Launch Kit" value="${escapeHtml(product?.title || '')}">
+            <span class="adm-title-badge" id="v-format-badge" hidden></span>
+          </span>
         </label>
-        <div class="vnd-modal-grid" style="margin-top:14px">
-          <label class="vnd-field">
-            <span class="label">Category</span>
+
+        <div class="adm-modal-grid">
+          <label class="adm-field"><span class="label">Category</span>
             <select class="field" name="category" id="v-category">
               ${categories.map((c) => `<option value="${escapeHtml(c.name)}" ${product?.category === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
-            </select>
-          </label>
-          <label class="vnd-field">
-            <span class="label">URL slug</span>
-            <input class="field font-mono text-xs" name="slug" id="v-slug" required value="${escapeHtml(product?.slug || '')}">
-          </label>
-          <label class="vnd-field">
-            <span class="label">Price</span>
-            <input class="field font-bold" name="price" type="number" step=".01" min="0" required placeholder="0.00" value="${product?.price ?? ''}">
-          </label>
-          <label class="vnd-field">
-            <span class="label">Compare-at price <!--<span class="vnd-optional">(optional)</span>--></span>
-            <input class="field" name="original_price" type="number" step=".01" min="0" placeholder="Optional filed" value="${product?.original_price ?? ''}">
-          </label>
-        </div>
-        <label class="vnd-field vnd-field--span2" style="margin-top:14px">
-          <span class="label">Short description</span>
-          <input class="field" name="short_description" maxlength="160" placeholder="One line shown on the product card" value="${escapeHtml(product?.short_description || '')}">
-        </label>
-        <label class="vnd-field vnd-field--span2" style="margin-top:14px">
-          <span class="label">Full description <span class="vnd-optional">(markdown supported: ## heading, **bold**, *italic*, - list, [link](url))</span></span>
-          <textarea class="field" name="description" rows="4" placeholder="What's included, who it's for, what they'll achieve…">${escapeHtml(product?.description || '')}</textarea>
-        </label>
-        <div class="vnd-modal-grid" style="margin-top:14px">
-          <div>
-            <span class="label">Cover image</span>
-            <div class="vnd-upload mt-1">
-              <input type="file" id="v-cover-file" accept="image/*" class="text-xs">
-              <img id="v-cover-preview" class="${product?.cover_url ? '' : 'hidden'}" src="${escapeHtml(product?.cover_url || '')}" alt="">
-            </div>
-            <input type="hidden" name="cover_url" id="v-cover-url" value="${escapeHtml(product?.cover_url || '')}">
-            <small id="v-cover-status" class="help"></small>
-          </div>
-          <div>
-            <span class="label">Product file <span class="vnd-optional">(what buyers download)</span></span>
-            <div class="vnd-upload mt-1">
-              <input type="file" id="v-product-file" class="text-xs">
-            </div>
-            <input type="hidden" name="file_path" id="v-file-path" value="${escapeHtml(product?.file_path || '')}">
-            <small id="v-file-status" class="help"></small>
-          </div>
-          <label class="vnd-field">
-            <span class="label">File type</span>
-            <input class="field" name="file_type" placeholder="e.g. PDF, ZIP, MP4" value="${escapeHtml(product?.file_type || '')}">
-          </label>
-          <label class="vnd-field">
-            <span class="label">Licence</span>
+            </select></label>
+          <label class="adm-field"><span class="label">Licence</span>
             <select class="field" name="license_type">
               <option value="personal" ${product?.license_type === 'personal' ? 'selected' : ''}>Personal use</option>
               <option value="commercial" ${product?.license_type === 'commercial' ? 'selected' : ''}>Commercial use</option>
               <option value="extended" ${product?.license_type === 'extended' ? 'selected' : ''}>Extended licence</option>
-            </select>
-          </label>
+            </select></label>
+          <label class="adm-field"><span class="label">Price (${escapeHtml(cur)})</span>
+            <input class="field font-bold" name="price" type="number" step=".01" min="0" required placeholder="0.00" value="${product?.price ?? ''}"></label>
+          <label class="adm-field"><span class="label label--nowrap">Compare-at price <span class="vnd-optional">(optional)</span></span>
+            <input class="field" name="original_price" type="number" step=".01" min="0" value="${product?.original_price ?? ''}"></label>
         </div>
-        <div class="vnd-field vnd-field--span2" style="margin-top:14px">
-          <span class="label">Additional cover images <span class="vnd-optional">(optional gallery, shown as thumbnails)</span></span>
-          <input type="file" id="v-gallery-file" accept="image/*" multiple class="text-xs mt-1">
+
+        <label class="adm-field"><span class="label">Short description <span class="vnd-optional">(one line on the product card)</span></span>
+          <input class="field" name="short_description" maxlength="160" value="${escapeHtml(product?.short_description || '')}"></label>
+
+        <details class="adm-collapse">
+          <summary>Full description${product?.description ? ' <span class="adm-collapse__dot"></span>' : ''}</summary>
+          <div id="v-desc-rte">${buildRte({ id: 'v-description', minHeight: 150 })}</div>
+        </details>
+
+        <div class="adm-field">
+          <span class="label">Cover image</span>
+          ${buildDropzone({ id: 'v-cover-file', accept: 'image/png,image/jpeg,image/webp', label: 'Drop cover image or click', hint: 'PNG, JPG or WebP' })}
+        </div>
+
+        <div class="adm-field">
+          <span class="label">What buyers get</span>
+          <div class="seg" role="tablist">
+            <button type="button" class="seg__btn ${startAsLink ? '' : 'is-active'}" data-delivery="file">Uploaded file</button>
+            <button type="button" class="seg__btn ${startAsLink ? 'is-active' : ''}" data-delivery="link">External link</button>
+          </div>
+          <div id="v-file-pane" class="${startAsLink ? 'hidden' : ''}" style="margin-top:10px">
+            ${buildDropzone({ id: 'v-product-file', label: 'Drop the product file or click', hint: 'PNG · JPG · WebP · ZIP · PDF · DOCX · EPUB — max 5 MB' })}
+          </div>
+          <div id="v-link-pane" class="${startAsLink ? '' : 'hidden'}" style="margin-top:10px">
+            <input class="field" type="url" id="v-external-url" placeholder="https://…" value="${escapeHtml(product?.external_url || '')}">
+            <div class="adm-ad-notice">
+              ${icon('megaphone', 15)}
+              <div>
+                <strong>External-link listings are ad placements.</strong>
+                <p>The destination is reviewed. Buyers see a "leaving DigiStore" warning first. These are funded from your ad wallet.</p>
+              </div>
+            </div>
+            <div class="adm-wallet-line" id="v-wallet-line" hidden>
+              <span>Ad wallet: <strong id="v-wallet-balance">—</strong></span>
+              <button type="button" class="button !min-h-8 !px-3 text-xs" id="v-wallet-topup">Top up</button>
+            </div>
+            <label class="adm-check-line" style="margin-top:10px"><input type="checkbox" id="v-ext-consent"> I take responsibility for this destination — no phishing, scams, malware, or misleading content, and it complies with the Acceptable Use Policy.</label>
+            <p class="adm-panel-note" style="margin-top:6px">Identity / biometric verification for ad publishers is coming — for now this consent is on record.</p>
+          </div>
+        </div>
+
+        <div class="adm-field">
+          <span class="label">Additional images <span class="vnd-optional">(gallery thumbnails)</span></span>
+          ${buildDropzone({ id: 'v-gallery-file', accept: 'image/png,image/jpeg,image/webp', label: 'Drop images or click', multiple: true, compact: true })}
           <div id="v-gallery-preview" class="adm-gallery-preview mt-2"></div>
-          <input type="hidden" name="gallery_urls" id="v-gallery-urls" value="${escapeHtml(JSON.stringify(Array.isArray(product?.gallery_urls) ? product.gallery_urls : []))}">
-          <small id="v-gallery-status" class="help"></small>
         </div>
-        <label class="vnd-check-line" style="margin-top:14px">
-          <input type="checkbox" name="is_published" ${!product || product.is_published ? 'checked' : ''}>
-          Publish to the storefront
-        </label>
-        <p id="product-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
+
+        <label class="adm-check-line"><input type="checkbox" name="is_published" ${!product || product.is_published ? 'checked' : ''}> Publish to the storefront</label>
+        <p id="product-feedback" class="status-line text-xs my-0"></p>
       </form>`,
     footer: `
       <button type="button" class="button" data-uk-cancel>Cancel</button>
       <button type="submit" form="product-form" class="button button-primary">Save product</button>`,
   });
-  dialog.classList.add('uk-modal--wide');
-
+  dialog.classList.add('uk-modal--form');
   dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
 
-  dialog.querySelector('#v-title').addEventListener('input', (event) => {
-    const slugField = dialog.querySelector('#v-slug');
-    // Only auto-fill the slug while creating; never rewrite a published URL.
-    if (!dialog.querySelector('#product-form').elements.id.value) {
-      slugField.value = slugify(event.target.value);
+  wireRte(dialog.querySelector('#v-desc-rte .cms-rte'), valueToHtml(product?.description || ''), {});
+
+  const badge = dialog.querySelector('#v-format-badge');
+  const setFormatBadge = (text) => {
+    badge.textContent = (text || '').toUpperCase();
+    badge.hidden = !text;
+    dialog.querySelector('#v-title').classList.toggle('has-badge', !!text);
+  };
+  setFormatBadge(startAsLink ? 'LINK' : (product?.file_type || extOf(product?.file_path || '')));
+
+  // Cover image → crop/compress editor → upload
+  const coverDz = wireDropzone(dialog.querySelector('#v-cover-file').closest('.filedrop'), {
+    onFiles: async ([picked]) => {
+      const file = await editImage(picked);
+      coverDz.setStatus('Uploading…');
+      const path = await uploadTo('product-images', 'covers', file, null);
+      if (!path) { coverDz.setStatus('Upload failed.', 'error'); return; }
+      const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+      dialog.querySelector('#v-cover-url').value = data.publicUrl;
+      coverDz.setPreview(data.publicUrl);
+      coverDz.setStatus(`Uploaded · ${(file.size / 1024).toFixed(0)} KB`, 'ok');
+    },
+  });
+  if (product?.cover_url) coverDz.setPreview(product.cover_url);
+  dialog.querySelector('#v-cover-file').closest('.filedrop').querySelector('.filedrop__preview')
+    .addEventListener('click', (e) => { const u = dialog.querySelector('#v-cover-url').value; if (u && e.target.tagName === 'IMG') { e.stopPropagation(); openFileViewer({ src: u, name: 'Cover image' }); } });
+
+  // Delivery mode
+  const modeInput = dialog.querySelector('#v-delivery-mode');
+  const filePane = dialog.querySelector('#v-file-pane');
+  const linkPane = dialog.querySelector('#v-link-pane');
+  const walletLine = dialog.querySelector('#v-wallet-line');
+  const adGate = { minBalance: 100, balance: Number(wallet?.balance ?? 0) };
+  const setDeliveryMode = async (mode) => {
+    modeInput.value = mode;
+    dialog.querySelectorAll('[data-delivery]').forEach((b) => b.classList.toggle('is-active', b.dataset.delivery === mode));
+    filePane.classList.toggle('hidden', mode !== 'file');
+    linkPane.classList.toggle('hidden', mode !== 'link');
+    if (mode === 'link') {
+      setFormatBadge('LINK');
+      if (walletLine.hidden) {
+        adGate.minBalance = await adMinWalletBalance();
+        walletLine.hidden = false;
+        const low = adGate.balance < adGate.minBalance;
+        dialog.querySelector('#v-wallet-balance').innerHTML =
+          `${cur} ${adGate.balance.toFixed(2)} <span class="help">· min ${cur} ${adGate.minBalance.toFixed(2)}${low ? ' — <strong style="color:var(--danger)">top up first</strong>' : ''}</span>`;
+      }
+    } else {
+      setFormatBadge(dialog.querySelector('#v-file-type').value || '');
     }
-  });
+  };
+  dialog.querySelectorAll('[data-delivery]').forEach((b) => b.addEventListener('click', () => setDeliveryMode(b.dataset.delivery)));
+  dialog.querySelector('#v-wallet-topup').addEventListener('click', () => { dialog.close(); location.hash = '#wallet'; });
+  if (startAsLink) setDeliveryMode('link');
 
-  dialog.querySelector('#v-cover-file').addEventListener('change', async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const path = await uploadTo('product-images', 'covers', file, dialog.querySelector('#v-cover-status'));
-    if (!path) return;
-    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-    dialog.querySelector('#v-cover-url').value = data.publicUrl;
-    const preview = dialog.querySelector('#v-cover-preview');
-    preview.src = data.publicUrl;
-    preview.classList.remove('hidden');
+  // Product file
+  const fileDz = wireDropzone(dialog.querySelector('#v-product-file').closest('.filedrop'), {
+    onFiles: async ([file]) => {
+      if (file.size > 5 * 1024 * 1024) {
+        fileDz.setStatus(`That file is ${(file.size / 1048576).toFixed(1)} MB — the limit is 5 MB. Compress it or host large media as an external link.`, 'error');
+        return;
+      }
+      fileDz.setStatus('Uploading…');
+      const path = await uploadTo('books', 'files', file, null);
+      if (!path) { fileDz.setStatus('Upload failed.', 'error'); return; }
+      dialog.querySelector('#v-file-path').value = path;
+      dialog.querySelector('#v-file-size').value = file.size || '';
+      dialog.querySelector('#v-file-type').value = extOf(file.name) || dialog.querySelector('#v-file-type').value;
+      setFormatBadge(dialog.querySelector('#v-file-type').value);
+      fileDz.setPreview(`${file.name} · ${(file.size / 1024).toFixed(0)} KB`);
+      fileDz.setStatus('Uploaded.', 'ok');
+    },
   });
+  if (product?.file_path) fileDz.setPreview(`${extOf(product.file_path) || 'file'} · uploaded`);
 
+  // Gallery
   function renderGalleryPreview() {
     const urls = JSON.parse(dialog.querySelector('#v-gallery-urls').value || '[]');
     const host = dialog.querySelector('#v-gallery-preview');
     host.innerHTML = urls.map((url, i) => `
-      <span class="adm-gallery-thumb"><img src="${escapeHtml(url)}" alt=""><button type="button" data-remove-gallery="${i}" aria-label="Remove image">${icon('x', 12)}</button></span>`).join('');
+      <span class="adm-gallery-thumb"><img src="${escapeHtml(url)}" alt="" data-view="${escapeHtml(url)}" style="cursor:zoom-in"><button type="button" data-remove-gallery="${i}" aria-label="Remove image">${icon('x', 12)}</button></span>`).join('');
+    host.querySelectorAll('[data-view]').forEach((im) => im.addEventListener('click', () => openFileViewer({ src: im.dataset.view, name: 'Gallery image' })));
     host.querySelectorAll('[data-remove-gallery]').forEach((btn) => btn.addEventListener('click', () => {
       const next = urls.filter((_, i) => String(i) !== btn.dataset.removeGallery);
       dialog.querySelector('#v-gallery-urls').value = JSON.stringify(next);
@@ -963,31 +1019,24 @@ function openProductModal(product = null) {
   }
   renderGalleryPreview();
 
-  dialog.querySelector('#v-gallery-file').addEventListener('change', async (event) => {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) return;
-    const status = dialog.querySelector('#v-gallery-status');
-    const urls = JSON.parse(dialog.querySelector('#v-gallery-urls').value || '[]');
-    for (const file of files) {
-      const path = await uploadTo('product-images', 'covers', file, status);
-      if (!path) continue;
-      const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-      urls.push(data.publicUrl);
-    }
-    dialog.querySelector('#v-gallery-urls').value = JSON.stringify(urls);
-    renderGalleryPreview();
-    event.target.value = '';
-  });
-
-  dialog.querySelector('#v-product-file').addEventListener('change', async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const path = await uploadTo('books', 'files', file, dialog.querySelector('#v-file-status'));
-    if (!path) return;
-    dialog.querySelector('#v-file-path').value = path;
-    // Offer the extension as the file type when the seller has not set one.
-    const typeField = dialog.querySelector('#product-form').elements.file_type;
-    if (!typeField.value) typeField.value = (file.name.split('.').pop() || '').toUpperCase();
+  const galleryDz = wireDropzone(dialog.querySelector('#v-gallery-file').closest('.filedrop'), {
+    onFiles: async (files) => {
+      const urls = JSON.parse(dialog.querySelector('#v-gallery-urls').value || '[]');
+      let n = 0;
+      for (const picked of files) {
+        n += 1;
+        galleryDz.setStatus(`Editing image ${n} of ${files.length}…`);
+        const file = await editImage(picked);
+        galleryDz.setStatus(`Uploading ${n} of ${files.length}…`);
+        const path = await uploadTo('product-images', 'covers', file, null);
+        if (!path) continue;
+        const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+        urls.push(data.publicUrl);
+      }
+      dialog.querySelector('#v-gallery-urls').value = JSON.stringify(urls);
+      renderGalleryPreview();
+      galleryDz.setStatus(`${urls.length} image${urls.length === 1 ? '' : 's'} in gallery.`, 'ok');
+    },
   });
 
   dialog.querySelector('#product-form').addEventListener('submit', async (event) => {
@@ -995,31 +1044,42 @@ function openProductModal(product = null) {
     const form = event.currentTarget;
     const button = dialog.querySelector('button[form="product-form"]');
     const feedback = dialog.querySelector('#product-feedback');
+    const fail = (msg) => { feedback.textContent = msg; feedback.className = 'status-line error text-xs my-0'; };
     const id = form.elements.id.value;
-
+    const mode = modeInput.value;
+    const isAd = mode === 'link';
     const filePath = dialog.querySelector('#v-file-path').value;
-    if (!filePath) {
-      feedback.textContent = 'Upload the file buyers will download.';
-      feedback.className = 'status-line error text-xs my-0';
-      return;
+    const externalUrl = dialog.querySelector('#v-external-url').value.trim();
+
+    if (isAd) {
+      if (!/^https?:\/\/.+/i.test(externalUrl)) { fail('Enter the full external URL (https://…).'); return; }
+      if (!dialog.querySelector('#v-ext-consent').checked) { fail('Tick the responsibility checkbox to publish an external-link listing.'); return; }
+      if (adGate.balance < adGate.minBalance) { fail(`Ad wallet balance (${cur} ${adGate.balance.toFixed(2)}) is below the ${cur} ${adGate.minBalance.toFixed(2)} minimum to publish an external-link listing. Top up first.`); return; }
+    } else if (!filePath) {
+      fail('Upload the file buyers will download, or switch to External link.'); return;
     }
 
+    const fileSize = dialog.querySelector('#v-file-size').value;
     const payload = {
       vendor_id: vendor.id,
       title: form.elements.title.value.trim(),
-      slug: slugify(form.elements.slug.value) || slugify(form.elements.title.value),
+      slug: product?.slug || slugify(form.elements.title.value),
       category: dialog.querySelector('#v-category').value,
+      license_type: form.elements.license_type.value,
       price: Number(form.elements.price.value),
       original_price: form.elements.original_price.value ? Number(form.elements.original_price.value) : null,
       short_description: form.elements.short_description.value.trim() || null,
-      description: form.elements.description.value.trim() || null,
+      description: getRteValue(dialog.querySelector('#v-desc-rte .cms-rte'), 'markdown') || null,
       cover_url: dialog.querySelector('#v-cover-url').value || null,
       gallery_urls: JSON.parse(dialog.querySelector('#v-gallery-urls').value || '[]'),
-      file_path: filePath,
-      file_type: form.elements.file_type.value.trim() || null,
-      license_type: form.elements.license_type.value,
+      file_path: isAd ? null : filePath,
+      external_url: isAd ? externalUrl : null,
+      is_ad: isAd,
+      ad_status: isAd ? 'pending' : 'none',
+      file_type: isAd ? 'LINK' : (dialog.querySelector('#v-file-type').value.trim() || extOf(filePath) || null),
+      file_size_bytes: (!isAd && fileSize) ? Number(fileSize) : null,
       is_published: form.elements.is_published.checked,
-      currency: vendor.payout_currency || 'USD',
+      currency: cur,
     };
 
     setBusy(button, true, 'Saving…');
@@ -1027,15 +1087,9 @@ function openProductModal(product = null) {
       ? await supabase.from('products').update(payload).eq('id', id)
       : await supabase.from('products').insert(payload);
     setBusy(button, false);
-
-    if (error) {
-      feedback.textContent = error.message;
-      feedback.className = 'status-line error text-xs my-0';
-      return;
-    }
-
+    if (error) { fail(error.message); return; }
     dialog.close();
-    toast(id ? 'Product updated.' : 'Product published.');
+    toast(id ? 'Product updated.' : (isAd ? 'External-link listing submitted for review.' : 'Product published.'));
     await loadProducts();
     await refreshDashboard();
   });
@@ -1181,7 +1235,7 @@ function openPayoutModal() {
       vendor_id: vendor.id,
       method,
       country,
-      currency: COUNTRIES.find((c) => c.code === country)?.currency || 'USD',
+      currency: currencyForCountry(country),
       account_name: form.elements.account_name.value.trim(),
       is_default: form.elements.is_default.checked,
     };
@@ -1564,7 +1618,10 @@ function fillSettings() {
   settingsCountry.innerHTML = countryOptions(vendor.country);
   enhanceSelect(settingsCountry, { label: 'Country' });
   refreshSelect(settingsCountry);
-  enhanceSelect(document.querySelector('select[name="payout_currency"]'), { label: 'Payout currency' });
+  const settingsPayoutCur = document.querySelector('select[name="payout_currency"]');
+  settingsPayoutCur.innerHTML = currencyOptions(vendor.payout_currency || 'USD');
+  enhanceSelect(settingsPayoutCur, { label: 'Payout currency' });
+  refreshSelect(settingsPayoutCur);
   document.querySelector('#logo-url').value = vendor.logo_url || '';
 
   const initial = (vendor.display_name || '?').trim().charAt(0).toUpperCase();
@@ -1626,7 +1683,9 @@ async function boot() {
     const applyCountry = document.querySelector('#apply-country');
     applyCountry.innerHTML = countryOptions();
     enhanceSelect(applyCountry, { label: 'Country' });
-    enhanceSelect(document.querySelector('select[name="payout_currency"]'), { label: 'Payout currency' });
+    const applyPayoutCur = document.querySelector('select[name="payout_currency"]');
+    applyPayoutCur.innerHTML = currencyOptions('USD');
+    enhanceSelect(applyPayoutCur, { label: 'Payout currency' });
 
     // The commission line in the "How payouts work" callout is not a hardcoded
     // 15% — it reflects the current default rate new stores are onboarded at,

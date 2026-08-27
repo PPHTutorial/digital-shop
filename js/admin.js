@@ -12,13 +12,14 @@
 import { supabase } from './client.js';
 import {
   compactMoney, compactNumber, escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader,
-  renderIcons, toast,
+  renderIcons, SOCIAL_LINKS, toast,
 } from './ui.js';
 import {
   attachPopover, confirmDialog, emptyState, initTabs, openModal, renderDataTable,
-  setButtonBusy, statusBadge,
+  rowMenu, setButtonBusy, statusBadge, wireRowMenus,
 } from './uikit.js';
 import { enhanceSelects, refreshSelect } from './select.js';
+import { enhanceDateTimeInput } from './form-controls.js';
 import { buildRte, formatForType, getRteValue, valueToHtml, wireRte } from './rte.js';
 import { buildDropzone, extOf, wireDropzone } from './filedrop.js';
 import { fileGlyph, openFileViewer } from './preview.js';
@@ -66,6 +67,13 @@ const shortDate = (value) => value
 const dateTime = (value) => value
   ? new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   : '—';
+
+// ISO/UTC timestamp -> local wall-clock "YYYY-MM-DDTHH:mm" for a datetime input.
+function toLocalDateTimeValue(iso) {
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 function slugify(text) {
   return (text || '').toLowerCase().trim()
@@ -370,11 +378,15 @@ function renderCustomers(users, orders) {
   paintCustomers();
 }
 
+// "Customers" excludes admins / system owners by default. The filter can widen
+// to "admin" or "all", but a bare Customers view never shows an admin row.
 function filteredCustomers() {
   const search = (document.querySelector('#customer-search')?.value || '').trim().toLowerCase();
-  const role = document.querySelector('#customer-role-filter')?.value || '';
+  const scope = document.querySelector('#customer-role-filter')?.value || 'customer';
   return customersState.users.filter((u) => {
-    if (role && u.role !== role) return false;
+    const isAdmin = u.role === 'admin';
+    if (scope === 'customer' && isAdmin) return false;
+    if (scope === 'admin' && !isAdmin) return false;
     if (!search) return true;
     return (u.full_name || '').toLowerCase().includes(search) || (u.email || '').toLowerCase().includes(search);
   });
@@ -408,49 +420,42 @@ function paintCustomers() {
     pageSize: customersState.pageSize,
     total: rows.length,
     onPage: (p) => { customersState.page = p; paintCustomers(); },
-    rowActions: (u) => `
-      <button class="button !min-h-8 !px-3 text-xs" type="button" data-manage-customer="${u.id}">Manage</button>
-      <button class="button !min-h-8 !px-3 text-xs" type="button" data-view-orders="${u.id}">Orders</button>
-      ${accountStatusActionsHtml(u)}
-      ${u.role !== 'admin' && hasPerm('manage_admins') ? `<button class="button !min-h-8 !px-3 text-xs" type="button" data-promote-admin="${u.id}">Promote</button>` : ''}`,
-    emptyMessage: 'No customers match this filter.',
+    rowActions: (u) => rowMenu([
+      { label: 'Manage profile', icon: 'pencil', act: 'manage', id: u.id },
+      { label: 'View orders', icon: 'package', act: 'orders', id: u.id },
+      ...accountStatusMenuItems(u),
+      ...(u.role !== 'admin' && hasPerm('manage_admins')
+        ? [{ sep: true }, { label: 'Promote to admin', icon: 'shield', act: 'promote', id: u.id }]
+        : []),
+    ]),
+    emptyMessage: 'No users match this filter.',
   });
 
-  host.querySelectorAll('[data-manage-customer]').forEach((btn) => btn.addEventListener('click', () => {
-    const user = customersState.users.find((u) => u.id === btn.dataset.manageCustomer);
-    if (user) openCustomerModal(user);
-  }));
-  host.querySelectorAll('[data-view-orders]').forEach((btn) => btn.addEventListener('click', () => {
-    const user = customersState.users.find((u) => u.id === btn.dataset.viewOrders);
-    if (user) openCustomerOrdersModal(user);
-  }));
-  host.querySelectorAll('[data-account-status]').forEach((btn) => btn.addEventListener('click', () => {
-    const user = customersState.users.find((u) => u.id === btn.dataset.accountStatus);
-    if (user) openAccountStatusModal(user, btn.dataset.targetStatus);
-  }));
-  host.querySelectorAll('[data-promote-admin]').forEach((btn) => btn.addEventListener('click', () => {
-    const user = customersState.users.find((u) => u.id === btn.dataset.promoteAdmin);
-    if (user) openTierModal(user, { promote: true });
-  }));
+  wireRowMenus(host, {
+    manage: (id) => { const u = customersState.users.find((x) => x.id === id); if (u) openCustomerModal(u); },
+    orders: (id) => { const u = customersState.users.find((x) => x.id === id); if (u) openCustomerOrdersModal(u); },
+    status: (id, btn) => { const u = customersState.users.find((x) => x.id === id); if (u) openAccountStatusModal(u, btn.dataset.target); },
+    promote: (id) => { const u = customersState.users.find((x) => x.id === id); if (u) openTierModal(u, { promote: true }); },
+  });
 }
 
 /**
- * Row-action buttons for account_status transitions. A viewer who lacks
- * manage_users sees nothing; one who has it but the target is itself an
- * admin (and the viewer isn't super_admin) also sees nothing — mirrors the
- * RPC's own guard, for a clean UX rather than a rejected-call error.
+ * account_status transitions as rowMenu items. A viewer who lacks manage_users
+ * sees nothing; one who has it but the target is itself an admin (and the
+ * viewer isn't super_admin) also sees nothing — mirrors the RPC's own guard.
  */
-function accountStatusActionsHtml(u) {
-  if (!hasPerm('manage_users')) return '';
-  if (u.role === 'admin' && !hasPerm('manage_admins')) return '';
+function accountStatusMenuItems(u) {
+  if (!hasPerm('manage_users')) return [];
+  if (u.role === 'admin' && !hasPerm('manage_admins')) return [];
   const current = u.account_status || 'active';
-  const options = [
-    current !== 'blocked' && { status: 'blocked', label: 'Block' },
-    current !== 'suspended' && { status: 'suspended', label: 'Suspend' },
-    current !== 'terminated' && { status: 'terminated', label: 'Terminate' },
-    current !== 'active' && { status: 'active', label: 'Reactivate' },
+  const opts = [
+    current !== 'blocked' && { label: 'Block', icon: 'ban', target: 'blocked', danger: true },
+    current !== 'suspended' && { label: 'Suspend', icon: 'pause', target: 'suspended', danger: true },
+    current !== 'terminated' && { label: 'Terminate', icon: 'octagon-alert', target: 'terminated', danger: true },
+    current !== 'active' && { label: 'Reactivate', icon: 'check', target: 'active' },
   ].filter(Boolean);
-  return options.map((o) => `<button class="button !min-h-8 !px-3 text-xs ${o.status === 'active' ? '' : 'button-danger'}" type="button" data-account-status="${u.id}" data-target-status="${o.status}">${o.label}</button>`).join('');
+  if (!opts.length) return [];
+  return [{ sep: true }, ...opts.map((o) => ({ label: o.label, icon: o.icon, act: 'status', id: u.id, data: { target: o.target }, danger: o.danger }))];
 }
 
 function openAccountStatusModal(user, targetStatus) {
@@ -720,30 +725,31 @@ function paintProducts() {
     pageSize: productsState.pageSize,
     total: productsState.products.length,
     onPage: (p) => { productsState.page = p; paintProducts(); },
-    rowActions: (p) => `
-      <button class="button !min-h-8 !px-3 text-xs" type="button" data-copy-link="${escapeHtml(p.slug || p.id)}" title="Copy checkout link">${icon('link', 12)}</button>
-      <button class="button !min-h-8 !px-3 text-xs" type="button" data-edit-product="${p.id}">Edit</button>
-      <button class="button !min-h-8 !px-3 text-xs button-danger" type="button" data-delete-product="${p.id}">Delete</button>`,
+    rowActions: (p) => rowMenu([
+      { label: 'Edit product', icon: 'pencil', act: 'edit', id: p.id },
+      { label: 'Copy checkout link', icon: 'link', act: 'copy', id: p.slug || p.id },
+      { sep: true },
+      { label: 'Delete product', icon: 'trash-2', act: 'del', id: p.id, danger: true },
+    ]),
     emptyMessage: 'No products in the catalog yet.',
   });
 
-  host.querySelectorAll('[data-copy-link]').forEach((btn) => btn.addEventListener('click', () => {
-    navigator.clipboard.writeText(`${window.location.origin}/checkout?product=${encodeURIComponent(btn.dataset.copyLink)}`);
-    toast('Checkout link copied.');
-  }));
-  host.querySelectorAll('[data-edit-product]').forEach((btn) => btn.addEventListener('click', () => {
-    const product = productsState.products.find((p) => p.id === btn.dataset.editProduct);
-    openProductModal(product);
-  }));
-  host.querySelectorAll('[data-delete-product]').forEach((btn) => btn.addEventListener('click', async () => {
-    const ok = await confirmDialog({ title: 'Delete this product?', body: 'This removes it from the catalog permanently. Past orders are unaffected.', confirmLabel: 'Delete product' });
-    if (!ok) return;
-    const { error } = await supabase.from('products').delete().eq('id', btn.dataset.deleteProduct);
-    if (error) { toast(error.message, 'error'); return; }
-    toast('Product deleted.');
-    supabase.functions.invoke('sitemap').catch(() => { });
-    await loadOverview(true);
-  }));
+  wireRowMenus(host, {
+    copy: (id) => {
+      navigator.clipboard.writeText(`${window.location.origin}/checkout?product=${encodeURIComponent(id)}`);
+      toast('Checkout link copied.');
+    },
+    edit: (id) => openProductModal(productsState.products.find((p) => p.id === id)),
+    del: async (id) => {
+      const ok = await confirmDialog({ title: 'Delete this product?', body: 'This removes it from the catalog permanently. Past orders are unaffected.', confirmLabel: 'Delete product' });
+      if (!ok) return;
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) { toast(error.message, 'error'); return; }
+      toast('Product deleted.');
+      supabase.functions.invoke('sitemap').catch(() => { });
+      await loadOverview(true);
+    },
+  });
 }
 
 document.querySelector('#new-product')?.addEventListener('click', () => openProductModal(null));
@@ -830,8 +836,8 @@ function openProductModal(product = null) {
         <label class="adm-field"><span class="label">Short description <span class="help" style="font-weight:400">(one line on the product card)</span></span>
           <input class="field" name="short_description" maxlength="160" value="${escapeHtml(product?.short_description || '')}"></label>
 
-        <details class="adm-collapse" ${product?.description ? 'open' : ''}>
-          <summary>Full description</summary>
+        <details class="adm-collapse">
+          <summary>Full description${product?.description ? ' <span class="adm-collapse__dot" title="has content"></span>' : ''}</summary>
           <div id="p-desc-rte">${buildRte({ id: 'p-description', minHeight: 150 })}</div>
         </details>
 
@@ -853,7 +859,7 @@ function openProductModal(product = null) {
             <button type="button" class="seg__btn ${startAsLink ? 'is-active' : ''}" data-delivery="link">External link</button>
           </div>
           <div id="p-file-pane" class="${startAsLink ? 'hidden' : ''}" style="margin-top:10px">
-            ${buildDropzone({ id: 'p-file', label: 'Drop the product file or click', hint: 'PNG · JPG · WebP · ZIP · PDF · DOCX · EPUB — max 5 MB' })}
+            ${buildDropzone({ id: 'p-file', label: 'Drop the product file or click', hint: 'PNG · JPG · WebP · ZIP · MP3 · MP4 · PDF · DOCX · EPUB — max 5 MB' })}
           </div>
           <div id="p-link-pane" class="${startAsLink ? '' : 'hidden'}" style="margin-top:10px">
             <input class="field" type="url" id="p-external-url" placeholder="https://…" value="${escapeHtml(product?.external_url || '')}">
@@ -1098,16 +1104,19 @@ function renderCategories(categories, products) {
       { key: 'is_active', label: 'Visibility', render: (c) => statusBadge(c.is_active ? 'published' : 'unpublished', c.is_active ? 'Visible' : 'Hidden') },
     ],
     rows: categories, page: 1, pageSize: categories.length || 1, total: categories.length,
-    rowActions: (c) => `
-      <button class="button !min-h-8 !px-3 text-xs" type="button" data-edit-category="${c.id}">Edit</button>
-      <button class="button !min-h-8 !px-3 text-xs" type="button" data-toggle-category="${c.id}" data-active="${c.is_active}">${c.is_active ? 'Hide' : 'Show'}</button>`,
+    rowActions: (c) => rowMenu([
+      { label: 'Edit category', icon: 'pencil', act: 'edit', id: c.id },
+      { label: c.is_active ? 'Hide from storefront' : 'Show in storefront', icon: c.is_active ? 'eye-off' : 'eye', act: 'toggle', id: c.id, data: { active: c.is_active } },
+    ]),
     emptyMessage: 'No categories yet.',
   });
-  host.querySelectorAll('[data-edit-category]').forEach((btn) => btn.addEventListener('click', () => openCategoryModal(categories.find((c) => c.id === btn.dataset.editCategory))));
-  host.querySelectorAll('[data-toggle-category]').forEach((btn) => btn.addEventListener('click', async () => {
-    const { error } = await supabase.from('categories').update({ is_active: btn.dataset.active !== 'true' }).eq('id', btn.dataset.toggleCategory);
-    if (error) toast(error.message, 'error'); else { toast('Category visibility updated.'); await loadOverview(true); }
-  }));
+  wireRowMenus(host, {
+    edit: (id) => openCategoryModal(categories.find((c) => c.id === id)),
+    toggle: async (id, btn) => {
+      const { error } = await supabase.from('categories').update({ is_active: btn.dataset.active !== 'true' }).eq('id', id);
+      if (error) toast(error.message, 'error'); else { toast('Category visibility updated.'); await loadOverview(true); }
+    },
+  });
 }
 
 document.querySelector('#new-category')?.addEventListener('click', () => openCategoryModal(null));
@@ -1170,22 +1179,26 @@ function renderPromos(promos) {
       { key: 'is_active', label: 'Status', render: (p) => statusBadge(p.is_active ? 'active' : 'paused', p.is_active ? 'Active' : 'Paused') },
     ],
     rows: promos, page: 1, pageSize: promos.length || 1, total: promos.length,
-    rowActions: (p) => `
-      <button class="button !min-h-8 !px-3 text-xs" type="button" data-toggle-promo="${p.id}" data-active="${p.is_active}">${p.is_active ? 'Pause' : 'Activate'}</button>
-      <button class="button !min-h-8 !px-3 text-xs button-danger" type="button" data-delete-promo="${p.id}">Delete</button>`,
+    rowActions: (p) => rowMenu([
+      { label: p.is_active ? 'Pause code' : 'Activate code', icon: p.is_active ? 'pause' : 'play', act: 'toggle', id: p.id, data: { active: p.is_active } },
+      { sep: true },
+      { label: 'Delete code', icon: 'trash-2', act: 'del', id: p.id, danger: true },
+    ]),
     emptyMessage: 'No promotion codes yet.',
   });
-  host.querySelectorAll('[data-toggle-promo]').forEach((btn) => btn.addEventListener('click', async () => {
-    const current = btn.dataset.active === 'true';
-    const { error } = await supabase.from('promo_codes').update({ is_active: !current }).eq('id', btn.dataset.togglePromo);
-    if (error) toast(error.message, 'error'); else { toast(`Promo ${current ? 'paused' : 'activated'}.`); await loadOverview(true); }
-  }));
-  host.querySelectorAll('[data-delete-promo]').forEach((btn) => btn.addEventListener('click', async () => {
-    const ok = await confirmDialog({ title: 'Delete this promo code?', body: 'Customers will no longer be able to redeem it.', confirmLabel: 'Delete code' });
-    if (!ok) return;
-    const { error } = await supabase.from('promo_codes').delete().eq('id', btn.dataset.deletePromo);
-    if (error) toast(error.message, 'error'); else { toast('Promo code deleted.'); await loadOverview(true); }
-  }));
+  wireRowMenus(host, {
+    toggle: async (id, btn) => {
+      const current = btn.dataset.active === 'true';
+      const { error } = await supabase.from('promo_codes').update({ is_active: !current }).eq('id', id);
+      if (error) toast(error.message, 'error'); else { toast(`Promo ${current ? 'paused' : 'activated'}.`); await loadOverview(true); }
+    },
+    del: async (id) => {
+      const ok = await confirmDialog({ title: 'Delete this promo code?', body: 'Customers will no longer be able to redeem it.', confirmLabel: 'Delete code' });
+      if (!ok) return;
+      const { error } = await supabase.from('promo_codes').delete().eq('id', id);
+      if (error) toast(error.message, 'error'); else { toast('Promo code deleted.'); await loadOverview(true); }
+    },
+  });
 }
 
 document.querySelector('#new-promo')?.addEventListener('click', () => {
@@ -1254,18 +1267,16 @@ function paintStores() {
       const ownerIsAdmin = ownerAdminMap.get(v.user_id) === 'admin';
       if (!hasPerm('manage_users') || (ownerIsAdmin && !hasPerm('manage_admins'))) return '';
       return v.status === 'approved'
-        ? `<button class="button button-danger !min-h-8 !px-3 text-xs" type="button" data-suspend-store="${v.id}">Suspend</button>`
-        : `<button class="button button-primary !min-h-8 !px-3 text-xs" type="button" data-reinstate-store="${v.id}">Reinstate</button>`;
+        ? rowMenu([{ label: 'Suspend store', icon: 'ban', act: 'suspend', id: v.id, danger: true }])
+        : rowMenu([{ label: 'Reinstate store', icon: 'check', act: 'reinstate', id: v.id }]);
     },
     emptyMessage: 'No stores yet.',
   });
 
-  host.querySelectorAll('[data-suspend-store],[data-reinstate-store]').forEach((btn) => btn.addEventListener('click', () => {
-    const id = btn.dataset.suspendStore || btn.dataset.reinstateStore;
-    const targetStatus = btn.dataset.suspendStore ? 'suspended' : 'approved';
-    const vendor = storesState.vendors.find((v) => v.id === id);
-    openStoreStatusModal(vendor, targetStatus);
-  }));
+  wireRowMenus(host, {
+    suspend: (id) => openStoreStatusModal(storesState.vendors.find((v) => v.id === id), 'suspended'),
+    reinstate: (id) => openStoreStatusModal(storesState.vendors.find((v) => v.id === id), 'approved'),
+  });
 }
 
 function openStoreStatusModal(vendor, targetStatus) {
@@ -1333,31 +1344,32 @@ function paintAdmins() {
       { key: 'created_at', label: 'Joined', render: (a) => shortDate(a.created_at) },
     ],
     rows: admins, page: 1, pageSize: admins.length || 1, total: admins.length,
-    rowActions: (a) => `
-      <button class="button !min-h-8 !px-3 text-xs" type="button" data-change-tier="${a.id}">Change tier</button>
-      <button class="button button-danger !min-h-8 !px-3 text-xs" type="button" data-revoke-admin="${a.id}">Revoke</button>`,
+    rowActions: (a) => rowMenu([
+      { label: 'Change tier', icon: 'sliders-horizontal', act: 'tier', id: a.id },
+      { sep: true },
+      { label: 'Revoke admin access', icon: 'shield-off', act: 'revoke', id: a.id, danger: true },
+    ]),
     emptyMessage: 'No admins on record.',
   });
 
-  host.querySelectorAll('[data-change-tier]').forEach((btn) => btn.addEventListener('click', () => {
-    const admin = admins.find((a) => a.id === btn.dataset.changeTier);
-    if (admin) openTierModal(admin, { promote: false });
-  }));
-  host.querySelectorAll('[data-revoke-admin]').forEach((btn) => btn.addEventListener('click', async () => {
-    const admin = admins.find((a) => a.id === btn.dataset.revokeAdmin);
-    const ok = await confirmDialog({
-      title: `Revoke admin access for ${admin?.full_name || 'this user'}?`,
-      body: 'They immediately drop to a regular customer account. This is refused if they are the last remaining super_admin.',
-      confirmLabel: 'Revoke admin access',
-    });
-    if (!ok) return;
-    const { error } = await supabase.rpc('admin_revoke_admin', { p_user_id: btn.dataset.revokeAdmin });
-    if (error) { toast(error.message, 'error'); return; }
-    toast('Admin access revoked.');
-    governanceProfiles = [];
-    await loadOverview(true);
-    paintAdmins();
-  }));
+  wireRowMenus(host, {
+    tier: (id) => { const admin = admins.find((a) => a.id === id); if (admin) openTierModal(admin, { promote: false }); },
+    revoke: async (id) => {
+      const admin = admins.find((a) => a.id === id);
+      const ok = await confirmDialog({
+        title: `Revoke admin access for ${admin?.full_name || 'this user'}?`,
+        body: 'They immediately drop to a regular customer account. This is refused if they are the last remaining super_admin.',
+        confirmLabel: 'Revoke admin access',
+      });
+      if (!ok) return;
+      const { error } = await supabase.rpc('admin_revoke_admin', { p_user_id: id });
+      if (error) { toast(error.message, 'error'); return; }
+      toast('Admin access revoked.');
+      governanceProfiles = [];
+      await loadOverview(true);
+      paintAdmins();
+    },
+  });
 }
 
 function openTierModal(user, { promote = false } = {}) {
@@ -2221,11 +2233,19 @@ async function loadSettings(force = false) {
   form.elements.tagline.value = data.tagline || '';
   form.elements.announcement.value = data.announcement || '';
   form.elements.announcement_active.value = String(Boolean(data.announcement_active));
-  form.elements.announcement_ends_at.value = data.announcement_ends_at ? new Date(data.announcement_ends_at).toISOString().slice(0, 16) : '';
+  form.elements.announcement_ends_at.value = data.announcement_ends_at ? toLocalDateTimeValue(data.announcement_ends_at) : '';
+  enhanceDateTimeInput(form.elements.announcement_ends_at);
+  form.elements.announcement_ends_at.dispatchEvent(new Event('change', { bubbles: true }));
   form.elements.checkout_note.value = data.checkout_note || '';
   const social = data.social || {};
-  form.elements.social_twitter.value = social.twitter || '';
-  form.elements.social_instagram.value = social.instagram || '';
+  const socialHost = document.querySelector('#settings-social');
+  if (socialHost && !socialHost.dataset.built) {
+    socialHost.dataset.built = 'true';
+    socialHost.innerHTML = SOCIAL_LINKS.map((s) => `
+      <label class="adm-field"><span class="label" style="font-size:.72rem">${escapeHtml(s.label)}</span>
+        <input class="field text-xs" name="social_${s.key}" type="url" placeholder="${escapeHtml(s.placeholder)}"></label>`).join('');
+  }
+  SOCIAL_LINKS.forEach((s) => { if (form.elements[`social_${s.key}`]) form.elements[`social_${s.key}`].value = social[s.key] || ''; });
   form.elements.default_commission_rate.value = data.default_commission_rate ?? 15;
   form.elements.refund_rate_percent.value = data.refund_rate_percent ?? 30;
   form.elements.ad_min_wallet_balance.value = data.ad_min_wallet_balance ?? 100;
@@ -2246,7 +2266,9 @@ document.querySelector('#settings-form')?.addEventListener('submit', async (even
     announcement_active: form.elements.announcement_active.value === 'true',
     announcement_ends_at: form.elements.announcement_ends_at.value ? new Date(form.elements.announcement_ends_at.value).toISOString() : null,
     checkout_note: form.elements.checkout_note.value.trim() || null,
-    social: { twitter: form.elements.social_twitter.value.trim() || undefined, instagram: form.elements.social_instagram.value.trim() || undefined },
+    social: Object.fromEntries(SOCIAL_LINKS
+      .map((s) => [s.key, (form.elements[`social_${s.key}`]?.value || '').trim()])
+      .filter(([, v]) => v)),
     default_commission_rate: Number(form.elements.default_commission_rate.value) || 0,
     refund_rate_percent: Number(form.elements.refund_rate_percent.value) || 0,
     ad_min_wallet_balance: Number(form.elements.ad_min_wallet_balance.value) || 0,

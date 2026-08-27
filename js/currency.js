@@ -1,44 +1,21 @@
 // Live & Fallback Currency Conversion Engine
 
+import { CURRENCIES, ZERO_DECIMAL_CURRENCIES } from './geo.js';
+
+// Offline fallback rates (USD base). Live rates from open.er-api.com are merged
+// over these when available, so this only needs the commonly-used currencies.
 const FALLBACK_RATES_FROM_USD = {
-  USD: 1,
-  NGN: 1540.0,
-  GBP: 0.79,
-  EUR: 0.92,
-  KES: 129.5,
-  GHS: 15.3,
-  ZAR: 18.1,
-  CAD: 1.37,
-  UGX: 3710.0,
-  AUD: 1.51,
-  INR: 83.9,
-  JPY: 154.0,
-  AED: 3.67,
-  SAR: 3.75,
-  BRL: 5.45,
-  RWF: 1320.0,
-  TZS: 2680.0,
+  USD: 1, EUR: 0.92, GBP: 0.79, NGN: 1540, GHS: 15.3, KES: 129.5, ZAR: 18.1,
+  UGX: 3710, TZS: 2680, RWF: 1320, XOF: 604, XAF: 604, EGP: 48.5, MAD: 9.9,
+  ETB: 122, ZMW: 26.5, CAD: 1.37, AUD: 1.51, NZD: 1.64, CHF: 0.88, SEK: 10.6,
+  NOK: 10.9, DKK: 6.9, PLN: 3.95, CZK: 23.1, RON: 4.57, HUF: 358, TRY: 34.2,
+  UAH: 41.3, RUB: 92, AED: 3.67, SAR: 3.75, QAR: 3.64, ILS: 3.7, INR: 83.9,
+  PKR: 278, BDT: 119, LKR: 296, CNY: 7.24, HKD: 7.8, TWD: 32.3, JPY: 154,
+  KRW: 1355, SGD: 1.34, MYR: 4.5, IDR: 15800, THB: 34.5, VND: 25400, PHP: 58.2,
+  BRL: 5.45, MXN: 18.7, ARS: 985, CLP: 945, COP: 4200,
 };
 
-const CURRENCY_SYMBOLS = {
-  USD: '$',
-  NGN: '₦',
-  GBP: '£',
-  EUR: '€',
-  KES: 'KSh ',
-  GHS: 'GH₵ ',
-  ZAR: 'R ',
-  CAD: 'CA$ ',
-  UGX: 'USh ',
-  AUD: 'A$ ',
-  INR: '₹',
-  JPY: '¥',
-  AED: 'AED ',
-  SAR: 'SAR ',
-  BRL: 'R$ ',
-  RWF: 'RF ',
-  TZS: 'TSh ',
-};
+const CURRENCY_SYMBOLS = Object.fromEntries(CURRENCIES.map((c) => [c.code, c.symbol]));
 
 let cachedRates = null;
 let lastFetchedAt = 0;
@@ -102,7 +79,7 @@ export function convertAmount(amount, fromCurrency = 'USD', toCurrency = 'USD', 
   const converted = amountInUSD * toRate;
 
   // Currencies without sub-units (like UGX, JPY, RWF) round to integer, others round to 2 decimals
-  if (['UGX', 'JPY', 'RWF', 'TZS'].includes(to)) {
+  if (ZERO_DECIMAL_CURRENCIES.includes(to)) {
     return Math.round(converted);
   }
   return Math.round(converted * 100) / 100;
@@ -113,7 +90,7 @@ export function formatCurrency(amount, currency = 'USD') {
   const num = Number(amount || 0);
   const symbol = CURRENCY_SYMBOLS[code] || `${code} `;
 
-  if (['UGX', 'JPY', 'RWF', 'TZS'].includes(code)) {
+  if (ZERO_DECIMAL_CURRENCIES.includes(code)) {
     return `${symbol}${num.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
   }
 

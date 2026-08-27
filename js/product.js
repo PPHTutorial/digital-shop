@@ -2,6 +2,7 @@ import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader, renderIcons, renderMarkdown, toast } from './ui.js';
 import { initTabs, openModal } from './uikit.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
+import { openFileViewer } from './preview.js';
 import { addToCart } from './cart-actions.js';
 
 const params = new URLSearchParams(window.location.search);
@@ -81,13 +82,24 @@ function renderGallery() {
   const main = document.querySelector('#pd-gallery-main');
   const thumbs = document.querySelector('#pd-thumbs');
 
+  let currentImage = images[0];
   const showImage = (url) => {
+    currentImage = url;
     main.innerHTML = url
-      ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(product.title)}">`
+      ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(product.title)}" style="cursor:zoom-in">
+         <button type="button" class="pd-gallery-zoom" aria-label="View full size"><i data-lucide="maximize-2" width="15" height="15"></i></button>`
       : `<span class="catalog-card__placeholder"><i data-lucide="file-text" width="40" height="40"></i></span>`;
     renderIcons();
   };
   showImage(images[0]);
+
+  // Click the main image (or the zoom button) to open the zoom/pan viewer.
+  main.addEventListener('click', (e) => {
+    if (!currentImage) return;
+    if (e.target.tagName === 'IMG' || e.target.closest('.pd-gallery-zoom')) {
+      openFileViewer({ src: currentImage, name: product.title, mime: 'image/*' });
+    }
+  });
 
   if (images.length > 1) {
     thumbs.classList.remove('hidden');
