@@ -4437,6 +4437,19 @@ dialog[open].admin-modal-container {
   }
 }
 
+.blog-loadmore-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 40px;
+}
+
+.blog-loadmore-count {
+  font-size: .78rem;
+  color: var(--text-soft);
+}
+
 .blog-card {
   position: relative;
   display: flex;
@@ -4606,15 +4619,25 @@ dialog[open].admin-modal-container {
   animation: uk-modal-in .18s ease both;
 }
 
+/* Opacity-only on purpose — no transform. A `transform` animation on the
+   dialog (even one whose end state is `transform: none`) makes the browser
+   report the dialog's computed transform as a non-"none" matrix for as long
+   as the animation stays attached (`animation-fill-mode`), and ANY element
+   with a computed transform other than the literal keyword "none" becomes
+   the containing block for its `position: fixed` descendants. That silently
+   broke the custom `<select>` dropdown (js/select.js positions its option
+   panel with `position: fixed` in real viewport coordinates): the panel's
+   coordinates were computed against the viewport but applied against the
+   dialog's box instead, and `.uk-modal`'s own `overflow: hidden` then
+   clipped it out of view entirely — the trigger looked like it opened but
+   no options ever appeared. */
 @keyframes uk-modal-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(.98);
   }
 
   to {
     opacity: 1;
-    transform: none;
   }
 }
 

@@ -2,7 +2,7 @@ import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 9;
 let allPosts = [];
 let currentPage = 1;
 
@@ -75,6 +75,7 @@ function renderFeatured(post) {
 
 function renderGrid() {
   const host = document.querySelector('#blog-grid');
+  const loadMoreRow = document.querySelector('#blog-grid-loadmore');
   if (!host) return;
 
   const rest = allPosts.slice(1);
@@ -82,13 +83,23 @@ function renderGrid() {
     host.innerHTML = allPosts.length
       ? ''
       : '<p class="col-span-full py-12 text-center text-sm" style="color:var(--text-muted)">New journal articles are coming soon.</p>';
+    loadMoreRow?.classList.add('hidden');
     return;
   }
 
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const subset = rest.slice(start, start + PAGE_SIZE);
+  // currentPage counts how many pages' worth are visible so far (cumulative,
+  // not a jump-to-page control) — "Load more" just grows it by one page.
+  const visibleCount = currentPage * PAGE_SIZE;
+  const subset = rest.slice(0, visibleCount);
   host.innerHTML = subset.map(blogCardHtml).join('');
   renderIcons();
+
+  if (loadMoreRow) {
+    const remaining = rest.length - subset.length;
+    loadMoreRow.classList.toggle('hidden', remaining <= 0);
+    const countEl = document.querySelector('#blog-grid-count');
+    if (countEl) countEl.textContent = remaining > 0 ? `Showing ${subset.length} of ${rest.length}` : '';
+  }
 }
 
 function wireSubscribeForm() {
@@ -486,10 +497,18 @@ async function loadListing() {
   finishPageLoader();
 }
 
+function wireLoadMore() {
+  document.querySelector('#blog-loadmore-btn')?.addEventListener('click', () => {
+    currentPage += 1;
+    renderGrid();
+  });
+}
+
 async function init() {
   mountHeader();
   mountFooter();
   wireSubscribeForm();
+  wireLoadMore();
 
   const params = new URLSearchParams(window.location.search);
   const slug = params.get('post');
