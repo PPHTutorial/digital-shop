@@ -15,3 +15,4 @@ alter table public.site_settings
 
 comment on column public.site_settings.ad_min_wallet_balance is
   'Minimum ad-wallet balance (USD) a seller must hold to publish an external-link / ad listing.';
+
