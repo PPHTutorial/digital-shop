@@ -11,7 +11,7 @@
  */
 import { supabase } from './client.js';
 import {
-  escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader,
+  compactMoney, compactNumber, escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader,
   renderIcons, toast,
 } from './ui.js';
 import {
@@ -129,7 +129,7 @@ function renderRankList(items, valueKey, meta) {
   return `<div class="adm-rank-list">${items.map((item) => `
     <div class="adm-rank-row">
       <div><strong>${escapeHtml(item.title || item.category)}</strong><small>${escapeHtml(meta(item))}</small></div>
-      <span class="adm-rank-value">$${Number(item[valueKey]).toFixed(2)}</span>
+      <span class="adm-rank-value">${compactMoney(item[valueKey])}</span>
       <div class="adm-rank-track"><span style="width:${Math.max(4, Number(item[valueKey]) / max * 100)}%"></span></div>
     </div>`).join('')}</div>`;
 }
@@ -233,9 +233,9 @@ async function loadPlatformAnalytics() {
   const statRow = document.querySelector('#entity-stat-row');
   if (statRow) {
     statRow.innerHTML = `
-      <div class="adm-stat-card"><span>Stores</span><strong>${vendors.length}</strong><small>${vendors.filter((v) => v.status === 'approved').length} approved</small></div>
-      <div class="adm-stat-card"><span>Admins</span><strong>${admins.length}</strong><small>${admins.filter((a) => a.admin_tier === 'super_admin').length} super_admin</small></div>
-      <div class="adm-stat-card"><span>Customers</span><strong>${customers.length}</strong><small>${customers.filter((c) => c.account_status && c.account_status !== 'active').length} restricted</small></div>`;
+      <div class="adm-stat-card"><span>Stores</span><strong>${compactNumber(vendors.length)}</strong><small>${compactNumber(vendors.filter((v) => v.status === 'approved').length)} approved</small></div>
+      <div class="adm-stat-card"><span>Admins</span><strong>${compactNumber(admins.length)}</strong><small>${compactNumber(admins.filter((a) => a.admin_tier === 'super_admin').length)} super_admin</small></div>
+      <div class="adm-stat-card"><span>Customers</span><strong>${compactNumber(customers.length)}</strong><small>${compactNumber(customers.filter((c) => c.account_status && c.account_status !== 'active').length)} restricted</small></div>`;
   }
 
   const vendorStatusColors = { pending: 'var(--warning)', approved: 'var(--success)', suspended: 'var(--danger)', rejected: 'var(--text-soft)' };
@@ -309,10 +309,10 @@ async function loadOverview(force = false) {
   dashboardData = data;
   const { metrics, orders, users, tickets, products, promos, categories = [], revenueByDay, topProducts = [], categoryStats = [] } = data;
 
-  document.querySelector('#m-revenue').textContent = `$${metrics.revenue.toFixed(2)}`;
-  document.querySelector('#m-orders').textContent = metrics.paidOrders;
-  document.querySelector('#m-customers').textContent = metrics.customers;
-  document.querySelector('#m-tickets').textContent = metrics.openTickets;
+  document.querySelector('#m-revenue').textContent = compactMoney(metrics.revenue);
+  document.querySelector('#m-orders').textContent = compactNumber(metrics.paidOrders);
+  document.querySelector('#m-customers').textContent = compactNumber(metrics.customers);
+  document.querySelector('#m-tickets').textContent = compactNumber(metrics.openTickets);
   const averageOrder = metrics.paidOrders ? metrics.revenue / metrics.paidOrders : 0;
   document.querySelector('#m-aov').textContent = `Average order $${averageOrder.toFixed(2)}`;
   document.querySelector('#m-conversion').textContent = `${users.filter((u) => u.last_sign_in_at).length} signed in before`;
@@ -322,15 +322,15 @@ async function loadOverview(force = false) {
     const days = Number(document.querySelector('#revenue-period')?.value || 30);
     const selected = revenueByDay.slice(-days);
     const total = selected.reduce((sum, item) => sum + Number(item.revenue), 0);
-    document.querySelector('#m-revenue-change').textContent = `$${total.toFixed(2)} in the selected period`;
+    document.querySelector('#m-revenue-change').textContent = `${compactMoney(total)} in the selected period`;
     document.querySelector('#revenue-chart').innerHTML = chart(selected);
   };
   document.querySelector('#revenue-period').onchange = renderRevenue;
   renderRevenue();
 
   document.querySelector('#operations-list').innerHTML = `
-    <div class="adm-stat-card !p-4"><span>Published products</span><strong>${metrics.activeProducts}</strong><small>${products.length - metrics.activeProducts} drafts remaining</small></div>
-    <div class="adm-stat-card !p-4"><span>Support queue</span><strong>${metrics.openTickets}</strong><small>${tickets.filter((t) => t.status === 'pending').length} awaiting follow-up</small></div>`;
+    <div class="adm-stat-card !p-4"><span>Published products</span><strong>${compactNumber(metrics.activeProducts)}</strong><small>${compactNumber(products.length - metrics.activeProducts)} drafts remaining</small></div>
+    <div class="adm-stat-card !p-4"><span>Support queue</span><strong>${compactNumber(metrics.openTickets)}</strong><small>${compactNumber(tickets.filter((t) => t.status === 'pending').length)} awaiting follow-up</small></div>`;
   document.querySelector('#top-products').innerHTML = renderRankList(topProducts, 'revenue', (item) => `${item.orders} paid order${item.orders === 1 ? '' : 's'}`);
   document.querySelector('#category-performance').innerHTML = renderRankList(categoryStats, 'revenue', (item) => `${item.products} product${item.products === 1 ? '' : 's'}`);
 
@@ -706,6 +706,7 @@ function paintProducts() {
       { key: 'price', label: 'Price', render: (p) => p.original_price ? `<span style="text-decoration:line-through;color:var(--text-soft);font-size:.72rem">${money(p.original_price, p.currency)}</span> <strong>${money(p.price, p.currency)}</strong>` : `<strong>${money(p.price, p.currency)}</strong>` },
       { key: 'slug', label: 'Slug', render: (p) => `<span style="font-family:var(--font-mono);font-size:.72rem;color:var(--text-muted)">${escapeHtml(p.slug || '—')}</span>` },
       { key: 'is_published', label: 'Status', render: (p) => statusBadge(p.is_published ? 'published' : 'draft') },
+      { key: 'is_featured', label: 'Featured', render: (p) => p.is_featured ? '<span class="catalog-card__badge catalog-card__badge--featured">Featured</span>' : '<span style="color:var(--text-soft);font-size:.75rem">—</span>' },
     ],
     rows: pageRows,
     page: productsState.page,
@@ -754,7 +755,7 @@ function openProductModal(product = null) {
           <label class="adm-field"><span class="label">Sale price</span><input class="field font-bold" name="price" type="number" step=".01" min="0" required value="${product?.price ?? ''}"></label>
           <label class="adm-field"><span class="label">Compare-at price (optional)</span><input class="field" name="original_price" type="number" step=".01" min="0" value="${product?.original_price ?? ''}"></label>
         </div>
-        <label class="adm-field" style="margin-top:14px"><span class="label">Description</span><textarea class="field" name="description" rows="4">${escapeHtml(product?.description || '')}</textarea></label>
+        <label class="adm-field" style="margin-top:14px"><span class="label">Description <span class="help" style="font-weight:400">(markdown supported: ## heading, **bold**, *italic*, - list, [link](url))</span></span><textarea class="field" name="description" rows="4">${escapeHtml(product?.description || '')}</textarea></label>
         <div class="adm-modal-grid" style="margin-top:14px">
           <div><span class="label">Cover image</span>
             <div class="adm-upload mt-1"><input type="file" id="p-cover-file" accept="image/*" class="text-xs"><img id="p-cover-preview" class="${product?.cover_url ? '' : 'hidden'}" src="${escapeHtml(product?.cover_url || '')}" alt=""></div>
@@ -765,7 +766,15 @@ function openProductModal(product = null) {
             <input type="hidden" name="file_path" id="p-file-path" value="${escapeHtml(product?.file_path || '')}"><small id="p-file-status" class="help">${product?.file_path ? `Current: ${escapeHtml(product.file_path)}` : ''}</small>
           </div>
         </div>
+        <div class="adm-field adm-field--span2" style="margin-top:14px">
+          <span class="label">Additional cover images <span class="help" style="font-weight:400">(optional gallery, shown as thumbnails)</span></span>
+          <input type="file" id="p-gallery-file" accept="image/*" multiple class="text-xs mt-1">
+          <div id="p-gallery-preview" class="adm-gallery-preview mt-2"></div>
+          <input type="hidden" name="gallery_urls" id="p-gallery-urls" value="${escapeHtml(JSON.stringify(Array.isArray(product?.gallery_urls) ? product.gallery_urls : []))}">
+          <small id="p-gallery-status" class="help"></small>
+        </div>
         <label class="adm-check-line" style="margin-top:14px"><input type="checkbox" name="is_published" ${!product || product.is_published ? 'checked' : ''}> Publish to catalog</label>
+        <label class="adm-check-line" style="margin-top:8px"><input type="checkbox" name="is_featured" ${product?.is_featured ? 'checked' : ''}> Mark as featured</label>
         <p id="product-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
       </form>`,
     footer: `<button type="button" class="button" data-uk-cancel>Cancel</button><button type="submit" form="product-form" class="button button-primary">Save product</button>`,
@@ -796,6 +805,36 @@ function openProductModal(product = null) {
     if (path) dialog.querySelector('#p-file-path').value = path;
   });
 
+  function renderGalleryPreview() {
+    const urls = JSON.parse(dialog.querySelector('#p-gallery-urls').value || '[]');
+    const host = dialog.querySelector('#p-gallery-preview');
+    host.innerHTML = urls.map((url, i) => `
+      <span class="adm-gallery-thumb"><img src="${escapeHtml(url)}" alt=""><button type="button" data-remove-gallery="${i}" aria-label="Remove image">${icon('x', 12)}</button></span>`).join('');
+    host.querySelectorAll('[data-remove-gallery]').forEach((btn) => btn.addEventListener('click', () => {
+      const next = urls.filter((_, i) => String(i) !== btn.dataset.removeGallery);
+      dialog.querySelector('#p-gallery-urls').value = JSON.stringify(next);
+      renderGalleryPreview();
+    }));
+    renderIcons();
+  }
+  renderGalleryPreview();
+
+  dialog.querySelector('#p-gallery-file').addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const status = dialog.querySelector('#p-gallery-status');
+    const urls = JSON.parse(dialog.querySelector('#p-gallery-urls').value || '[]');
+    for (const file of files) {
+      const path = await uploadTo('product-images', 'covers', file, status);
+      if (!path) continue;
+      const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+      urls.push(data.publicUrl);
+    }
+    dialog.querySelector('#p-gallery-urls').value = JSON.stringify(urls);
+    renderGalleryPreview();
+    e.target.value = '';
+  });
+
   dialog.querySelector('#product-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -812,8 +851,10 @@ function openProductModal(product = null) {
       original_price: form.elements.original_price.value ? Number(form.elements.original_price.value) : null,
       description: form.elements.description.value.trim() || null,
       cover_url: dialog.querySelector('#p-cover-url').value || null,
+      gallery_urls: JSON.parse(dialog.querySelector('#p-gallery-urls').value || '[]'),
       file_path: filePath,
       is_published: form.elements.is_published.checked,
+      is_featured: form.elements.is_featured.checked,
       currency: 'USD',
     };
     setBusy(button, true, 'Saving…');
@@ -1835,6 +1876,8 @@ async function loadSettings(force = false) {
   const social = data.social || {};
   form.elements.social_twitter.value = social.twitter || '';
   form.elements.social_instagram.value = social.instagram || '';
+  form.elements.default_commission_rate.value = data.default_commission_rate ?? 15;
+  form.elements.refund_rate_percent.value = data.refund_rate_percent ?? 30;
 }
 
 document.querySelector('#settings-form')?.addEventListener('submit', async (event) => {
@@ -1853,6 +1896,8 @@ document.querySelector('#settings-form')?.addEventListener('submit', async (even
     announcement_ends_at: form.elements.announcement_ends_at.value ? new Date(form.elements.announcement_ends_at.value).toISOString() : null,
     checkout_note: form.elements.checkout_note.value.trim() || null,
     social: { twitter: form.elements.social_twitter.value.trim() || undefined, instagram: form.elements.social_instagram.value.trim() || undefined },
+    default_commission_rate: Number(form.elements.default_commission_rate.value) || 0,
+    refund_rate_percent: Number(form.elements.refund_rate_percent.value) || 0,
     updated_by: account.user.id,
   };
   setBusy(button, true, 'Saving…');
@@ -1862,6 +1907,50 @@ document.querySelector('#settings-form')?.addEventListener('submit', async (even
   feedback.textContent = 'Settings saved.';
   feedback.className = 'status-line success text-xs my-0';
   toast('Site settings saved.');
+});
+
+/* ==========================================================================
+   A10b — Ad rate card (per-placement CPM/CPC/CPA, public.ad_rate_card)
+   ========================================================================== */
+
+const AD_PLACEMENT_LABELS = { featured: 'Featured (home rails)', search: 'Search results', category: 'Category page' };
+let adRatesLoaded = false;
+
+async function loadAdRates(force = false) {
+  if (adRatesLoaded && !force) return;
+  const { data } = await supabase.from('ad_rate_card').select('*').order('placement');
+  adRatesLoaded = true;
+  const host = document.querySelector('#ad-rates-fields');
+  if (!host || !data) return;
+  host.innerHTML = `
+    <div class="adm-rate-card-grid">
+      <span></span><span class="label">CPM (per 1,000 views)</span><span class="label">CPC (per click)</span><span class="label">CPA (% of sale)</span>
+      ${data.map((row) => `
+        <span class="label">${escapeHtml(AD_PLACEMENT_LABELS[row.placement] || row.placement)}</span>
+        <input class="field" data-rate="${row.placement}:cpm_rate" type="number" step=".01" min="0" value="${row.cpm_rate}">
+        <input class="field" data-rate="${row.placement}:cpc_rate" type="number" step=".01" min="0" value="${row.cpc_rate}">
+        <input class="field" data-rate="${row.placement}:cpa_percent" type="number" step=".01" min="0" max="100" value="${row.cpa_percent}">
+      `).join('')}
+    </div>`;
+}
+
+document.querySelector('#ad-rates-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  const feedback = document.querySelector('#ad-rates-feedback');
+  const rows = new Map();
+  document.querySelectorAll('#ad-rates-fields [data-rate]').forEach((input) => {
+    const [placement, field] = input.dataset.rate.split(':');
+    if (!rows.has(placement)) rows.set(placement, { placement });
+    rows.get(placement)[field] = Number(input.value) || 0;
+  });
+  setBusy(button, true, 'Saving…');
+  const { error } = await supabase.from('ad_rate_card').upsert([...rows.values()]);
+  setBusy(button, false);
+  if (error) { feedback.textContent = error.message; feedback.className = 'status-line error text-xs my-0'; return; }
+  feedback.textContent = 'Rate card saved.';
+  feedback.className = 'status-line success text-xs my-0';
+  toast('Ad rate card saved.');
 });
 
 /* ==========================================================================
@@ -1923,7 +2012,7 @@ document.querySelector('#refresh-audit')?.addEventListener('click', () => loadAu
 
 SCREEN_LOADERS.moderation = loadModeration;
 SCREEN_LOADERS.content = () => loadCms();
-SCREEN_LOADERS.settings = () => loadSettings();
+SCREEN_LOADERS.settings = () => { loadSettings(); loadAdRates(); };
 SCREEN_LOADERS.audit = () => loadAudit();
 SCREEN_LOADERS.stores = () => paintStores();
 SCREEN_LOADERS.admins = () => paintAdmins();

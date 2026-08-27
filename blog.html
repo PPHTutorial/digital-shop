@@ -8,6 +8,23 @@
   <title>Journal | DigiStore</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" type="image/png" sizes="16x16" href="/img/brand/favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/brand/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/img/brand/icon-192.png">
+  <link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#072220">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="DigiStore">
+  <meta property="og:title" content="Journal | DigiStore">
+  <meta property="og:description" content="The DigiStore Journal — insights, guides, and release notes from the marketplace.">
+  <meta property="og:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <meta property="og:url" content="https://digistore.codeinktechnologies.com/blog">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Journal | DigiStore">
+  <meta name="twitter:description" content="The DigiStore Journal — insights, guides, and release notes from the marketplace.">
+  <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
   <link rel="stylesheet" href="./css/app.css">
 </head>
 
@@ -23,16 +40,41 @@
   <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
 
   <main class="flex-1">
-    <section class="page-hero">
-      <h1 class="page-hero__title">DigiStore Journal</h1>
-      <p class="page-hero__sub">Insights, guides, and release notes from the marketplace. Learn how to grow your digital asset toolkit.</p>
+    <section id="blog-hero" class="page-hero">
+      <h1 id="blog-hero-title" class="page-hero__title">DigiStore Journal</h1>
+      <p id="blog-hero-sub" class="page-hero__sub">Insights, guides, and release notes from the marketplace. Learn how to grow your digital asset toolkit.</p>
     </section>
 
-    <section class="blog-body">
-      <div id="blog-featured-wrap"></div>
+    <section id="blog-listing">
+      <section class="blog-body">
+        <div id="blog-featured-wrap"></div>
 
-      <h2 class="blog-section-title">Latest Articles</h2>
-      <div id="blog-grid" class="blog-grid"></div>
+        <h2 class="blog-section-title">Latest Articles</h2>
+        <div id="blog-grid" class="blog-grid"></div>
+      </section>
+    </section>
+
+    <section id="blog-article-wrap" class="hidden">
+      <div class="blog-article-body">
+        <a href="./blog" class="blog-article-back">← Back to Journal</a>
+        <div id="blog-article-loading" class="legal-skel">
+          <div class="uk-skel" style="height:14px;width:140px;border-radius:999px"></div>
+          <div class="uk-skel" style="height:32px;width:70%"></div>
+          <div class="uk-skel" style="height:14px;width:100%"></div>
+          <div class="uk-skel" style="height:14px;width:90%"></div>
+        </div>
+        <div id="blog-article-not-found" class="hidden soft-panel p-10 text-center">
+          <p class="font-bold" style="color:var(--text)">That article could not be found.</p>
+          <p class="mt-1 text-sm" style="color:var(--text-muted)">It may have been unpublished or the link is out of date.</p>
+          <a class="button button-primary mt-4" href="./blog">Browse the journal</a>
+        </div>
+        <article id="blog-article-content" class="hidden">
+          <span id="blog-article-date" class="legal-effective"></span>
+          <h1 id="blog-article-title" class="legal-title"></h1>
+          <div id="blog-article-cover-wrap" class="blog-article-cover hidden"><img id="blog-article-cover" alt=""></div>
+          <div id="blog-article-html" class="legal-doc-body pd-markdown"></div>
+        </article>
+      </div>
     </section>
 
     <section class="newsletter-band">

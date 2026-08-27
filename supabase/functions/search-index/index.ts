@@ -23,7 +23,7 @@ function publicUrlFor(entityType: string, slug: string | null, id: string): stri
   const key = slug || id;
   switch (entityType) {
     case 'product':
-      return `${SITE_URL}/checkout?product=${encodeURIComponent(key)}`;
+      return `${SITE_URL}/product?product=${encodeURIComponent(key)}`;
     case 'blog_post':
       return `${SITE_URL}/blog?post=${encodeURIComponent(key)}`;
     default:

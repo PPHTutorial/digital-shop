@@ -26,7 +26,6 @@ let currentPage = 1;
 
 const grid = document.querySelector('#product-grid');
 const pagination = document.querySelector('#store-pagination');
-const searchInput = document.querySelector('#store-search-input');
 const sortSelect = document.querySelector('#store-sort-select');
 if (sortSelect) enhanceSelect(sortSelect, { label: 'Sort products by' });
 
@@ -348,6 +347,14 @@ function renderCatalog() {
   if (!grid) return;
   const filtered = getFilteredList();
 
+  // Nothing to filter or sort when the catalog itself has no products at
+  // all — hide that chrome entirely rather than showing controls that act
+  // on zero items.
+  const catalogEmpty = allProducts.length === 0;
+  document.querySelector('.store-sidebar')?.classList.toggle('hidden', catalogEmpty);
+  document.querySelector('#store-sort-row')?.classList.toggle('hidden', catalogEmpty);
+  document.querySelector('#store-layout')?.classList.toggle('is-single-col', catalogEmpty);
+
   const countEl = document.querySelector('#product-count');
   if (countEl) {
     if (!filtered.length) {
@@ -373,7 +380,14 @@ function renderCatalog() {
   }
 
   if (!filtered.length) {
-    grid.innerHTML = `
+    grid.innerHTML = catalogEmpty
+      ? `
+      <div class="w-full col-span-full py-16 text-center rounded-2xl border p-8 space-y-3" style="background:var(--surface);border-color:var(--border)">
+        <div class="text-4xl">🛍️</div>
+        <h3 class="font-black text-xl" style="color:var(--text)">No products yet</h3>
+        <p class="text-xs max-w-sm mx-auto" style="color:var(--text-muted)">The catalog is empty right now. Check back soon.</p>
+      </div>`
+      : `
       <div class="w-full col-span-full py-16 text-center rounded-2xl border p-8 space-y-3" style="background:var(--surface);border-color:var(--border)">
         <div class="text-4xl">🔍</div>
         <h3 class="font-black text-xl" style="color:var(--text)">No products found</h3>
@@ -412,10 +426,38 @@ function resetAllFilters() {
   priceMax = priceBounds.max;
   priceUserTouched = false;
   activeSearchQuery = '';
-  if (searchInput) searchInput.value = '';
+  const headerInput = document.querySelector('#header-search-input');
+  if (headerInput) headerInput.value = '';
   currentPage = 1;
   renderAll();
 }
+
+/* ==========================================================================
+   Mobile filters drawer — same `#dash-sidebar`/`#dash-menu-button`/
+   `#dash-scrim` off-canvas pattern as the admin/vendor/account consoles.
+   ========================================================================== */
+function wireFiltersDrawer() {
+  const sidebar = document.querySelector('#dash-sidebar');
+  const menuButton = document.querySelector('#dash-menu-button');
+  const closeButton = document.querySelector('#dash-sidebar-close');
+  const scrim = document.querySelector('#dash-scrim');
+  if (!sidebar || !menuButton) return;
+
+  const setOpen = (open) => {
+    sidebar.classList.toggle('is-open', open);
+    scrim?.classList.toggle('is-open', open);
+    menuButton.setAttribute('aria-expanded', String(open));
+    document.body.style.overflow = open ? 'hidden' : '';
+  };
+
+  menuButton.addEventListener('click', () => setOpen(true));
+  closeButton?.addEventListener('click', () => setOpen(false));
+  scrim?.addEventListener('click', () => setOpen(false));
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') setOpen(false);
+  });
+}
+wireFiltersDrawer();
 
 /* ==========================================================================
    Wiring
@@ -535,10 +577,10 @@ async function init() {
   mountFooter();
   wirePriceSlider();
 
-  if (searchInput && activeSearchQuery) searchInput.value = activeSearchQuery;
-
-  searchInput?.addEventListener('input', (e) => {
-    activeSearchQuery = e.target.value;
+  // The catalog has no search box of its own — the header search (js/ui.js)
+  // filters this page live via this event, debounced, with no navigation.
+  window.addEventListener('digistore:search', (e) => {
+    activeSearchQuery = e.detail?.query || '';
     currentPage = 1;
     renderAll();
   });

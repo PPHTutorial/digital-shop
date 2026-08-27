@@ -8,7 +8,7 @@
  */
 import { supabase } from './client.js';
 import {
-  escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader,
+  compactMoney, compactNumber, escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader,
   renderIcons, setButtonLoading, toast,
 } from './ui.js';
 import {
@@ -164,10 +164,10 @@ function renderOverview() {
     ? `Selling since ${shortDate(vendor.approved_at)}.`
     : 'A snapshot of how your store is performing.';
 
-  document.querySelector('#m-lifetime').textContent = money(balance.lifetime, currency);
-  document.querySelector('#m-commission').textContent = `${money(balance.commission, currency)} platform commission`;
-  document.querySelector('#m-sales-count').textContent = counts.sales ?? 0;
-  document.querySelector('#m-products').textContent = counts.published_products ?? 0;
+  document.querySelector('#m-lifetime').textContent = compactMoney(balance.lifetime, currency);
+  document.querySelector('#m-commission').textContent = `${compactMoney(balance.commission, currency)} platform commission`;
+  document.querySelector('#m-sales-count').textContent = compactNumber(counts.sales ?? 0);
+  document.querySelector('#m-products').textContent = compactNumber(counts.published_products ?? 0);
 
   const ratingTotals = myProducts.reduce((acc, p) => ({
     sum: acc.sum + Number(p.rating_sum || 0),
@@ -342,9 +342,9 @@ async function loadSales() {
   const gross30 = recent.reduce((sum, r) => sum + Number(r.gross_amount), 0);
   const net30 = recent.reduce((sum, r) => sum + Number(r.net_amount), 0);
   const commission30 = recent.reduce((sum, r) => sum + Number(r.commission_amount), 0);
-  document.querySelector('#s-gross').textContent = money(gross30, currency);
-  document.querySelector('#s-net').textContent = money(net30, currency);
-  document.querySelector('#s-commission').textContent = money(commission30, currency);
+  document.querySelector('#s-gross').textContent = compactMoney(gross30, currency);
+  document.querySelector('#s-net').textContent = compactMoney(net30, currency);
+  document.querySelector('#s-commission').textContent = compactMoney(commission30, currency);
   document.querySelector('#s-commission-label').textContent = `Commission (${vendor.commission_rate}%, 30d)`;
 
   salesPage = 1;
@@ -462,8 +462,8 @@ async function loadWallet() {
 
   document.querySelector('#wallet-balance').textContent = money(wallet.balance, wallet.currency);
   document.querySelector('#wallet-balance-mini').textContent = money(wallet.balance, wallet.currency);
-  document.querySelector('#wallet-lifetime-topup').textContent = money(wallet.lifetime_topup, wallet.currency);
-  document.querySelector('#wallet-lifetime-spend').textContent = money(wallet.lifetime_spend, wallet.currency);
+  document.querySelector('#wallet-lifetime-topup').textContent = compactMoney(wallet.lifetime_topup, wallet.currency);
+  document.querySelector('#wallet-lifetime-spend').textContent = compactMoney(wallet.lifetime_spend, wallet.currency);
 
   const baseNote = Number(wallet.balance) > 0
     ? `${money(wallet.lifetime_spend, wallet.currency)} spent on ads so far.`
@@ -874,7 +874,7 @@ function openProductModal(product = null) {
           <input class="field" name="short_description" maxlength="160" placeholder="One line shown on the product card" value="${escapeHtml(product?.short_description || '')}">
         </label>
         <label class="vnd-field vnd-field--span2" style="margin-top:14px">
-          <span class="label">Full description</span>
+          <span class="label">Full description <span class="vnd-optional">(markdown supported: ## heading, **bold**, *italic*, - list, [link](url))</span></span>
           <textarea class="field" name="description" rows="4" placeholder="What's included, who it's for, what they'll achieve…">${escapeHtml(product?.description || '')}</textarea>
         </label>
         <div class="vnd-modal-grid" style="margin-top:14px">
@@ -908,6 +908,13 @@ function openProductModal(product = null) {
             </select>
           </label>
         </div>
+        <div class="vnd-field vnd-field--span2" style="margin-top:14px">
+          <span class="label">Additional cover images <span class="vnd-optional">(optional gallery, shown as thumbnails)</span></span>
+          <input type="file" id="v-gallery-file" accept="image/*" multiple class="text-xs mt-1">
+          <div id="v-gallery-preview" class="adm-gallery-preview mt-2"></div>
+          <input type="hidden" name="gallery_urls" id="v-gallery-urls" value="${escapeHtml(JSON.stringify(Array.isArray(product?.gallery_urls) ? product.gallery_urls : []))}">
+          <small id="v-gallery-status" class="help"></small>
+        </div>
         <label class="vnd-check-line" style="margin-top:14px">
           <input type="checkbox" name="is_published" ${!product || product.is_published ? 'checked' : ''}>
           Publish to the storefront
@@ -940,6 +947,36 @@ function openProductModal(product = null) {
     const preview = dialog.querySelector('#v-cover-preview');
     preview.src = data.publicUrl;
     preview.classList.remove('hidden');
+  });
+
+  function renderGalleryPreview() {
+    const urls = JSON.parse(dialog.querySelector('#v-gallery-urls').value || '[]');
+    const host = dialog.querySelector('#v-gallery-preview');
+    host.innerHTML = urls.map((url, i) => `
+      <span class="adm-gallery-thumb"><img src="${escapeHtml(url)}" alt=""><button type="button" data-remove-gallery="${i}" aria-label="Remove image">${icon('x', 12)}</button></span>`).join('');
+    host.querySelectorAll('[data-remove-gallery]').forEach((btn) => btn.addEventListener('click', () => {
+      const next = urls.filter((_, i) => String(i) !== btn.dataset.removeGallery);
+      dialog.querySelector('#v-gallery-urls').value = JSON.stringify(next);
+      renderGalleryPreview();
+    }));
+    renderIcons();
+  }
+  renderGalleryPreview();
+
+  dialog.querySelector('#v-gallery-file').addEventListener('change', async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    const status = dialog.querySelector('#v-gallery-status');
+    const urls = JSON.parse(dialog.querySelector('#v-gallery-urls').value || '[]');
+    for (const file of files) {
+      const path = await uploadTo('product-images', 'covers', file, status);
+      if (!path) continue;
+      const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+      urls.push(data.publicUrl);
+    }
+    dialog.querySelector('#v-gallery-urls').value = JSON.stringify(urls);
+    renderGalleryPreview();
+    event.target.value = '';
   });
 
   dialog.querySelector('#v-product-file').addEventListener('change', async (event) => {
@@ -977,6 +1014,7 @@ function openProductModal(product = null) {
       short_description: form.elements.short_description.value.trim() || null,
       description: form.elements.description.value.trim() || null,
       cover_url: dialog.querySelector('#v-cover-url').value || null,
+      gallery_urls: JSON.parse(dialog.querySelector('#v-gallery-urls').value || '[]'),
       file_path: filePath,
       file_type: form.elements.file_type.value.trim() || null,
       license_type: form.elements.license_type.value,

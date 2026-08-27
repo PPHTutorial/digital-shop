@@ -24,12 +24,18 @@ Deno.serve(async () => {
     `<url><loc>${base}/contact</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
     `<url><loc>${base}/support</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
     `<url><loc>${base}/blog</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`,
+    `<url><loc>${base}/store</loc><changefreq>daily</changefreq><priority>0.9</priority></url>`,
+    `<url><loc>${base}/categories</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>`,
+    `<url><loc>${base}/legal?doc=terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>`,
+    `<url><loc>${base}/legal?doc=privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>`,
+    `<url><loc>${base}/legal?doc=refunds</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>`,
+    `<url><loc>${base}/legal?doc=licence</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>`,
   ];
 
   const productUrls = (products || []).map((item) => {
     const slug = item.slug || item.id;
     const lastmod = item.updated_at ? new Date(item.updated_at).toISOString() : new Date().toISOString();
-    return `<url><loc>${base}/checkout?product=${encodeURIComponent(slug)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`;
+    return `<url><loc>${base}/product?product=${encodeURIComponent(slug)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`;
   });
 
   const postUrls = (posts || []).map((post) => {

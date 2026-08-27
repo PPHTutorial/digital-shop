@@ -2,7 +2,7 @@ import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 import { categoryLook } from './category-look.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
-import { paintSkeletonGrid, emptyState } from './uikit.js';
+import { paintSkeletonGrid } from './uikit.js';
 
 let allProducts = []; // full published catalogue — powers the category-specific rails + jumbotron counts
 let managedCategories = [];
@@ -84,15 +84,20 @@ function createProductCardHtml(p, context) {
     </article>`;
 }
 
-function paintSection(id, countClass, items, context, emptyLabel) {
+function paintSection(id, countClass, items, context) {
   const container = document.querySelector(`#${id}`);
   const countEl = document.querySelector(countClass);
   if (countEl) countEl.textContent = items.length;
   if (!container) return;
 
-  container.innerHTML = items.length
-    ? items.map((p) => createProductCardHtml(p, context)).join('')
-    : `<div class="w-full">${emptyState({ icon: 'package-search', title: 'Nothing here yet', body: emptyLabel || 'New releases in this collection are arriving soon.' })}</div>`;
+  // A rail with nothing in it isn't worth a "coming soon" placeholder — it's
+  // one more empty box competing with the rails that do have products, so
+  // the whole section (heading, prev/next, "see all") disappears with it.
+  const section = container.closest('section');
+  section?.classList.toggle('hidden', items.length === 0);
+  if (!items.length) return;
+
+  container.innerHTML = items.map((p) => createProductCardHtml(p, context)).join('');
 }
 
 // ============================================================

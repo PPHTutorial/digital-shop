@@ -71,17 +71,52 @@ export function enhanceSelect(select, { label = '' } = {}) {
   select.parentNode.insertBefore(wrap, select);
   wrap.append(trigger, panel, select);
 
+  // >=768px, the panel is a dropdown anchored under the trigger. Anchoring it
+  // with `position:absolute` (relative to `.xselect`) means any scrollable or
+  // `overflow:hidden` ancestor — a modal body, a horizontally-scrolling table
+  // wrapper, a sidebar with its own scroll — clips or hides it. Positioning
+  // it with `position:fixed` from real viewport coordinates escapes all of
+  // that; below 768px the CSS media rules take over with a fixed bottom
+  // sheet instead, so this is skipped there.
+  function positionPanel() {
+    if (!window.matchMedia('(min-width: 768px)').matches) {
+      panel.style.cssText = '';
+      return;
+    }
+    const rect = trigger.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward = spaceBelow < 280 && rect.top > spaceBelow;
+    panel.style.position = 'fixed';
+    panel.style.left = `${rect.left}px`;
+    panel.style.width = `${rect.width}px`;
+    panel.style.right = 'auto';
+    if (openUpward) {
+      panel.style.top = 'auto';
+      panel.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+    } else {
+      panel.style.top = `${rect.bottom + 8}px`;
+      panel.style.bottom = 'auto';
+    }
+  }
+  const reposition = () => positionPanel();
+
   const instance = {
     close() {
       wrap.classList.remove('is-open');
       trigger.setAttribute('aria-expanded', 'false');
       document.body.classList.remove('xselect-locked');
+      panel.style.cssText = '';
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
       if (openInstance === instance) openInstance = null;
     },
     open() {
       closeOpen();
       wrap.classList.add('is-open');
       trigger.setAttribute('aria-expanded', 'true');
+      positionPanel();
+      window.addEventListener('scroll', reposition, true);
+      window.addEventListener('resize', reposition);
       // Only the sheet presentation locks scrolling; the dropdown does not.
       if (window.matchMedia('(max-width: 767px)').matches) {
         document.body.classList.add('xselect-locked');

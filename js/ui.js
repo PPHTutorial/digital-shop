@@ -18,6 +18,81 @@ export function finishPageLoader() {
   }
 }
 export function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+
+/**
+ * Compact "1.2K / 3.4M / 5.6B / 7.8T" formatting for dashboard cards and
+ * tables where a raw figure (revenue, order counts, product counts…) would
+ * otherwise blow out a stat card's width. Values under 1000 print as-is —
+ * no point compacting "482".
+ */
+export function compactNumber(value) {
+  const n = Number(value) || 0;
+  const abs = Math.abs(n);
+  const units = [
+    { at: 1e12, suffix: 'T' },
+    { at: 1e9, suffix: 'B' },
+    { at: 1e6, suffix: 'M' },
+    { at: 1e3, suffix: 'K' },
+  ];
+  for (const { at, suffix } of units) {
+    if (abs >= at) {
+      const scaled = n / at;
+      const rounded = Math.abs(scaled) >= 100 ? Math.round(scaled) : Math.round(scaled * 10) / 10;
+      return `${rounded}${suffix}`;
+    }
+  }
+  return n.toLocaleString();
+}
+
+/** Same compacting, prefixed with a currency amount, e.g. "$1.2M". */
+export function compactMoney(value, currency = 'USD') {
+  const symbol = currency === 'USD' ? '$' : `${currency} `;
+  return `${symbol}${compactNumber(value)}`;
+}
+
+/**
+ * A small, dependency-free markdown-to-HTML pass — headings, bold/italic,
+ * links, inline code, unordered/ordered lists, and paragraphs. Not a full
+ * CommonMark implementation; it covers what a product/blog author actually
+ * types. Input is escaped first, so the only HTML that reaches the page is
+ * what this function itself emits.
+ */
+export function renderMarkdown(source) {
+  const text = String(source ?? '').replace(/\r\n/g, '\n').trim();
+  if (!text) return '';
+
+  const inline = (line) => escapeHtml(line)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  const blocks = text.split(/\n{2,}/);
+  const html = blocks.map((block) => {
+    const lines = block.split('\n').filter(Boolean);
+    if (!lines.length) return '';
+
+    const headingMatch = lines.length === 1 && lines[0].match(/^(#{1,3})\s+(.*)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length + 1; // # -> h2, ## -> h3, ### -> h4
+      return `<h${level}>${inline(headingMatch[2])}</h${level}>`;
+    }
+
+    const isUnordered = lines.every((l) => /^[-*]\s+/.test(l));
+    if (isUnordered) {
+      return `<ul>${lines.map((l) => `<li>${inline(l.replace(/^[-*]\s+/, ''))}</li>`).join('')}</ul>`;
+    }
+
+    const isOrdered = lines.every((l) => /^\d+\.\s+/.test(l));
+    if (isOrdered) {
+      return `<ol>${lines.map((l) => `<li>${inline(l.replace(/^\d+\.\s+/, ''))}</li>`).join('')}</ol>`;
+    }
+
+    return `<p>${lines.map(inline).join('<br>')}</p>`;
+  }).join('');
+
+  return html;
+}
 const TOAST_GLYPH = { success: '✓', error: '!', warning: '!', info: 'i' };
 export function toast(message,type='success'){let r=document.querySelector('#toast-region');if(!r){r=document.createElement('div');r.id='toast-region';r.className='toast-region';document.body.append(r)}const e=document.createElement('div');e.className=`toast toast-${type}`;e.innerHTML=`<span>${TOAST_GLYPH[type]||'✓'}</span><p>${escapeHtml(message)}</p><button>×</button>`;e.querySelector('button').onclick=()=>e.remove();r.append(e);setTimeout(()=>e.remove(),6000)}
 export function setButtonLoading(b,loading,label='Please wait…'){if(!b)return;if(loading){b.dataset.label=b.textContent;b.disabled=true;b.innerHTML=`<span class="spinner"></span>${label}`}else{b.disabled=false;b.textContent=b.dataset.label||b.textContent}}
@@ -285,20 +360,48 @@ export async function mountHeader() {
       if (open) acctDrawer.querySelector('a, button')?.focus();
     };
 
-    // Header search — a query navigates to the store's own search filter.
-    // The store page reads ?search= on load, so this works from any page.
+    // Header search. On the catalog page itself, typing filters the grid in
+    // place (debounced — store.js listens for 'digistore:search'); no reload,
+    // no need to press Enter. From every other page there's no local grid to
+    // filter, so a query still hands off to the catalog, just debounced
+    // instead of requiring Enter.
+    const isStorePage = /(^|\/)store(\.html)?\/?$/.test(location.pathname);
+    const debounce = (fn, wait) => {
+      let timer;
+      return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), wait); };
+    };
     const goSearch = (value) => {
       const q = value.trim();
       if (!q) return;
       location.href = `./store?search=${encodeURIComponent(q)}`;
     };
+    const liveSearch = debounce((value) => {
+      const q = value.trim();
+      if (isStorePage) {
+        const url = new URL(location.href);
+        if (q) url.searchParams.set('search', q); else url.searchParams.delete('search');
+        history.replaceState(null, '', url);
+        window.dispatchEvent(new CustomEvent('digistore:search', { detail: { query: q } }));
+      } else if (q) {
+        goSearch(q);
+      }
+    }, 350);
+    const initialQuery = new URLSearchParams(location.search).get('search') || '';
+    if (initialQuery) {
+      const headerInput = target.querySelector('#header-search-input');
+      const drawerInput = drawer.querySelector('#drawer-search-input');
+      if (headerInput) headerInput.value = initialQuery;
+      if (drawerInput) drawerInput.value = initialQuery;
+    }
+    target.querySelector('#header-search-input')?.addEventListener('input', (e) => liveSearch(e.target.value));
+    drawer.querySelector('#drawer-search-input')?.addEventListener('input', (e) => liveSearch(e.target.value));
     target.querySelector('#header-search-form')?.addEventListener('submit', (e) => {
       e.preventDefault();
-      goSearch(target.querySelector('#header-search-input')?.value || '');
+      if (!isStorePage) goSearch(target.querySelector('#header-search-input')?.value || '');
     });
     drawer.querySelector('#drawer-search-form')?.addEventListener('submit', (e) => {
       e.preventDefault();
-      goSearch(drawer.querySelector('#drawer-search-input')?.value || '');
+      if (!isStorePage) goSearch(drawer.querySelector('#drawer-search-input')?.value || '');
     });
     // ⌘K / Ctrl+K jumps focus to the header search from anywhere on the page.
     // Bound once, guarded like the popover dismiss handler below.
@@ -403,8 +506,8 @@ export function mountFooter() {
         </a>
       </div>
 
-      <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-6 text-sm">
-        <div class="lg:col-span-2 space-y-4 pr-4">
+      <div class="grid gap-10 grid-cols-2 lg:grid-cols-6 text-sm">
+        <div class="col-span-2 space-y-4 pr-4">
           <div class="flex items-center gap-3">
             <span class="brand-mark">D</span>
             <div>
@@ -464,10 +567,10 @@ export function mountFooter() {
         <div class="space-y-3">
           <h3 class="text-xs uppercase tracking-wider" style="color:var(--text);font-family:var(--font-display);font-weight:700">Trust &amp; Legal</h3>
           <ul class="space-y-2 text-xs" style="color:var(--text-muted)">
-            <li><a href="./support#faq">Terms of Service</a></li>
-            <li><a href="./support#faq">Privacy Policy</a></li>
-            <li><a href="./support#faq">Refund &amp; Return Policy</a></li>
-            <li><a href="./support#faq">Digital License Agreement</a></li>
+            <li><a href="./legal?doc=terms">Terms of Service</a></li>
+            <li><a href="./legal?doc=privacy">Privacy Policy</a></li>
+            <li><a href="./legal?doc=refunds">Refund &amp; Return Policy</a></li>
+            <li><a href="./legal?doc=licence">Digital License Agreement</a></li>
             <li><a href="./support#faq">Security &amp; Compliance</a></li>
             <li><a href="./contact">Contact Legal Team</a></li>
           </ul>

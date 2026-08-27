@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="DigiStore's terms of service, privacy policy, refund policy, and digital licence agreement.">
+  <title>Legal | DigiStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" type="image/png" sizes="16x16" href="/img/brand/favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/brand/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/img/brand/icon-192.png">
+  <link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#072220">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="DigiStore">
+  <meta property="og:title" content="Legal | DigiStore">
+  <meta property="og:description" content="DigiStore's terms of service, privacy policy, refund policy, and digital licence agreement.">
+  <meta property="og:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <meta property="og:url" content="https://digistore.codeinktechnologies.com/legal">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Legal | DigiStore">
+  <meta name="twitter:description" content="DigiStore's terms of service, privacy policy, refund policy, and digital licence agreement.">
+  <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
+    </div>
+  </div>
+
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
+
+  <main class="flex-1">
+    <section class="page-hero">
+      <h1 id="legal-hero-title" class="page-hero__title">Trust &amp; Legal</h1>
+      <p id="legal-hero-sub" class="page-hero__sub">The agreements that govern buying, selling, and browsing on DigiStore.</p>
+    </section>
+
+    <section class="legal-body">
+      <nav class="legal-nav" aria-label="Legal documents">
+        <a href="./legal?doc=terms" data-legal-link="terms">Terms of Service</a>
+        <a href="./legal?doc=privacy" data-legal-link="privacy">Privacy Policy</a>
+        <a href="./legal?doc=refunds" data-legal-link="refunds">Refund Policy</a>
+        <a href="./legal?doc=licence" data-legal-link="licence">Digital Licence Agreement</a>
+      </nav>
+
+      <article id="legal-article" class="legal-article">
+        <div id="legal-loading" class="legal-skel">
+          <div class="uk-skel" style="height:14px;width:140px;border-radius:999px"></div>
+          <div class="uk-skel" style="height:32px;width:60%"></div>
+          <div class="uk-skel" style="height:14px;width:100%"></div>
+          <div class="uk-skel" style="height:14px;width:90%"></div>
+          <div class="uk-skel" style="height:14px;width:95%"></div>
+        </div>
+        <div id="legal-not-found" class="hidden soft-panel p-10 text-center">
+          <p class="font-bold" style="color:var(--text)">That document could not be found.</p>
+          <p class="mt-1 text-sm" style="color:var(--text-muted)">Pick one of the documents above.</p>
+        </div>
+        <div id="legal-content" class="hidden">
+          <span id="legal-effective" class="legal-effective"></span>
+          <h1 id="legal-title" class="legal-title"></h1>
+          <p id="legal-summary" class="legal-summary"></p>
+          <div id="legal-doc-body" class="legal-doc-body pd-markdown"></div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module" src="./js/legal.js"></script>
+</body>
+
+</html>

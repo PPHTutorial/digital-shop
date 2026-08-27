@@ -225,7 +225,31 @@ document.querySelectorAll('[data-acct-tab]').forEach((btn) => {
     const key = btn.dataset.acctTab;
     document.querySelectorAll('[data-acct-tab]').forEach((b) => b.classList.toggle('is-active', b === btn));
     document.querySelectorAll('[data-acct-panel]').forEach((p) => p.classList.toggle('is-active', p.dataset.acctPanel === key));
+    setDashSidebarOpen(false);
   });
+});
+
+// Mobile off-canvas drawer — same `#dash-sidebar`/`#dash-menu-button`/
+// `#dash-scrim` pattern as the admin/vendor consoles (js/admin.js,
+// js/vendor.js), so the account sidebar collapses into a real slide-in
+// panel below the 980px breakpoint instead of a static stacked block.
+const dashSidebar = document.querySelector('#dash-sidebar');
+const dashMenuButton = document.querySelector('#dash-menu-button');
+const dashCloseButton = document.querySelector('#dash-sidebar-close');
+const dashScrim = document.querySelector('#dash-scrim');
+
+function setDashSidebarOpen(open) {
+  dashSidebar?.classList.toggle('is-open', open);
+  dashScrim?.classList.toggle('is-open', open);
+  dashMenuButton?.setAttribute('aria-expanded', String(open));
+  document.body.style.overflow = open ? 'hidden' : '';
+}
+
+dashMenuButton?.addEventListener('click', () => setDashSidebarOpen(true));
+dashCloseButton?.addEventListener('click', () => setDashSidebarOpen(false));
+dashScrim?.addEventListener('click', () => setDashSidebarOpen(false));
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') setDashSidebarOpen(false);
 });
 
 // Profile form submit

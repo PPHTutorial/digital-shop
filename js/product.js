@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader, renderIcons, toast } from './ui.js';
+import { escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader, renderIcons, renderMarkdown, toast } from './ui.js';
 import { initTabs, openModal } from './uikit.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
 import { addToCart } from './cart-actions.js';
@@ -165,7 +165,9 @@ function renderInfo() {
     btn.disabled = false;
   });
 
-  document.querySelector('#pd-description').textContent = product.description || 'No description provided for this product yet.';
+  document.querySelector('#pd-description').innerHTML = product.description
+    ? renderMarkdown(product.description)
+    : '<p>No description provided for this product yet.</p>';
   document.querySelector('#pd-description').classList.toggle('is-muted', !product.description);
   document.querySelector('#pd-included').textContent = product.delivery_note || `${product.title} — delivered instantly as a ${product.file_type ? String(product.file_type).toUpperCase() : 'digital'} file to your DigiStore account after payment.`;
 

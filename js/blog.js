@@ -10,8 +10,9 @@ function formatDate(iso) {
 }
 
 function blogCardHtml(post) {
+  const href = `./blog?post=${encodeURIComponent(post.slug)}`;
   return `
-    <article class="blog-card">
+    <article class="blog-card is-clickable">
       <span class="blog-card__cover">
         ${post.cover_url ? `<img src="${escapeHtml(post.cover_url)}" alt="${escapeHtml(post.title)}" loading="lazy">` : ''}
       </span>
@@ -22,6 +23,7 @@ function blogCardHtml(post) {
           <span>${formatDate(post.published_at)}</span>
         </span>
       </span>
+      <a class="blog-card__link" href="${href}"><span class="sr-only">${escapeHtml(post.title)}</span></a>
     </article>`;
 }
 
@@ -30,8 +32,9 @@ function renderFeatured(post) {
   if (!host) return;
   if (!post) { host.innerHTML = ''; return; }
 
+  const href = `./blog?post=${encodeURIComponent(post.slug)}`;
   host.innerHTML = `
-    <article class="blog-featured">
+    <article class="blog-featured is-clickable">
       <span class="blog-featured__cover">
         ${post.cover_url ? `<img src="${escapeHtml(post.cover_url)}" alt="${escapeHtml(post.title)}" loading="lazy">` : ''}
       </span>
@@ -43,6 +46,7 @@ function renderFeatured(post) {
           <span class="blog-featured__date">${formatDate(post.published_at)}</span>
         </div>
       </div>
+      <a class="blog-card__link" href="${href}"><span class="sr-only">${escapeHtml(post.title)}</span></a>
     </article>`;
 }
 
@@ -64,26 +68,7 @@ function renderGrid() {
   renderIcons();
 }
 
-async function init() {
-  mountHeader();
-  mountFooter();
-
-  const { data, error } = await supabase
-    .from('blog_posts')
-    .select('title,slug,excerpt,cover_url,published_at')
-    .eq('status', 'published')
-    .order('published_at', { ascending: false });
-
-  if (error) {
-    document.querySelector('#blog-grid').innerHTML = '<p class="col-span-full py-8 text-center" style="color:var(--text-muted)">The journal is unavailable right now.</p>';
-    finishPageLoader();
-    return;
-  }
-
-  allPosts = data || [];
-  renderFeatured(allPosts[0]);
-  renderGrid();
-
+function wireSubscribeForm() {
   document.querySelector('#subscribe-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = new FormData(e.currentTarget).get('email');
@@ -100,8 +85,89 @@ async function init() {
       e.currentTarget.reset();
     }
   });
+}
 
+/* ==========================================================================
+   Single article view — ?post=<slug>. Sitemap/search-index both link here,
+   so this has to resolve to real content rather than the generic listing.
+   ========================================================================== */
+async function loadArticle(slug) {
+  document.querySelector('#blog-hero')?.classList.add('hidden');
+  document.querySelector('#blog-listing')?.classList.add('hidden');
+  document.querySelector('#blog-article-wrap')?.classList.remove('hidden');
+
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .select('title,excerpt,content,cover_url,published_at')
+    .eq('status', 'published')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  document.querySelector('#blog-article-loading')?.classList.add('hidden');
+
+  if (error || !data) {
+    document.querySelector('#blog-article-not-found')?.classList.remove('hidden');
+    finishPageLoader();
+    return;
+  }
+
+  document.title = `${data.title} | DigiStore Journal`;
+  const descMeta = document.querySelector('meta[name="description"]');
+  if (descMeta && data.excerpt) descMeta.setAttribute('content', data.excerpt);
+  document.querySelector('meta[property="og:title"]')?.setAttribute('content', `${data.title} | DigiStore`);
+  document.querySelector('meta[property="og:description"]')?.setAttribute('content', data.excerpt || '');
+  document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', `${data.title} | DigiStore`);
+  document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', data.excerpt || '');
+
+  document.querySelector('#blog-article-date').textContent = formatDate(data.published_at);
+  document.querySelector('#blog-article-title').textContent = data.title;
+  document.querySelector('#blog-article-html').innerHTML = data.content || '';
+
+  const coverWrap = document.querySelector('#blog-article-cover-wrap');
+  const cover = document.querySelector('#blog-article-cover');
+  if (data.cover_url) {
+    cover.src = data.cover_url;
+    cover.alt = data.title;
+    coverWrap.classList.remove('hidden');
+  }
+
+  document.querySelector('#blog-article-content')?.classList.remove('hidden');
+  renderIcons();
   finishPageLoader();
+}
+
+async function loadListing() {
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .select('title,slug,excerpt,cover_url,published_at')
+    .eq('status', 'published')
+    .order('published_at', { ascending: false });
+
+  if (error) {
+    document.querySelector('#blog-grid').innerHTML = '<p class="col-span-full py-8 text-center" style="color:var(--text-muted)">The journal is unavailable right now.</p>';
+    finishPageLoader();
+    return;
+  }
+
+  allPosts = data || [];
+  renderFeatured(allPosts[0]);
+  renderGrid();
+  finishPageLoader();
+}
+
+async function init() {
+  mountHeader();
+  mountFooter();
+  wireSubscribeForm();
+
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get('post');
+
+  if (slug) {
+    await loadArticle(slug);
+  } else {
+    await loadListing();
+  }
 }
 
 init().catch(() => finishPageLoader());

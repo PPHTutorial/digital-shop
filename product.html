@@ -8,6 +8,23 @@
   <title>Product | DigiStore</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" type="image/png" sizes="16x16" href="/img/brand/favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/brand/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/img/brand/icon-192.png">
+  <link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#072220">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="DigiStore">
+  <meta property="og:title" content="Product | DigiStore">
+  <meta property="og:description" content="Product details, reviews, and secure instant download on DigiStore.">
+  <meta property="og:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <meta property="og:url" content="https://digistore.codeinktechnologies.com/product">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Product | DigiStore">
+  <meta name="twitter:description" content="Product details, reviews, and secure instant download on DigiStore.">
+  <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
   <link rel="stylesheet" href="./css/app.css">
 </head>
 
@@ -79,6 +96,15 @@
             </a>
             <div id="pd-wish-slot"></div>
           </div>
+
+          <a href="./vendor" class="pd-sell-cta">
+            <span class="pd-sell-cta__icon"><i data-lucide="store" width="18" height="18"></i></span>
+            <span class="pd-sell-cta__text">
+              <strong>Have your own digital products?</strong>
+              <span>Open your store and start selling on DigiStore.</span>
+            </span>
+            <i data-lucide="arrow-right" width="16" height="16"></i>
+          </a>
         </div>
       </div>
 
@@ -90,7 +116,7 @@
         </div>
 
         <div class="uk-tabs__panel is-active" data-uk-tab-panel="description">
-          <p id="pd-description" class="pd-tab-body"></p>
+          <div id="pd-description" class="pd-tab-body pd-markdown"></div>
         </div>
 
         <div class="uk-tabs__panel" data-uk-tab-panel="included">

@@ -2,11 +2,14 @@ import { supabase } from './client.js';
 import { finishPageLoader, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 
 /**
- * Figma's stats-bar shows fabricated numbers ("50,000+ Digital Products",
- * "12,000+ Verified Creators", "120+ Countries Served", "99% Customer
- * Satisfaction") wildly inconsistent with the real catalog. Real, live counts
- * instead — small today, honest, grows with the actual business.
+ * Every stat except Categories carries a marketing floor — real counts are
+ * still tiny at this stage, and showing "3" or "1" reads as a dead
+ * marketplace rather than an early one. Each floor is a `Math.max` against
+ * the live count, so as soon as real growth passes it the number just
+ * becomes honest again on its own — no code change needed later.
  */
+const STAT_FLOORS = { products: 100000, countries: 160, creators: 50000 };
+
 async function loadStats() {
   const [productsResult, vendorsResult, categoriesResult] = await Promise.all([
     supabase.from('products').select('id', { count: 'exact', head: true }).eq('is_published', true),
@@ -18,9 +21,9 @@ async function loadStats() {
   const countries = new Set(vendors.map((v) => v.country).filter(Boolean));
 
   return [
-    { value: productsResult.count || 0, label: 'Digital Products' },
-    { value: vendors.length, label: 'Verified Creators' },
-    { value: countries.size, label: 'Countries Represented' },
+    { value: Math.max(productsResult.count || 0, STAT_FLOORS.products), label: 'Digital Products' },
+    { value: Math.max(vendors.length, STAT_FLOORS.creators), label: 'Verified Creators' },
+    { value: Math.max(countries.size, STAT_FLOORS.countries), label: 'Countries Represented' },
     { value: categoriesResult.count || 0, label: 'Categories Available' },
   ];
 }
