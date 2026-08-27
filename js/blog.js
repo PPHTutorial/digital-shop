@@ -189,7 +189,6 @@ function renderComments() {
   if (!host) return;
 
   document.querySelector('#blog-comments-title').textContent = `Comments (${engagement.comment_count})`;
-  document.querySelector('#blog-comment-count-chip').textContent = engagement.comment_count;
 
   const byParent = new Map();
   const roots = [];
@@ -241,16 +240,24 @@ async function loadEngagement(postId) {
   renderComments();
 }
 
+/**
+ * The action row is duplicated (top of the article and above comments), so
+ * every paint/wire step here loops over all matches instead of assuming one.
+ */
 function paintEngagement() {
-  const likeBtn = document.querySelector('#blog-like-btn');
-  likeBtn.classList.toggle('is-active', engagement.viewer_liked);
-  likeBtn.setAttribute('aria-pressed', String(engagement.viewer_liked));
-  document.querySelector('#blog-like-count').textContent = engagement.like_count;
+  document.querySelectorAll('.js-blog-like').forEach((btn) => {
+    btn.classList.toggle('is-active', engagement.viewer_liked);
+    btn.setAttribute('aria-pressed', String(engagement.viewer_liked));
+  });
+  document.querySelectorAll('.js-blog-like-count').forEach((el) => { el.textContent = engagement.like_count; });
 
-  const saveBtn = document.querySelector('#blog-save-btn');
-  saveBtn.classList.toggle('is-active', engagement.viewer_saved);
-  saveBtn.setAttribute('aria-pressed', String(engagement.viewer_saved));
-  saveBtn.querySelector('span:last-child').textContent = engagement.viewer_saved ? 'Saved' : 'Save';
+  document.querySelectorAll('.js-blog-save').forEach((btn) => {
+    btn.classList.toggle('is-active', engagement.viewer_saved);
+    btn.setAttribute('aria-pressed', String(engagement.viewer_saved));
+  });
+  document.querySelectorAll('.js-blog-save-label').forEach((el) => { el.textContent = engagement.viewer_saved ? 'Saved' : 'Save'; });
+
+  document.querySelectorAll('.js-blog-comment-count').forEach((el) => { el.textContent = engagement.comment_count; });
 }
 
 function signInRedirectUrl() {
@@ -258,63 +265,75 @@ function signInRedirectUrl() {
   return `./auth?mode=signin&next=${encodeURIComponent(next)}`;
 }
 
+async function toggleLike() {
+  if (!currentUser) { window.location.href = signInRedirectUrl(); return; }
+  const wasLiked = engagement.viewer_liked;
+  engagement.viewer_liked = !wasLiked;
+  engagement.like_count += wasLiked ? -1 : 1;
+  paintEngagement();
+  try {
+    if (wasLiked) {
+      const { error } = await supabase.from('blog_post_likes').delete().eq('post_id', currentPostId).eq('user_id', currentUser.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('blog_post_likes').insert({ post_id: currentPostId, user_id: currentUser.id });
+      if (error) throw error;
+    }
+  } catch (err) {
+    engagement.viewer_liked = wasLiked;
+    engagement.like_count += wasLiked ? 1 : -1;
+    paintEngagement();
+    toast(err.message || 'That did not save. Please try again.', 'error');
+  }
+}
+
+async function toggleSave() {
+  if (!currentUser) { window.location.href = signInRedirectUrl(); return; }
+  const wasSaved = engagement.viewer_saved;
+  engagement.viewer_saved = !wasSaved;
+  paintEngagement();
+  try {
+    if (wasSaved) {
+      const { error } = await supabase.from('blog_post_saves').delete().eq('post_id', currentPostId).eq('user_id', currentUser.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('blog_post_saves').insert({ post_id: currentPostId, user_id: currentUser.id });
+      if (error) throw error;
+      toast('Saved to your reading list.');
+    }
+  } catch (err) {
+    engagement.viewer_saved = wasSaved;
+    paintEngagement();
+    toast(err.message || 'That did not save. Please try again.', 'error');
+  }
+}
+
+async function shareArticle() {
+  const url = window.location.href;
+  const title = document.querySelector('#blog-article-title')?.textContent || 'DigiStore Journal';
+  if (navigator.share) {
+    try { await navigator.share({ title, url }); } catch { /* user cancelled */ }
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('Link copied to clipboard.');
+  } catch {
+    toast('Could not copy the link.', 'error');
+  }
+}
+
+// Delegated once on <main> so both the top and bottom copies of the action
+// row (and any future copy) work without binding to each button by hand.
 function wireEngagementActions() {
-  document.querySelector('#blog-like-btn')?.addEventListener('click', async () => {
-    if (!currentUser) { window.location.href = signInRedirectUrl(); return; }
-    const wasLiked = engagement.viewer_liked;
-    engagement.viewer_liked = !wasLiked;
-    engagement.like_count += wasLiked ? -1 : 1;
-    paintEngagement();
-    try {
-      if (wasLiked) {
-        const { error } = await supabase.from('blog_post_likes').delete().eq('post_id', currentPostId).eq('user_id', currentUser.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('blog_post_likes').insert({ post_id: currentPostId, user_id: currentUser.id });
-        if (error) throw error;
-      }
-    } catch (err) {
-      engagement.viewer_liked = wasLiked;
-      engagement.like_count += wasLiked ? 1 : -1;
-      paintEngagement();
-      toast(err.message || 'That did not save. Please try again.', 'error');
-    }
-  });
+  const main = document.querySelector('main');
+  if (!main || main.dataset.engagementWired === 'true') return;
+  main.dataset.engagementWired = 'true';
 
-  document.querySelector('#blog-save-btn')?.addEventListener('click', async () => {
-    if (!currentUser) { window.location.href = signInRedirectUrl(); return; }
-    const wasSaved = engagement.viewer_saved;
-    engagement.viewer_saved = !wasSaved;
-    paintEngagement();
-    try {
-      if (wasSaved) {
-        const { error } = await supabase.from('blog_post_saves').delete().eq('post_id', currentPostId).eq('user_id', currentUser.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('blog_post_saves').insert({ post_id: currentPostId, user_id: currentUser.id });
-        if (error) throw error;
-        toast('Saved to your reading list.');
-      }
-    } catch (err) {
-      engagement.viewer_saved = wasSaved;
-      paintEngagement();
-      toast(err.message || 'That did not save. Please try again.', 'error');
-    }
-  });
-
-  document.querySelector('#blog-share-btn')?.addEventListener('click', async () => {
-    const url = window.location.href;
-    const title = document.querySelector('#blog-article-title')?.textContent || 'DigiStore Journal';
-    if (navigator.share) {
-      try { await navigator.share({ title, url }); } catch { /* user cancelled */ }
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      toast('Link copied to clipboard.');
-    } catch {
-      toast('Could not copy the link.', 'error');
-    }
+  main.addEventListener('click', (event) => {
+    if (event.target.closest('.js-blog-like')) { toggleLike(); return; }
+    if (event.target.closest('.js-blog-save')) { toggleSave(); return; }
+    if (event.target.closest('.js-blog-share')) { shareArticle(); return; }
   });
 }
 

@@ -56,6 +56,7 @@
 
     <section id="blog-article-wrap" class="hidden">
       <div class="blog-article-body">
+       <div class="blog-article-prose">
         <a href="./blog" class="blog-article-back">← Back to Journal</a>
         <div id="blog-article-loading" class="legal-skel">
           <div class="uk-skel" style="height:14px;width:140px;border-radius:999px"></div>
@@ -76,28 +77,38 @@
           <h1 id="blog-article-title" class="legal-title"></h1>
           <div id="blog-article-cover-wrap" class="blog-article-cover hidden"><img id="blog-article-cover" alt=""></div>
 
-          <div class="blog-article-actions">
-            <button type="button" id="blog-like-btn" class="blog-action-btn" aria-pressed="false">
-              <i data-lucide="heart" width="16" height="16"></i><span id="blog-like-count">0</span>
+          <div class="blog-article-actions" data-engagement-bar="top">
+            <button type="button" class="js-blog-like blog-action-btn" aria-pressed="false">
+              <i data-lucide="heart" width="16" height="16"></i><span class="js-blog-like-count">0</span>
             </button>
-            <button type="button" id="blog-save-btn" class="blog-action-btn" aria-pressed="false">
-              <i data-lucide="bookmark" width="16" height="16"></i><span>Save</span>
+            <button type="button" class="js-blog-save blog-action-btn" aria-pressed="false">
+              <i data-lucide="bookmark" width="16" height="16"></i><span class="js-blog-save-label">Save</span>
             </button>
-            <button type="button" id="blog-share-btn" class="blog-action-btn">
+            <button type="button" class="js-blog-share blog-action-btn">
               <i data-lucide="share-2" width="16" height="16"></i><span>Share</span>
             </button>
-            <a id="blog-comment-jump" href="#blog-comments" class="blog-action-btn">
-              <i data-lucide="message-circle" width="16" height="16"></i><span id="blog-comment-count-chip">0</span>
+            <a href="#blog-comments" class="blog-action-btn">
+              <i data-lucide="message-circle" width="16" height="16"></i><span class="js-blog-comment-count">0</span>
             </a>
           </div>
 
           <div id="blog-article-html" class="legal-doc-body pd-markdown"></div>
-        </article>
 
-        <section id="blog-related" class="pd-related hidden" style="margin-top:48px">
-          <h2>You Might Also Like</h2>
-          <div id="blog-related-grid" class="pd-related-grid"></div>
-        </section>
+          <div class="blog-article-actions" data-engagement-bar="bottom">
+            <button type="button" class="js-blog-like blog-action-btn" aria-pressed="false">
+              <i data-lucide="heart" width="16" height="16"></i><span class="js-blog-like-count">0</span>
+            </button>
+            <button type="button" class="js-blog-save blog-action-btn" aria-pressed="false">
+              <i data-lucide="bookmark" width="16" height="16"></i><span class="js-blog-save-label">Save</span>
+            </button>
+            <button type="button" class="js-blog-share blog-action-btn">
+              <i data-lucide="share-2" width="16" height="16"></i><span>Share</span>
+            </button>
+            <a href="#blog-comments" class="blog-action-btn">
+              <i data-lucide="message-circle" width="16" height="16"></i><span class="js-blog-comment-count">0</span>
+            </a>
+          </div>
+        </article>
 
         <section id="blog-comments" class="blog-comments">
           <h2 id="blog-comments-title" class="blog-comments-title">Comments</h2>
@@ -111,6 +122,12 @@
           <a id="blog-comment-signin" href="#" class="hidden button !min-h-9 !px-4 text-xs font-bold">Sign in to comment</a>
 
           <div id="blog-comments-list" class="blog-comments-list"></div>
+        </section>
+       </div>
+
+        <section id="blog-related" class="pd-related hidden">
+          <h2>You Might Also Like</h2>
+          <div id="blog-related-grid" class="pd-related-grid"></div>
         </section>
       </div>
     </section>

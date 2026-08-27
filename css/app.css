@@ -4079,9 +4079,24 @@ dialog[open].admin-modal-container {
 
 /* --- Journal / Blog: single article view ----------------------------------- */
 .blog-article-body {
-  max-width: 920px;
+  max-width: 1440px;
   margin: auto;
   padding: 48px clamp(20px, 6vw, 80px) 80px;
+}
+
+/* The outer shell matches the site's standard 1440px shell width, but a
+   single column of running prose that wide is unreadable — this keeps the
+   actual text/comments at a normal measure while related products (outside
+   this wrapper) get to use the full width for a wider card grid. */
+.blog-article-prose {
+  max-width: 820px;
+  margin: 0 auto 56px;
+}
+
+#blog-related {
+  margin-top: 48px;
+  padding-top: 48px;
+  border-top: 1px solid var(--border);
 }
 
 .blog-article-back {
@@ -4142,6 +4157,13 @@ dialog[open].admin-modal-container {
   margin: 8px 0 32px;
   padding-bottom: 24px;
   border-bottom: 1px solid var(--border);
+}
+
+.blog-article-actions[data-engagement-bar="bottom"] {
+  margin: 40px 0 0;
+  padding: 24px 0 0;
+  border-bottom: 0;
+  border-top: 1px solid var(--border);
 }
 
 .blog-action-btn {
