@@ -20,6 +20,7 @@ Deno.serve(async () => {
 
   const staticUrls = [
     `<url><loc>${base}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>`,
+    `<url><loc>${base}/auth</loc><changefreq>daily</changefreq><priority>1.0</priority></url>`,
     `<url><loc>${base}/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
     `<url><loc>${base}/contact</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
     `<url><loc>${base}/support</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,

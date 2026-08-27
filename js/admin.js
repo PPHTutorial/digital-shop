@@ -15,10 +15,17 @@ import {
   renderIcons, toast,
 } from './ui.js';
 import {
-  confirmDialog, emptyState, initTabs, openModal, renderDataTable,
+  attachPopover, confirmDialog, emptyState, initTabs, openModal, renderDataTable,
   setButtonBusy, statusBadge,
 } from './uikit.js';
 import { enhanceSelects, refreshSelect } from './select.js';
+import { buildRte, formatForType, getRteValue, valueToHtml, wireRte } from './rte.js';
+import { buildDropzone, extOf, wireDropzone } from './filedrop.js';
+import { fileGlyph, openFileViewer } from './preview.js';
+import { openImageEditor } from './imgedit.js';
+
+/** Run a picked image through the crop/compress editor; resolves to a File. */
+const editImage = (file) => new Promise((resolve) => openImageEditor(file, { maxBytes: 5 * 1024 * 1024, onApply: resolve }));
 
 let account = null;
 
@@ -455,8 +462,8 @@ function openAccountStatusModal(user, targetStatus) {
     body: `
       <form id="account-status-form">
         <p style="font-size:.84rem;color:var(--text-muted)">${targetStatus === 'active'
-          ? 'This restores full account access immediately.'
-          : `This immediately blocks the account from signing purchases, payouts, or store actions. It does not delete any data.`}</p>
+        ? 'This restores full account access immediately.'
+        : `This immediately blocks the account from signing purchases, payouts, or store actions. It does not delete any data.`}</p>
         <label class="adm-field" style="margin-top:14px"><span class="label">Reason ${targetStatus === 'active' ? '(optional)' : '(recorded, shown to the user)'}</span><textarea class="field" name="reason" rows="3" placeholder="Why is this account being ${label.toLowerCase()}d?"></textarea></label>
         <p id="account-status-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
       </form>`,
@@ -571,14 +578,14 @@ function paintOrdersSummary() {
   const orders = ordersState.orders;
   const counts = { paid: 0, pending: 0, cancelled: 0, failed: 0, refunded: 0 };
   orders.forEach((o) => { if (counts[o.status] !== undefined) counts[o.status]++; });
-  const summaryEl = document.querySelector('#orders-status-summary');
+  /* const summaryEl = document.querySelector('#orders-status-summary');
   if (summaryEl) {
     summaryEl.innerHTML = `
       ${statusBadge('paid', `${counts.paid} paid`)} ${statusBadge('pending', `${counts.pending} pending`)}
       ${statusBadge('cancelled', `${counts.cancelled} cancelled`)} ${statusBadge('failed', `${counts.failed} failed`)}
       ${statusBadge('refunded', `${counts.refunded} refunded`)}
       <span style="color:var(--text-soft);font-size:.72rem;margin-left:4px">(Only paid orders count towards revenue)</span>`;
-  }
+  } */
   const filterEl = document.querySelector('#orders-filter-tabs');
   if (filterEl) {
     const tabs = [
@@ -734,82 +741,256 @@ function paintProducts() {
     const { error } = await supabase.from('products').delete().eq('id', btn.dataset.deleteProduct);
     if (error) { toast(error.message, 'error'); return; }
     toast('Product deleted.');
-    supabase.functions.invoke('sitemap').catch(() => {});
+    supabase.functions.invoke('sitemap').catch(() => { });
     await loadOverview(true);
   }));
 }
 
 document.querySelector('#new-product')?.addEventListener('click', () => openProductModal(null));
 
+async function loadOwnAdWallet() {
+  const [walletRes, settingsRes] = await Promise.all([
+    supabase.from('ad_wallets').select('balance,currency').maybeSingle().then((r) => r, () => ({ data: null })),
+    supabase.from('site_settings').select('ad_min_wallet_balance').eq('id', 1).maybeSingle().then((r) => r, () => ({ data: null })),
+  ]);
+  return {
+    wallet: walletRes?.data || null,
+    minBalance: Number(settingsRes?.data?.ad_min_wallet_balance ?? 100),
+  };
+}
+
+/**
+ * Best-effort peek inside a .zip: pull it apart in the browser and scan the
+ * text entries for external URLs plus a "how to access / redeem / visit"
+ * instruction. If it looks like the archive is really just a wrapper around an
+ * external link, we warn the admin to declare it as an External link instead
+ * (which routes it through the ad pipeline). The authoritative check is
+ * server-side — this is only a fast hint.
+ */
+async function inspectArchiveForExternalLinks(file) {
+  try {
+    const { unzipSync, strFromU8 } = await import('https://esm.sh/fflate@0.8.2');
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const entries = unzipSync(buf);
+    let urlHits = 0;
+    let instructionHit = false;
+    for (const [name, bytes] of Object.entries(entries)) {
+      if (!/\.(txt|md|rtf|html?|nfo|url|webloc|pdf)$/i.test(name)) continue;
+      const text = strFromU8(bytes, true).slice(0, 20000).toLowerCase();
+      const urls = text.match(/https?:\/\/[^\s"'<>)]+/g) || [];
+      urlHits += urls.length;
+      if (/\b(visit|go to|open|click|redeem|access|download from|continue at|proceed to)\b/.test(text) && urls.length) instructionHit = true;
+    }
+    return { suspicious: instructionHit || urlHits >= 3, urlHits };
+  } catch {
+    return { suspicious: false, urlHits: 0, unavailable: true };
+  }
+}
+
 function openProductModal(product = null) {
+  const gallery = Array.isArray(product?.gallery_urls) ? [...product.gallery_urls] : [];
+  const startAsLink = !!product?.external_url;
+
   const { dialog } = openModal({
     id: 'product-modal',
     title: product ? 'Edit product' : 'New product',
     body: `
-      <form id="product-form">
+      <form id="product-form" class="adm-form">
         <input type="hidden" name="id" value="${product?.id || ''}">
-        <label class="adm-field adm-field--span2"><span class="label">Title</span><input class="field" name="title" id="p-title" required value="${escapeHtml(product?.title || '')}"></label>
-        <div class="adm-modal-grid" style="margin-top:14px">
-          <label class="adm-field"><span class="label">Category</span><select class="field" name="category" id="p-category">${categoryOptions(product?.category || 'General')}</select></label>
-          <label class="adm-field"><span class="label">URL slug</span><input class="field font-mono text-xs" name="slug" id="p-slug" required value="${escapeHtml(product?.slug || '')}"></label>
-          <label class="adm-field"><span class="label">Sale price</span><input class="field font-bold" name="price" type="number" step=".01" min="0" required value="${product?.price ?? ''}"></label>
-          <label class="adm-field"><span class="label">Compare-at price (optional)</span><input class="field" name="original_price" type="number" step=".01" min="0" value="${product?.original_price ?? ''}"></label>
+        <input type="hidden" name="cover_url" id="p-cover-url" value="${escapeHtml(product?.cover_url || '')}">
+        <input type="hidden" name="file_path" id="p-file-path" value="${escapeHtml(product?.file_path || '')}">
+        <input type="hidden" name="file_size_bytes" id="p-file-size" value="${product?.file_size_bytes ?? ''}">
+        <input type="hidden" name="file_type" id="p-file-type" value="${escapeHtml(product?.file_type || '')}">
+        <input type="hidden" name="gallery_urls" id="p-gallery-urls" value='${escapeHtml(JSON.stringify(gallery))}'>
+        <input type="hidden" name="delivery_mode" id="p-delivery-mode" value="${startAsLink ? 'link' : 'file'}">
+
+        <label class="adm-field"><span class="label">Title</span>
+          <span class="adm-title-wrap">
+            <input class="field" name="title" id="p-title" required value="${escapeHtml(product?.title || '')}">
+            <span class="adm-title-badge" id="p-format-badge" hidden></span>
+          </span>
+        </label>
+
+        <div class="adm-modal-grid">
+          <label class="adm-field"><span class="label">Category</span>
+            <select class="field" name="category" id="p-category">${categoryOptions(product?.category || 'General')}</select></label>
+          <label class="adm-field"><span class="label">Licence</span>
+            <select class="field" name="license_type">
+              <option value="single-seat" ${(!product || product.license_type === 'single-seat') ? 'selected' : ''}>Single seat</option>
+              <option value="personal" ${product?.license_type === 'personal' ? 'selected' : ''}>Personal use</option>
+              <option value="commercial" ${product?.license_type === 'commercial' ? 'selected' : ''}>Commercial use</option>
+              <option value="extended" ${product?.license_type === 'extended' ? 'selected' : ''}>Extended licence</option>
+            </select></label>
+          <label class="adm-field"><span class="label">Sale price (USD)</span>
+            <input class="field font-bold" name="price" type="number" step=".01" min="0" required value="${product?.price ?? ''}"></label>
+          <label class="adm-field"><span class="label label--nowrap">Compare-at price <!--<span class="vnd-optional">(optional)</span>--></span>
+            <input class="field" name="original_price" type="number" step=".01" min="0" value="${product?.original_price ?? ''}"></label>
         </div>
-        <label class="adm-field" style="margin-top:14px"><span class="label">Description <span class="help" style="font-weight:400">(markdown supported: ## heading, **bold**, *italic*, - list, [link](url))</span></span><textarea class="field" name="description" rows="4">${escapeHtml(product?.description || '')}</textarea></label>
-        <div class="adm-modal-grid" style="margin-top:14px">
-          <div><span class="label">Cover image</span>
-            <div class="adm-upload mt-1"><input type="file" id="p-cover-file" accept="image/*" class="text-xs"><img id="p-cover-preview" class="${product?.cover_url ? '' : 'hidden'}" src="${escapeHtml(product?.cover_url || '')}" alt=""></div>
-            <input type="hidden" name="cover_url" id="p-cover-url" value="${escapeHtml(product?.cover_url || '')}"><small id="p-cover-status" class="help"></small>
-          </div>
-          <div><span class="label">Downloadable file</span>
-            <div class="adm-upload mt-1"><input type="file" id="p-file" class="text-xs"></div>
-            <input type="hidden" name="file_path" id="p-file-path" value="${escapeHtml(product?.file_path || '')}"><small id="p-file-status" class="help">${product?.file_path ? `Current: ${escapeHtml(product.file_path)}` : ''}</small>
-          </div>
+
+        <label class="adm-field"><span class="label">Short description <span class="help" style="font-weight:400">(one line on the product card)</span></span>
+          <input class="field" name="short_description" maxlength="160" value="${escapeHtml(product?.short_description || '')}"></label>
+
+        <details class="adm-collapse" ${product?.description ? 'open' : ''}>
+          <summary>Full description</summary>
+          <div id="p-desc-rte">${buildRte({ id: 'p-description', minHeight: 150 })}</div>
+        </details>
+
+        <div class="adm-field">
+          <span class="label">Cover image</span>
+          ${buildDropzone({ id: 'p-cover-file', accept: 'image/png,image/jpeg,image/webp', label: 'Drop cover image or click', hint: 'PNG, JPG or WebP' })}
         </div>
-        <div class="adm-field adm-field--span2" style="margin-top:14px">
-          <span class="label">Additional cover images <span class="help" style="font-weight:400">(optional gallery, shown as thumbnails)</span></span>
-          <input type="file" id="p-gallery-file" accept="image/*" multiple class="text-xs mt-1">
+
+         <div class="adm-field">
+          <span class="label">Additional images <span class="help" style="font-weight:400">(gallery thumbnails)</span></span>
+          ${buildDropzone({ id: 'p-gallery-file', accept: 'image/png,image/jpeg,image/webp', label: 'Drop images or click', multiple: true, compact: true })}
           <div id="p-gallery-preview" class="adm-gallery-preview mt-2"></div>
-          <input type="hidden" name="gallery_urls" id="p-gallery-urls" value="${escapeHtml(JSON.stringify(Array.isArray(product?.gallery_urls) ? product.gallery_urls : []))}">
-          <small id="p-gallery-status" class="help"></small>
         </div>
-        <label class="adm-check-line" style="margin-top:14px"><input type="checkbox" name="is_published" ${!product || product.is_published ? 'checked' : ''}> Publish to catalog</label>
-        <label class="adm-check-line" style="margin-top:8px"><input type="checkbox" name="is_featured" ${product?.is_featured ? 'checked' : ''}> Mark as featured</label>
-        <p id="product-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
+
+        <div class="adm-field">
+          <span class="label">What buyers get</span>
+          <div class="seg" role="tablist">
+            <button type="button" class="seg__btn ${startAsLink ? '' : 'is-active'}" data-delivery="file">Uploaded file</button>
+            <button type="button" class="seg__btn ${startAsLink ? 'is-active' : ''}" data-delivery="link">External link</button>
+          </div>
+          <div id="p-file-pane" class="${startAsLink ? 'hidden' : ''}" style="margin-top:10px">
+            ${buildDropzone({ id: 'p-file', label: 'Drop the product file or click', hint: 'PNG · JPG · WebP · ZIP · PDF · DOCX · EPUB — max 5 MB' })}
+          </div>
+          <div id="p-link-pane" class="${startAsLink ? '' : 'hidden'}" style="margin-top:10px">
+            <input class="field" type="url" id="p-external-url" placeholder="https://…" value="${escapeHtml(product?.external_url || '')}">
+            <div class="adm-ad-notice">
+              ${icon('megaphone', 15)}
+              <div>
+                <strong>External-link listings are ad placements.</strong>
+                <p>The destination is reviewed. Buyers are shown a "leaving DigiStore" warning before they continue. Sellers fund these from their ad wallet; platform listings are published directly.</p>
+              </div>
+            </div>
+            <div class="adm-wallet-line" id="p-wallet-line" hidden>
+              <span>Ad wallet balance: <strong id="p-wallet-balance">—</strong></span>
+              <button type="button" class="button !min-h-8 !px-3 text-xs" id="p-wallet-topup">Top up</button>
+            </div>
+            <label class="adm-check-line" style="margin-top:10px"><input type="checkbox" id="p-ext-consent"> I take responsibility for this destination — no phishing, scams, malware, or misleading content, and it complies with the Acceptable Use Policy.</label>
+            <p class="adm-panel-note" style="margin-top:6px">Identity / biometric verification for ad publishers is coming — for now this consent is on record.</p>
+          </div>
+        </div>
+
+       
+
+        <label class="adm-check-line"><input type="checkbox" name="is_published" ${!product || product.is_published ? 'checked' : ''}> Publish to catalog</label>
+        <label class="adm-check-line"><input type="checkbox" name="is_featured" ${product?.is_featured ? 'checked' : ''}> Mark as featured</label>
+        <p id="product-feedback" class="status-line text-xs my-0"></p>
       </form>`,
     footer: `<button type="button" class="button" data-uk-cancel>Cancel</button><button type="submit" form="product-form" class="button button-primary">Save product</button>`,
   });
-  dialog.classList.add('uk-modal--wide');
+  dialog.classList.add('uk-modal--form');
   dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
 
-  dialog.querySelector('#p-title').addEventListener('input', (e) => {
-    const slugField = dialog.querySelector('#p-slug');
-    if (!dialog.querySelector('#product-form').dataset.slugEdited) slugField.value = slugify(e.target.value);
-  });
-  dialog.querySelector('#p-slug').addEventListener('input', () => { dialog.querySelector('#product-form').dataset.slugEdited = 'true'; });
+  // Rich-text description — same editor as the CMS, stored as markdown.
+  wireRte(dialog.querySelector('#p-desc-rte .cms-rte'), valueToHtml(product?.description || ''), {});
 
-  dialog.querySelector('#p-cover-file').addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const path = await uploadTo('product-images', 'covers', file, dialog.querySelector('#p-cover-status'));
-    if (!path) return;
-    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-    dialog.querySelector('#p-cover-url').value = data.publicUrl;
-    const prev = dialog.querySelector('#p-cover-preview');
-    prev.src = data.publicUrl; prev.classList.remove('hidden');
-  });
-  dialog.querySelector('#p-file').addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const path = await uploadTo('books', 'files', file, dialog.querySelector('#p-file-status'));
-    if (path) dialog.querySelector('#p-file-path').value = path;
-  });
+  // Format badge pinned to the end of the title input.
+  const badge = dialog.querySelector('#p-format-badge');
+  const setFormatBadge = (text) => {
+    badge.textContent = (text || '').toUpperCase();
+    badge.hidden = !text;
+    dialog.querySelector('#p-title').classList.toggle('has-badge', !!text);
+  };
+  setFormatBadge(startAsLink ? 'LINK' : (product?.file_type || extOf(product?.file_path || '')));
 
+  // (Slug is derived from the title at save time — no field in the form.)
+
+  // Cover image — routed through the crop/compress editor first.
+  const coverDz = wireDropzone(dialog.querySelector('#p-cover-file').closest('.filedrop'), {
+    onFiles: async ([picked]) => {
+      const file = await editImage(picked);
+      coverDz.setStatus('Uploading…');
+      const path = await uploadTo('product-images', 'covers', file, null);
+      if (!path) { coverDz.setStatus('Upload failed.', 'error'); return; }
+      const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+      dialog.querySelector('#p-cover-url').value = data.publicUrl;
+      coverDz.setPreview(data.publicUrl);
+      coverDz.setStatus(`Uploaded · ${(file.size / 1024).toFixed(0)} KB`, 'ok');
+    },
+  });
+  if (product?.cover_url) coverDz.setPreview(product.cover_url);
+  dialog.querySelector('#p-cover-file').closest('.filedrop').querySelector('.filedrop__preview')
+    .addEventListener('click', (e) => {
+      const url = dialog.querySelector('#p-cover-url').value;
+      if (url && e.target.tagName === 'IMG') { e.stopPropagation(); openFileViewer({ src: url, name: 'Cover image' }); }
+    });
+
+  // Delivery mode: uploaded file vs external link (= ad placement)
+  const modeInput = dialog.querySelector('#p-delivery-mode');
+  const filePane = dialog.querySelector('#p-file-pane');
+  const linkPane = dialog.querySelector('#p-link-pane');
+  const walletLine = dialog.querySelector('#p-wallet-line');
+  const adGate = { minBalance: 100, balance: null, hasWallet: false };
+  const setDeliveryMode = async (mode) => {
+    modeInput.value = mode;
+    dialog.querySelectorAll('[data-delivery]').forEach((b) => b.classList.toggle('is-active', b.dataset.delivery === mode));
+    filePane.classList.toggle('hidden', mode !== 'file');
+    linkPane.classList.toggle('hidden', mode !== 'link');
+    if (mode === 'link') {
+      setFormatBadge('LINK');
+      if (walletLine.hidden) {
+        const { wallet, minBalance } = await loadOwnAdWallet();
+        adGate.minBalance = minBalance;
+        adGate.hasWallet = !!wallet;
+        adGate.balance = wallet ? Number(wallet.balance) : null;
+        walletLine.hidden = false;
+        const cur = wallet?.currency || 'USD';
+        const short = wallet
+          ? `${cur} ${adGate.balance.toFixed(2)}`
+          : 'no seller wallet';
+        const low = wallet && adGate.balance < minBalance;
+        dialog.querySelector('#p-wallet-balance').innerHTML =
+          `${short} <span class="help">· min ${cur} ${minBalance.toFixed(2)} to publish${low ? ' — <strong style="color:var(--danger)">top up first</strong>' : ''}</span>`;
+      }
+    } else {
+      setFormatBadge(dialog.querySelector('#p-file-type').value || '');
+    }
+  };
+  dialog.querySelectorAll('[data-delivery]').forEach((b) => b.addEventListener('click', () => setDeliveryMode(b.dataset.delivery)));
+  dialog.querySelector('#p-wallet-topup').addEventListener('click', () => {
+    toast('Open Seller centre → Ad wallet to add funds.', 'info');
+  });
+  if (startAsLink) setDeliveryMode('link');
+
+  // Downloadable file
+  const fileDz = wireDropzone(dialog.querySelector('#p-file').closest('.filedrop'), {
+    onFiles: async ([file]) => {
+      const MAX = 5 * 1024 * 1024;
+      if (file.size > MAX) {
+        fileDz.setStatus(`That file is ${(file.size / 1048576).toFixed(1)} MB — the limit is 5 MB. Compress it or host large media as an external link.`, 'error');
+        return;
+      }
+      if (/\.(zip|rar|7z|tar|gz)$/i.test(file.name)) {
+        fileDz.setStatus('Inspecting archive…');
+        const scan = await inspectArchiveForExternalLinks(file);
+        if (scan.suspicious) {
+          fileDz.setStatus('This archive looks like it mainly points to an external site. Declare it as an External link instead so it goes through ad review.', 'error');
+          return;
+        }
+      }
+      fileDz.setStatus('Uploading…');
+      const path = await uploadTo('books', 'files', file, null);
+      if (!path) { fileDz.setStatus('Upload failed.', 'error'); return; }
+      dialog.querySelector('#p-file-path').value = path;
+      dialog.querySelector('#p-file-size').value = file.size || '';
+      dialog.querySelector('#p-file-type').value = extOf(file.name) || dialog.querySelector('#p-file-type').value;
+      setFormatBadge(dialog.querySelector('#p-file-type').value);
+      fileDz.setPreview(`${file.name} · ${(file.size / 1024).toFixed(0)} KB`);
+      fileDz.setStatus('Uploaded.', 'ok');
+    },
+  });
+  if (product?.file_path) fileDz.setPreview(`${extOf(product.file_path) || 'file'} · uploaded`);
+
+  // Gallery
   function renderGalleryPreview() {
     const urls = JSON.parse(dialog.querySelector('#p-gallery-urls').value || '[]');
     const host = dialog.querySelector('#p-gallery-preview');
     host.innerHTML = urls.map((url, i) => `
-      <span class="adm-gallery-thumb"><img src="${escapeHtml(url)}" alt=""><button type="button" data-remove-gallery="${i}" aria-label="Remove image">${icon('x', 12)}</button></span>`).join('');
+      <span class="adm-gallery-thumb"><img src="${escapeHtml(url)}" alt="" data-view-gallery="${escapeHtml(url)}" style="cursor:zoom-in"><button type="button" data-remove-gallery="${i}" aria-label="Remove image">${icon('x', 12)}</button></span>`).join('');
+    host.querySelectorAll('[data-view-gallery]').forEach((im) => im.addEventListener('click', () => openFileViewer({ src: im.dataset.viewGallery, name: 'Gallery image' })));
     host.querySelectorAll('[data-remove-gallery]').forEach((btn) => btn.addEventListener('click', () => {
       const next = urls.filter((_, i) => String(i) !== btn.dataset.removeGallery);
       dialog.querySelector('#p-gallery-urls').value = JSON.stringify(next);
@@ -819,20 +1000,24 @@ function openProductModal(product = null) {
   }
   renderGalleryPreview();
 
-  dialog.querySelector('#p-gallery-file').addEventListener('change', async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    const status = dialog.querySelector('#p-gallery-status');
-    const urls = JSON.parse(dialog.querySelector('#p-gallery-urls').value || '[]');
-    for (const file of files) {
-      const path = await uploadTo('product-images', 'covers', file, status);
-      if (!path) continue;
-      const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-      urls.push(data.publicUrl);
-    }
-    dialog.querySelector('#p-gallery-urls').value = JSON.stringify(urls);
-    renderGalleryPreview();
-    e.target.value = '';
+  const galleryDz = wireDropzone(dialog.querySelector('#p-gallery-file').closest('.filedrop'), {
+    onFiles: async (files) => {
+      const urls = JSON.parse(dialog.querySelector('#p-gallery-urls').value || '[]');
+      let n = 0;
+      for (const picked of files) {
+        n += 1;
+        galleryDz.setStatus(`Editing image ${n} of ${files.length}…`);
+        const file = await editImage(picked); // crop/compress each, one at a time
+        galleryDz.setStatus(`Uploading ${n} of ${files.length}…`);
+        const path = await uploadTo('product-images', 'covers', file, null);
+        if (!path) continue;
+        const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+        urls.push(data.publicUrl);
+      }
+      dialog.querySelector('#p-gallery-urls').value = JSON.stringify(urls);
+      renderGalleryPreview();
+      galleryDz.setStatus(`${urls.length} image${urls.length === 1 ? '' : 's'} in gallery.`, 'ok');
+    },
   });
 
   dialog.querySelector('#product-form').addEventListener('submit', async (event) => {
@@ -840,19 +1025,46 @@ function openProductModal(product = null) {
     const form = event.currentTarget;
     const button = dialog.querySelector('button[form="product-form"]');
     const feedback = dialog.querySelector('#product-feedback');
+    const fail = (msg) => { feedback.textContent = msg; feedback.className = 'status-line error text-xs my-0'; };
     const id = form.elements.id.value;
+    const mode = dialog.querySelector('#p-delivery-mode').value;
     const filePath = dialog.querySelector('#p-file-path').value;
-    if (!filePath) { feedback.textContent = 'Upload the file buyers will download.'; feedback.className = 'status-line error text-xs my-0'; return; }
+    const externalUrl = dialog.querySelector('#p-external-url').value.trim();
+    const isAd = mode === 'link';
+
+    if (isAd) {
+      if (!/^https?:\/\/.+/i.test(externalUrl)) { fail('Enter the full external URL (https://…).'); return; }
+      if (!dialog.querySelector('#p-ext-consent').checked) { fail('Tick the responsibility checkbox to publish an external-link listing.'); return; }
+      // Seller wallet gate — the threshold is admin-controlled
+      // (site_settings.ad_min_wallet_balance). A pure platform admin has no
+      // ad wallet and is not gated.
+      if (adGate.hasWallet && adGate.balance < adGate.minBalance) {
+        fail(`Ad wallet balance (${adGate.balance.toFixed(2)}) is below the ${adGate.minBalance.toFixed(2)} minimum to publish an external-link listing. Top up first.`);
+        return;
+      }
+    } else if (!filePath) {
+      fail('Upload the file buyers will download, or switch to External link.'); return;
+    }
+
+    const fileSize = dialog.querySelector('#p-file-size').value;
     const payload = {
       title: form.elements.title.value.trim(),
-      slug: slugify(form.elements.slug.value) || slugify(form.elements.title.value),
+      // Auto-derived; an existing listing keeps its slug so live URLs don't break.
+      slug: product?.slug || slugify(form.elements.title.value),
       category: dialog.querySelector('#p-category').value,
+      license_type: form.elements.license_type.value,
       price: Number(form.elements.price.value),
       original_price: form.elements.original_price.value ? Number(form.elements.original_price.value) : null,
-      description: form.elements.description.value.trim() || null,
+      short_description: form.elements.short_description.value.trim() || null,
+      description: getRteValue(dialog.querySelector('#p-desc-rte .cms-rte'), 'markdown') || null,
       cover_url: dialog.querySelector('#p-cover-url').value || null,
       gallery_urls: JSON.parse(dialog.querySelector('#p-gallery-urls').value || '[]'),
-      file_path: filePath,
+      file_path: isAd ? null : filePath,
+      external_url: isAd ? externalUrl : null,
+      is_ad: isAd,
+      ad_status: isAd ? 'active' : 'none',
+      file_type: isAd ? 'LINK' : (dialog.querySelector('#p-file-type').value.trim() || extOf(filePath) || null),
+      file_size_bytes: (!isAd && fileSize) ? Number(fileSize) : null,
       is_published: form.elements.is_published.checked,
       is_featured: form.elements.is_featured.checked,
       currency: 'USD',
@@ -860,10 +1072,10 @@ function openProductModal(product = null) {
     setBusy(button, true, 'Saving…');
     const { error } = id ? await supabase.from('products').update(payload).eq('id', id) : await supabase.from('products').insert(payload);
     setBusy(button, false);
-    if (error) { feedback.textContent = error.message; feedback.className = 'status-line error text-xs my-0'; return; }
+    if (error) { fail(error.message); return; }
     dialog.close();
     toast(id ? 'Product updated.' : 'Product created.');
-    supabase.functions.invoke('sitemap').catch(() => {});
+    supabase.functions.invoke('sitemap').catch(() => { });
     await loadOverview(true);
   });
 }
@@ -1065,8 +1277,8 @@ function openStoreStatusModal(vendor, targetStatus) {
     body: `
       <form id="store-status-form">
         <p style="font-size:.84rem;color:var(--text-muted)">${suspending
-          ? 'Their products are unpublished and active ad campaigns are paused immediately. The owner keeps their personal account.'
-          : 'The store becomes visible and sellable again immediately.'}</p>
+        ? 'Their products are unpublished and active ad campaigns are paused immediately. The owner keeps their personal account.'
+        : 'The store becomes visible and sellable again immediately.'}</p>
         <label class="adm-field" style="margin-top:14px"><span class="label">Reason ${suspending ? '(recorded, shown to the seller)' : '(optional)'}</span><textarea class="field" name="reason" rows="3"></textarea></label>
         <p id="store-status-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
       </form>`,
@@ -1405,8 +1617,8 @@ async function loadModeration() {
 
   document.querySelector('#mod-payouts').innerHTML = data.payouts?.length
     ? data.payouts.map((p) => {
-        const dest = p.method === 'mobile_money' ? `${p.momo_provider || 'MoMo'} ····${p.account_last4 || ''}` : p.method === 'bank_transfer' ? `${p.bank_name || 'Bank'} ····${p.account_last4 || ''}` : (p.method || 'account');
-        return `
+      const dest = p.method === 'mobile_money' ? `${p.momo_provider || 'MoMo'} ····${p.account_last4 || ''}` : p.method === 'bank_transfer' ? `${p.bank_name || 'Bank'} ····${p.account_last4 || ''}` : (p.method || 'account');
+      return `
         <div class="adm-mod-row">
           <div class="adm-mod-row__meta"><strong>${money(p.amount, p.currency)}</strong><span>${escapeHtml(p.vendor_name)} → ${escapeHtml(dest)} · ${escapeHtml(p.account_name || '')} · requested ${shortDate(p.requested_at)}</span></div>
           <div class="adm-mod-row__actions">
@@ -1414,7 +1626,7 @@ async function loadModeration() {
             <button class="button button-danger !min-h-8 !px-3 text-xs" data-fail-payout="${p.id}">Fail</button>
           </div>
         </div>`;
-      }).join('')
+    }).join('')
     : modEmpty('No payout requests waiting.');
 
   renderIcons();
@@ -1469,17 +1681,21 @@ initTabs(document.querySelector('#mod-tabs-root'));
    A07 — CMS / Content editor (the deep screen)
    ========================================================================== */
 
+/* `rich: true` swaps the plain textarea for the js/rte.js rich-text editor.
+   On save its HTML is serialised to whatever shape the storefront expects for
+   that document type (legal → block array, post → HTML, others → markdown);
+   see formatForType() in js/rte.js. */
 const CMS_TYPE_FIELDS = {
   page: [
     { key: 'heading', label: 'Heading', type: 'text' },
     { key: 'subheading', label: 'Subheading', type: 'text' },
-    { key: 'body', label: 'Body', type: 'textarea', rows: 10 },
+    { key: 'body', label: 'Body', type: 'rich' },
     { key: 'seo_title', label: 'SEO title', type: 'text' },
     { key: 'seo_description', label: 'SEO description', type: 'textarea', rows: 2 },
   ],
   post: [
     { key: 'excerpt', label: 'Excerpt', type: 'textarea', rows: 2 },
-    { key: 'body', label: 'Article body', type: 'textarea', rows: 12 },
+    { key: 'body', label: 'Article body', type: 'rich', minHeight: 420 },
     { key: 'cover_url', label: 'Cover image URL', type: 'text' },
     { key: 'tags', label: 'Tags (comma separated)', type: 'text' },
   ],
@@ -1487,11 +1703,11 @@ const CMS_TYPE_FIELDS = {
     { key: 'name', label: 'Display name', type: 'text' },
     { key: 'role', label: 'Role / title', type: 'text' },
     { key: 'avatar_url', label: 'Avatar URL', type: 'text' },
-    { key: 'bio', label: 'Bio', type: 'textarea', rows: 4 },
+    { key: 'bio', label: 'Bio', type: 'rich', minHeight: 200 },
   ],
   faq: [
     { key: 'question', label: 'Question', type: 'text' },
-    { key: 'answer', label: 'Answer', type: 'textarea', rows: 4 },
+    { key: 'answer', label: 'Answer', type: 'rich', minHeight: 220 },
     { key: 'category', label: 'Category', type: 'text' },
   ],
   announcement: [
@@ -1501,7 +1717,8 @@ const CMS_TYPE_FIELDS = {
   ],
   legal: [
     { key: 'effective_date', label: 'Effective date', type: 'text' },
-    { key: 'body', label: 'Document body', type: 'textarea', rows: 16 },
+    { key: 'summary', label: 'Summary', type: 'textarea', rows: 2 },
+    { key: 'body', label: 'Document body', type: 'rich', minHeight: 480 },
   ],
   navigation: [
     { key: 'label', label: 'Label', type: 'text' },
@@ -1511,10 +1728,15 @@ const CMS_TYPE_FIELDS = {
   homepage: [
     { key: 'section_key', label: 'Section key', type: 'text' },
     { key: 'heading', label: 'Heading', type: 'text' },
-    { key: 'body', label: 'Body', type: 'textarea', rows: 4 },
+    { key: 'body', label: 'Body', type: 'rich', minHeight: 200 },
     { key: 'cta_label', label: 'CTA label', type: 'text' },
     { key: 'cta_href', label: 'CTA link', type: 'text' },
   ],
+};
+
+const CMS_TYPE_LABELS = {
+  page: 'Page', post: 'Blog post', author: 'Author', faq: 'FAQ',
+  announcement: 'Announcement', legal: 'Legal', navigation: 'Navigation', homepage: 'Homepage block',
 };
 
 let cmsDocs = [];
@@ -1523,6 +1745,10 @@ let cmsHeldLock = false;
 let cmsLockTimer = null;
 let cmsLoaded = false;
 
+let cmsPickerClose = null;
+let cmsEditorDoc = null;
+let cmsEditorLocked = false;
+
 async function loadCms(force = false) {
   if (cmsLoaded && !force) return;
   const { data, error } = await supabase.from('cms_documents')
@@ -1530,21 +1756,31 @@ async function loadCms(force = false) {
     .order('updated_at', { ascending: false })
     .limit(300);
   if (error) {
-    document.querySelector('#cms-doc-list').innerHTML = emptyState({ icon: 'triangle-alert', title: 'Could not load content', body: error.message });
+    document.querySelector('#cms-editor-blank').innerHTML = emptyState({ icon: 'triangle-alert', title: 'Could not load content', body: error.message });
     return;
   }
   cmsLoaded = true;
   cmsDocs = data || [];
   paintCmsList();
-  if (!cmsSelectedId && cmsDocs.length) selectCmsDoc(cmsDocs[0].id);
-  else if (!cmsDocs.length) paintCmsEmptyEditor();
+  if (cmsSelectedId && cmsDocs.some((d) => d.id === cmsSelectedId)) { /* keep current selection */ }
+  else if (cmsDocs.length) selectCmsDoc(cmsDocs[0].id);
+  else paintCmsEmptyEditor();
 }
 
 function paintCmsEmptyEditor() {
   document.querySelector('#cms-editor').classList.add('hidden');
-  document.querySelector('#cms-editor-empty').innerHTML = emptyState({
-    icon: 'file-text', title: 'No document selected', body: 'Choose a document on the left, or create a new one.',
-  });
+  const blank = document.querySelector('#cms-editor-blank');
+  blank.innerHTML = `${emptyState({
+    icon: 'file-text', title: 'No document open',
+    body: 'Open the document picker to choose one, or start a new document.',
+  })}
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:-8px">
+      <button type="button" class="button" id="cms-blank-browse">Browse documents</button>
+      <button type="button" class="button button-primary" id="cms-blank-new">+ New document</button>
+    </div>`;
+  blank.querySelector('#cms-blank-browse').addEventListener('click', openCmsDocPicker);
+  blank.querySelector('#cms-blank-new').addEventListener('click', openCmsNewDoc);
+  renderIcons();
 }
 
 function paintCmsList() {
@@ -1560,13 +1796,63 @@ function paintCmsList() {
   host.innerHTML = rows.length ? rows.map((d) => `
     <button type="button" class="adm-cms-doc ${d.id === cmsSelectedId ? 'is-active' : ''}" data-cms-select="${d.id}">
       <div class="adm-cms-doc__head"><strong>${escapeHtml(d.title || 'Untitled')}</strong>${statusBadge(d.status)}</div>
-      <div class="adm-cms-doc__meta"><span>${escapeHtml(d.type)}</span><span>·</span><span>v${d.version}</span><span>·</span><span>${shortDate(d.updated_at)}</span></div>
+      <div class="adm-cms-doc__meta"><span>${escapeHtml(CMS_TYPE_LABELS[d.type] || d.type)}</span><span>·</span><span>v${d.version}</span><span>·</span><span>${shortDate(d.updated_at)}</span></div>
     </button>`).join('') : emptyState({ icon: 'search', title: 'No documents match', body: 'Try a different search or type filter.' });
-  host.querySelectorAll('[data-cms-select]').forEach((btn) => btn.addEventListener('click', () => selectCmsDoc(btn.dataset.cmsSelect)));
+  host.querySelectorAll('[data-cms-select]').forEach((btn) => btn.addEventListener('click', () => {
+    cmsPickerClose?.();
+    cmsPickerClose = null;
+    selectCmsDoc(btn.dataset.cmsSelect);
+  }));
 }
 
-document.querySelector('#cms-search')?.addEventListener('input', paintCmsList);
-document.querySelector('#cms-type-filter')?.addEventListener('change', paintCmsList);
+const CMS_TYPE_OPTIONS = Object.entries(CMS_TYPE_LABELS)
+  .map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+
+/* The document list lives in a modal, not a fixed side column — that keeps the
+   editor itself full-width. */
+function openCmsDocPicker() {
+  const { dialog, close } = openModal({
+    id: 'cms-doc-picker',
+    title: 'Documents',
+    body: `
+      <div class="cms-picker__filters">
+        <input id="cms-search" class="field cms-picker__search" type="search" placeholder="Search by title or slug…">
+        <select id="cms-type-filter" class="field cms-picker__type">
+          <option value="">All types</option>${CMS_TYPE_OPTIONS}
+        </select>
+      </div>
+      <div id="cms-doc-list" class="cms-picker__list"></div>`,
+    footer: `<button type="button" class="button" data-uk-cancel>Close</button><button type="button" class="button button-primary" id="cms-picker-new">+ New document</button>`,
+  });
+  dialog.classList.add('uk-modal--wide');
+  cmsPickerClose = close;
+  dialog.addEventListener('close', () => { if (cmsPickerClose === close) cmsPickerClose = null; });
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => close());
+  dialog.querySelector('#cms-search').addEventListener('input', paintCmsList);
+  dialog.querySelector('#cms-type-filter').addEventListener('change', paintCmsList);
+  dialog.querySelector('#cms-picker-new').addEventListener('click', () => { close(); openCmsNewDoc(); });
+  paintCmsList();
+}
+
+function openCmsNewDoc() {
+  const { dialog, close } = openModal({
+    id: 'cms-new-doc-modal',
+    title: 'New document',
+    body: `<label class="adm-field"><span class="label">Document type</span>
+      <select class="field" id="cms-new-type">${CMS_TYPE_OPTIONS}</select></label>
+      <p class="adm-panel-note" style="margin-top:10px">Pick the type that matches where this content appears on the storefront. You can't change it later.</p>`,
+    footer: `<button type="button" class="button" data-uk-cancel>Cancel</button><button type="button" class="button button-primary" id="cms-new-create">Create draft</button>`,
+  });
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => close());
+  dialog.querySelector('#cms-new-create').addEventListener('click', async () => {
+    const type = dialog.querySelector('#cms-new-type').value || 'page';
+    close();
+    await releaseCmsLock();
+    cmsSelectedId = null;
+    cmsHeldLock = false;
+    renderCmsEditor({ id: null, type, title: '', slug: '', draft: {}, published: null, version: 0, status: 'draft', updated_at: new Date().toISOString() }, { held_by_me: true });
+  });
+}
 
 async function releaseCmsLock() {
   if (cmsLockTimer) { clearInterval(cmsLockTimer); cmsLockTimer = null; }
@@ -1593,7 +1879,7 @@ async function selectCmsDoc(id) {
   cmsHeldLock = lock ? lock.held_by_me : true;
   if (cmsHeldLock) {
     cmsLockTimer = setInterval(() => {
-      supabase.rpc('cms_claim_lock', { p_id: id }).then(() => {}, () => {});
+      supabase.rpc('cms_claim_lock', { p_id: id }).then(() => { }, () => { });
     }, 90000);
   }
 
@@ -1608,33 +1894,36 @@ function cmsExtraFields(doc) {
 }
 
 function renderCmsEditor(doc, lock) {
-  document.querySelector('#cms-editor-empty').innerHTML = '';
+  document.querySelector('#cms-editor-blank').innerHTML = '';
   const editor = document.querySelector('#cms-editor');
   editor.classList.remove('hidden');
   const fields = CMS_TYPE_FIELDS[doc.type] || [];
   const draft = doc.draft || {};
   const locked = lock && !lock.held_by_me;
+  const typeLabel = CMS_TYPE_LABELS[doc.type] || doc.type;
+
+  // Rich fields load into a contenteditable surface — build their seed HTML up
+  // front (out of the template string, so document markup can't break out).
+  const richHtml = {};
+  fields.filter((f) => f.type === 'rich').forEach((f) => { richHtml[f.key] = valueToHtml(draft[f.key]); });
 
   editor.innerHTML = `
     <div id="cms-lock-banner" class="adm-lock-banner" ${locked ? '' : 'hidden'}>
       ${icon('lock', 14)} <span>Being edited by ${escapeHtml(lock?.holder_name || 'another admin')} — you can view but changes may conflict.</span>
     </div>
-    <div class="adm-cms-editor-head">
-      <div style="flex:1;min-width:220px">
-        <div class="adm-modal-grid">
-          <label class="adm-field"><span class="label">Title</span><input class="field" id="cms-title" value="${escapeHtml(doc.title || '')}" ${locked ? 'disabled' : ''}></label>
-          <label class="adm-field"><span class="label">Slug</span><input class="field font-mono text-xs" id="cms-slug" value="${escapeHtml(doc.slug || '')}" ${locked ? 'disabled' : ''}></label>
-        </div>
-        <p style="margin-top:6px;font-size:.72rem;color:var(--text-soft)">${escapeHtml(doc.type)} · version ${doc.version} · updated ${shortDate(doc.updated_at)} ${doc.published_at ? `· published ${shortDate(doc.published_at)}` : ''}</p>
-      </div>
-      <div class="adm-cms-actions">
-        <button type="button" class="button" id="cms-save-draft" ${locked ? 'disabled' : ''}>Save draft</button>
-        <button type="button" class="button button-primary" id="cms-publish">Publish</button>
-        ${doc.published ? `<button type="button" class="button" id="cms-unpublish">Unpublish</button>` : ''}
-        <button type="button" class="button" id="cms-duplicate">Duplicate</button>
-        <button type="button" class="button button-danger" id="cms-delete">Delete</button>
-      </div>
+
+    <div class="adm-cms-editor-head" data-uk-popover-anchor>
+      <input class="field adm-cms-title-input" id="cms-title" placeholder="Untitled document" value="${escapeHtml(doc.title || '')}" ${locked ? 'disabled' : ''}>
+      <button type="button" class="button adm-cms-actions-trigger" id="cms-actions-trigger">${icon('sliders-horizontal', 14)} Actions ${icon('chevron-down', 13)}</button>
+      <input type="hidden" id="cms-slug" value="${escapeHtml(doc.slug || '')}">
     </div>
+    <p class="adm-cms-meta">
+      <span class="uk-badge uk-badge--neutral">${escapeHtml(typeLabel)}</span>
+      <span>v${doc.version}</span>
+      ${doc.id ? `<span>updated ${shortDate(doc.updated_at)}</span>` : '<span>new draft</span>'}
+      ${doc.published_at ? `<span>· published ${shortDate(doc.published_at)}</span>` : ''}
+      <span class="adm-cms-meta__slug">/<span id="cms-slug-display">${escapeHtml(doc.slug || '—')}</span>${locked ? '' : ` <button type="button" class="linklike" id="cms-edit-slug">edit</button>`}</span>
+    </p>
 
     <div class="adm-cms-tabs" role="tablist">
       <button type="button" class="adm-cms-tab-btn is-active" data-cms-tab="edit">Edit</button>
@@ -1647,14 +1936,16 @@ function renderCmsEditor(doc, lock) {
         ${fields.map((f) => `
           <div class="adm-field-group">
             <label class="label" for="cms-f-${f.key}">${escapeHtml(f.label)}</label>
-            ${f.type === 'textarea'
-              ? `<textarea class="field" id="cms-f-${f.key}" rows="${f.rows || 4}" ${locked ? 'disabled' : ''}>${escapeHtml(draft[f.key] ?? '')}</textarea>`
-              : `<input class="field" id="cms-f-${f.key}" value="${escapeHtml(draft[f.key] ?? '')}" ${locked ? 'disabled' : ''}>`}
+            ${f.type === 'rich'
+      ? `<div id="cms-rte-${f.key}">${buildRte({ id: `cms-f-${f.key}`, minHeight: f.minHeight || 320, disabled: locked })}</div>`
+      : f.type === 'textarea'
+        ? `<textarea class="field" id="cms-f-${f.key}" rows="${f.rows || 4}" ${locked ? 'disabled' : ''}>${escapeHtml(draft[f.key] ?? '')}</textarea>`
+        : `<input class="field" id="cms-f-${f.key}" value="${escapeHtml(draft[f.key] ?? '')}" ${locked ? 'disabled' : ''}>`}
           </div>`).join('')}
-        <div class="adm-field-group">
-          <label class="label" for="cms-extra-json">Advanced: extra fields (JSON, merged in on save)</label>
+        <details class="adm-cms-advanced">
+          <summary>Advanced: extra fields (JSON, merged in on save)</summary>
           <textarea class="field font-mono text-xs" id="cms-extra-json" rows="4" ${locked ? 'disabled' : ''}>${escapeHtml(JSON.stringify(cmsExtraFields(doc), null, 2))}</textarea>
-        </div>
+        </details>
         ${doc.published ? `<p class="adm-panel-note" style="margin-top:4px">This document has unpublished changes: the storefront still shows the last <strong>published</strong> snapshot until you press Publish.</p>` : ''}
       </div>
     </div>
@@ -1664,9 +1955,17 @@ function renderCmsEditor(doc, lock) {
     </div>
 
     <div class="adm-cms-tabpanel" data-cms-tabpanel="media">
-      <div class="adm-filter-row"><label class="adm-media-upload" style="width:auto;height:auto;padding:8px 14px;display:inline-flex">${icon('upload', 14)} <span>Upload to library</span><input type="file" id="cms-media-upload-input" accept="image/*" class="hidden"></label></div>
-      <div id="cms-media-grid" class="adm-media-grid mt-4">Loading…</div>
+      <div class="adm-media-toolbar">
+        <span class="adm-media-toolbar__count" id="cms-media-count">Media library</span>
+        <label class="button button-primary !min-h-9 !px-4 text-xs" style="cursor:pointer">${icon('upload', 13)} Upload image<input type="file" id="cms-media-upload-input" accept="image/*" class="hidden"></label>
+      </div>
+      <div id="cms-media-grid" class="adm-media-grid"></div>
     </div>`;
+
+  // Rich-text editors: attach behaviour and seed content.
+  fields.filter((f) => f.type === 'rich').forEach((f) => {
+    wireRte(editor.querySelector(`#cms-rte-${f.key} .cms-rte`), richHtml[f.key], { disabled: locked });
+  });
 
   editor.querySelectorAll('.adm-cms-tab-btn').forEach((btn) => btn.addEventListener('click', () => {
     editor.querySelectorAll('.adm-cms-tab-btn').forEach((b) => b.classList.toggle('is-active', b === btn));
@@ -1675,12 +1974,49 @@ function renderCmsEditor(doc, lock) {
     if (btn.dataset.cmsTab === 'media') loadCmsMedia();
   }));
 
-  editor.querySelector('#cms-save-draft')?.addEventListener('click', () => saveCmsDraft(doc));
-  editor.querySelector('#cms-publish')?.addEventListener('click', () => publishCms(doc));
-  editor.querySelector('#cms-unpublish')?.addEventListener('click', () => unpublishCms(doc));
-  editor.querySelector('#cms-duplicate')?.addEventListener('click', () => duplicateCms(doc));
-  editor.querySelector('#cms-delete')?.addEventListener('click', () => deleteCms(doc));
-  editor.querySelector('#cms-media-upload-input')?.addEventListener('change', (e) => uploadCmsMedia(e.target.files?.[0]));
+  // The five document actions live in a popover so the title gets the full row.
+  const actionsTrigger = editor.querySelector('#cms-actions-trigger');
+  const pop = attachPopover(actionsTrigger, `
+    <button type="button" id="cms-save-draft" ${locked ? 'disabled' : ''}>${icon('save', 14)} Save draft</button>
+    <button type="button" id="cms-publish" ${locked ? 'disabled' : ''}>${icon('upload-cloud', 14)} Publish</button>
+    ${doc.published ? `<button type="button" id="cms-unpublish">${icon('eye-off', 14)} Unpublish</button>` : ''}
+    <button type="button" id="cms-duplicate" ${doc.id ? '' : 'disabled'}>${icon('copy', 14)} Duplicate</button>
+    <span class="uk-popover__sep"></span>
+    <button type="button" class="is-danger" id="cms-delete" ${doc.id ? '' : 'disabled'}>${icon('trash-2', 14)} Delete</button>`, { align: 'right' });
+  const closePop = () => pop?.close();
+  editor.querySelector('#cms-save-draft')?.addEventListener('click', () => { closePop(); saveCmsDraft(doc); });
+  editor.querySelector('#cms-publish')?.addEventListener('click', () => { closePop(); publishCms(doc); });
+  editor.querySelector('#cms-unpublish')?.addEventListener('click', () => { closePop(); unpublishCms(doc); });
+  editor.querySelector('#cms-duplicate')?.addEventListener('click', () => { closePop(); duplicateCms(doc); });
+  editor.querySelector('#cms-delete')?.addEventListener('click', () => { closePop(); deleteCms(doc); });
+
+  editor.querySelector('#cms-edit-slug')?.addEventListener('click', () => {
+    const next = window.prompt('URL slug (lowercase, hyphens). Changing it breaks existing links to this document.', doc.slug || slugify(document.querySelector('#cms-title')?.value || ''));
+    if (next == null) return;
+    const clean = slugify(next);
+    document.querySelector('#cms-slug').value = clean;
+    document.querySelector('#cms-slug-display').textContent = clean || '—';
+  });
+
+  editor.querySelector('#cms-media-upload-input')?.addEventListener('change', (e) => {
+    const picked = e.target.files?.[0];
+    if (picked) editImage(picked).then(uploadCmsMedia); else uploadCmsMedia(picked);
+  });
+
+  // Ctrl/Cmd+S saves the current draft. Wired once on the persistent editor
+  // element (renderCmsEditor replaces its innerHTML, not the element itself);
+  // the handler reads the live doc/lock from module state.
+  cmsEditorDoc = doc;
+  cmsEditorLocked = locked;
+  if (!editor.dataset.saveShortcutWired) {
+    editor.dataset.saveShortcutWired = 'true';
+    editor.addEventListener('keydown', (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        if (cmsEditorDoc && !cmsEditorLocked) saveCmsDraft(cmsEditorDoc);
+      }
+    });
+  }
 
   renderIcons();
 }
@@ -1688,7 +2024,14 @@ function renderCmsEditor(doc, lock) {
 function collectCmsDraft(doc) {
   const fields = CMS_TYPE_FIELDS[doc.type] || [];
   const draft = {};
-  fields.forEach((f) => { draft[f.key] = document.querySelector(`#cms-f-${f.key}`)?.value ?? ''; });
+  fields.forEach((f) => {
+    if (f.type === 'rich') {
+      const root = document.querySelector(`#cms-rte-${f.key} .cms-rte`);
+      draft[f.key] = getRteValue(root, formatForType(doc.type));
+    } else {
+      draft[f.key] = document.querySelector(`#cms-f-${f.key}`)?.value ?? '';
+    }
+  });
   const extraRaw = document.querySelector('#cms-extra-json')?.value || '{}';
   try {
     Object.assign(draft, JSON.parse(extraRaw || '{}'));
@@ -1699,9 +2042,12 @@ function collectCmsDraft(doc) {
 }
 
 async function saveCmsDraft(doc, { silent = false } = {}) {
-  const button = document.querySelector('#cms-save-draft');
+  const button = document.querySelector('#cms-save-draft') || document.querySelector('#cms-actions-trigger');
   const title = document.querySelector('#cms-title')?.value.trim() || 'Untitled';
-  const slug = document.querySelector('#cms-slug')?.value.trim() || null;
+  // Slug is auto-derived from the title for brand-new docs; for existing docs
+  // it stays put unless explicitly changed via the "edit" affordance.
+  const rawSlug = document.querySelector('#cms-slug')?.value.trim();
+  const slug = rawSlug || (doc.id ? null : slugify(title)) || null;
   const draft = collectCmsDraft(doc);
   setBusy(button, true, 'Saving…');
   const { data, error } = await supabase.rpc('cms_save', {
@@ -1778,9 +2124,13 @@ async function loadCmsHistory(documentId) {
   if (!data?.length) { host.innerHTML = emptyState({ icon: 'history', title: 'No revisions yet' }); return; }
   host.innerHTML = `<div class="adm-version-list">${data.map((r) => `
     <div class="adm-version-row">
-      <div class="adm-version-row__meta"><strong>v${r.version} · ${escapeHtml(r.action)}</strong><span>${escapeHtml(r.actor_email || 'system')} · ${dateTime(r.created_at)}</span></div>
-      <button type="button" class="button !min-h-8 !px-3 text-xs" data-restore-revision="${r.id}">Restore</button>
+      <div class="adm-version-row__meta">
+        <strong>v${r.version} · ${escapeHtml(r.action)}</strong>
+        <span>${escapeHtml(r.actor_email || 'system')} · ${dateTime(r.created_at)}</span>
+      </div>
+      <button type="button" class="button !min-h-8 !px-3 text-xs" data-restore-revision="${r.id}">${icon('rotate-ccw', 12)} Restore</button>
     </div>`).join('')}</div>`;
+  renderIcons();
   host.querySelectorAll('[data-restore-revision]').forEach((btn) => btn.addEventListener('click', async () => {
     const ok = await confirmDialog({ title: 'Restore this revision?', body: 'The current draft is replaced with this older snapshot. This does not affect what is currently published until you publish again.', confirmLabel: 'Restore', danger: true });
     if (!ok) return;
@@ -1798,11 +2148,16 @@ async function loadCmsMedia() {
   const host = document.querySelector('#cms-media-grid');
   if (!host) return;
   const { data, error } = await supabase.from('cms_assets').select('*').order('created_at', { ascending: false }).limit(60);
+  const countEl = document.querySelector('#cms-media-count');
   if (error) { host.innerHTML = emptyState({ icon: 'triangle-alert', title: 'Could not load media', body: error.message }); return; }
-  if (!data?.length) { host.innerHTML = emptyState({ icon: 'image', title: 'No media uploaded yet', body: 'Upload an image to start the library.' }); return; }
+  if (!data?.length) { host.innerHTML = emptyState({ icon: 'image', title: 'No media uploaded yet', body: 'Upload an image to start the library.' }); if (countEl) countEl.textContent = 'Media library'; return; }
+  if (countEl) countEl.textContent = `${data.length} file${data.length === 1 ? '' : 's'}`;
+  const isImg = (a) => (a.mime_type || '').startsWith('image/') || /\.(png|jpe?g|webp|gif|avif|svg)$/i.test(a.filename || a.url || '');
   host.innerHTML = data.map((a) => `
     <div class="adm-media-card">
-      <img class="adm-media-card__thumb" src="${escapeHtml(a.url)}" alt="${escapeHtml(a.alt || a.filename)}" loading="lazy">
+      <button type="button" class="adm-media-card__thumb" data-view-asset="${escapeHtml(a.url)}" data-view-name="${escapeHtml(a.filename || '')}" aria-label="Preview ${escapeHtml(a.filename || 'asset')}">
+        ${isImg(a) ? `<img src="${escapeHtml(a.url)}" alt="${escapeHtml(a.alt || a.filename || '')}" loading="lazy">` : fileGlyph(a.filename || a.url, 44)}
+      </button>
       <div class="adm-media-card__body">
         <strong title="${escapeHtml(a.filename)}">${escapeHtml(a.filename)}</strong>
         <span>${a.width && a.height ? `${a.width}×${a.height} · ` : ''}${a.size_bytes ? `${(a.size_bytes / 1024).toFixed(0)} KB` : ''}</span>
@@ -1812,6 +2167,7 @@ async function loadCmsMedia() {
         </div>
       </div>
     </div>`).join('');
+  host.querySelectorAll('[data-view-asset]').forEach((btn) => btn.addEventListener('click', () => openFileViewer({ src: btn.dataset.viewAsset, name: btn.dataset.viewName })));
   host.querySelectorAll('[data-copy-asset]').forEach((btn) => btn.addEventListener('click', () => { navigator.clipboard.writeText(btn.dataset.copyAsset); toast('Asset URL copied.'); }));
   host.querySelectorAll('[data-delete-asset]').forEach((btn) => btn.addEventListener('click', async () => {
     const ok = await confirmDialog({ title: 'Delete this asset?', body: 'Any content still referencing this URL will show a broken image.', confirmLabel: 'Delete asset' });
@@ -1844,14 +2200,8 @@ async function uploadCmsMedia(file) {
   }
 }
 
-document.querySelector('#cms-new-doc')?.addEventListener('click', async () => {
-  await releaseCmsLock();
-  const type = document.querySelector('#cms-new-type')?.value || 'page';
-  cmsSelectedId = null;
-  renderCmsEditor({ id: null, type, title: '', slug: '', draft: {}, published: null, version: 0, status: 'draft', updated_at: new Date().toISOString() }, { held_by_me: true });
-  cmsHeldLock = false;
-  paintCmsList();
-});
+document.querySelector('#cms-new-doc')?.addEventListener('click', openCmsNewDoc);
+document.querySelector('#cms-open-picker')?.addEventListener('click', openCmsDocPicker);
 
 /* ==========================================================================
    A10 — Site settings
@@ -1878,6 +2228,7 @@ async function loadSettings(force = false) {
   form.elements.social_instagram.value = social.instagram || '';
   form.elements.default_commission_rate.value = data.default_commission_rate ?? 15;
   form.elements.refund_rate_percent.value = data.refund_rate_percent ?? 30;
+  form.elements.ad_min_wallet_balance.value = data.ad_min_wallet_balance ?? 100;
 }
 
 document.querySelector('#settings-form')?.addEventListener('submit', async (event) => {
@@ -1898,6 +2249,7 @@ document.querySelector('#settings-form')?.addEventListener('submit', async (even
     social: { twitter: form.elements.social_twitter.value.trim() || undefined, instagram: form.elements.social_instagram.value.trim() || undefined },
     default_commission_rate: Number(form.elements.default_commission_rate.value) || 0,
     refund_rate_percent: Number(form.elements.refund_rate_percent.value) || 0,
+    ad_min_wallet_balance: Number(form.elements.ad_min_wallet_balance.value) || 0,
     updated_by: account.user.id,
   };
   setBusy(button, true, 'Saving…');
@@ -2101,7 +2453,7 @@ async function boot() {
 
   activateScreen();
   await loadOverview();
-  loadModeration().catch(() => {});
+  loadModeration().catch(() => { });
   renderIcons();
   finishPageLoader();
 }

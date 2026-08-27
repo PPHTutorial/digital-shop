@@ -291,8 +291,8 @@ function paintProductsTable() {
         key: 'title', label: 'Product', render: (p) => `
           <div class="flex items-center gap-3">
             ${p.cover_url
-              ? `<img src="${escapeHtml(p.cover_url)}" alt="" style="width:52px;height:38px;border-radius:6px;object-fit:cover">`
-              : `<span style="display:grid;place-items:center;width:52px;height:38px;border-radius:6px;background:var(--surface-sunken);font-size:9px;color:var(--text-soft)">No image</span>`}
+            ? `<img src="${escapeHtml(p.cover_url)}" alt="" style="width:52px;height:38px;border-radius:6px;object-fit:cover">`
+            : `<span style="display:grid;place-items:center;width:52px;height:38px;border-radius:6px;background:var(--surface-sunken);font-size:9px;color:var(--text-soft)">No image</span>`}
             <span class="min-w-0">
               <strong style="display:block;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px">${escapeHtml(p.title)}</strong>
               <span style="font-size:.72rem;color:var(--text-muted)">${escapeHtml(p.category || 'General')}</span>
@@ -407,13 +407,13 @@ async function loadPayouts() {
 
   accountsHost.innerHTML = payoutAccounts.length
     ? payoutAccounts.map((a) => {
-        const label = {
-          bank_transfer: `${a.bank_name || 'Bank'} ····${a.account_last4 || ''}`,
-          mobile_money: `${a.momo_provider || 'Mobile money'} ····${a.account_last4 || ''}`,
-          paypal: a.paypal_email || 'PayPal',
-          crypto: `${a.crypto_asset || 'Crypto'} ····${a.account_last4 || ''}`,
-        }[a.method];
-        return `
+      const label = {
+        bank_transfer: `${a.bank_name || 'Bank'} ····${a.account_last4 || ''}`,
+        mobile_money: `${a.momo_provider || 'Mobile money'} ····${a.account_last4 || ''}`,
+        paypal: a.paypal_email || 'PayPal',
+        crypto: `${a.crypto_asset || 'Crypto'} ····${a.account_last4 || ''}`,
+      }[a.method];
+      return `
           <div class="vnd-account-row">
             <div class="vnd-account-row__meta">
               <strong>${escapeHtml(label)}</strong>
@@ -425,7 +425,7 @@ async function loadPayouts() {
               <button class="button !min-h-8 !px-3 text-xs button-danger" type="button" data-delete-account="${a.id}">Remove</button>
             </div>
           </div>`;
-      }).join('')
+    }).join('')
     : emptyState({ icon: 'landmark', title: 'No payout account yet', body: 'Add one before requesting a withdrawal.' });
 
   payoutHistory = historyResult.data || [];
@@ -696,8 +696,8 @@ async function loadCampaigns() {
           <div><strong>${Number(c.conversions).toLocaleString()}</strong><span>Sold</span></div>
         </div>
         ${c.review_status === 'approved' && ['active', 'paused'].includes(c.status)
-          ? `<div class="vnd-campaign-card__actions"><button class="button !min-h-8 !px-3 text-xs" type="button" data-toggle-campaign="${c.id}" data-status="${c.status}">${c.status === 'active' ? 'Pause' : 'Resume'}</button></div>`
-          : ''}
+        ? `<div class="vnd-campaign-card__actions"><button class="button !min-h-8 !px-3 text-xs" type="button" data-toggle-campaign="${c.id}" data-status="${c.status}">${c.status === 'active' ? 'Pause' : 'Resume'}</button></div>`
+        : ''}
       </div>`;
   }).join('');
 
@@ -865,8 +865,8 @@ function openProductModal(product = null) {
             <input class="field font-bold" name="price" type="number" step=".01" min="0" required placeholder="0.00" value="${product?.price ?? ''}">
           </label>
           <label class="vnd-field">
-            <span class="label">Compare-at price <span class="vnd-optional">(optional)</span></span>
-            <input class="field" name="original_price" type="number" step=".01" min="0" placeholder="0.00" value="${product?.original_price ?? ''}">
+            <span class="label">Compare-at price <!--<span class="vnd-optional">(optional)</span>--></span>
+            <input class="field" name="original_price" type="number" step=".01" min="0" placeholder="Optional filed" value="${product?.original_price ?? ''}">
           </label>
         </div>
         <label class="vnd-field vnd-field--span2" style="margin-top:14px">
@@ -1627,6 +1627,16 @@ async function boot() {
     applyCountry.innerHTML = countryOptions();
     enhanceSelect(applyCountry, { label: 'Country' });
     enhanceSelect(document.querySelector('select[name="payout_currency"]'), { label: 'Payout currency' });
+
+    // The commission line in the "How payouts work" callout is not a hardcoded
+    // 15% — it reflects the current default rate new stores are onboarded at,
+    // set in the admin Settings screen (site_settings.default_commission_rate).
+    const { data: settings } = await supabase
+      .from('site_settings').select('default_commission_rate').eq('id', 1).maybeSingle();
+    const rate = settings?.default_commission_rate;
+    const rateEl = document.querySelector('#apply-commission-rate');
+    if (rateEl && rate != null) rateEl.textContent = `${Number(rate)}%`;
+
     show('vendor-apply');
     renderIcons();
     finishPageLoader();

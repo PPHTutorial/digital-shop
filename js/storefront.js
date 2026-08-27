@@ -268,7 +268,12 @@ async function load() {
       count: counts.get(category.name) || 0,
       ...categoryLook(category.slug),
     }));
-    renderCategoryTiles(document.querySelector('#category-jumbotron'), withCounts.slice(9));
+    // Top 9 categories by live product count — the grid renders these plus a
+    // trailing "View all" card (9 + 1). How many of the 9 are actually visible
+    // is capped per breakpoint in CSS (`.cattile-grid` rules): the full 9 only
+    // on lg, fewer as the grid narrows.
+    const topCategories = [...withCounts].sort((a, b) => b.count - a.count).slice(0, 9);
+    renderCategoryTiles(document.querySelector('#category-jumbotron'), topCategories);
   } catch (error) {
     console.error('Category tiles failed:', error);
   }

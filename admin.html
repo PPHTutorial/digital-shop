@@ -239,43 +239,14 @@
           <div class="adm-panel-head">
             <div><span class="eyebrow">CMS &amp; JOURNAL</span><h2>Content &amp; store experience</h2><p>Draft, review and publish every page, post, FAQ and legal document that appears on the storefront.</p></div>
             <div class="flex gap-2">
-              <select id="cms-new-type" class="field" style="max-width:160px">
-                <option value="page">Page</option>
-                <option value="post">Blog post</option>
-                <option value="author">Author</option>
-                <option value="faq">FAQ</option>
-                <option value="announcement">Announcement</option>
-                <option value="legal">Legal</option>
-                <option value="navigation">Navigation</option>
-                <option value="homepage">Homepage block</option>
-              </select>
+              <button id="cms-open-picker" class="button" type="button"><i data-lucide="folder-open" width="15" height="15"></i> Documents</button>
               <button id="cms-new-doc" class="button button-primary" type="button">+ New document</button>
             </div>
           </div>
 
-          <div class="adm-cms-layout">
-            <div class="adm-panel">
-              <div class="adm-filter-row">
-                <input id="cms-search" class="field" type="search" placeholder="Search documents…" style="max-width:170px">
-                <select id="cms-type-filter" class="field" style="max-width:150px">
-                  <option value="">All types</option>
-                  <option value="page">Page</option>
-                  <option value="post">Post</option>
-                  <option value="author">Author</option>
-                  <option value="faq">FAQ</option>
-                  <option value="announcement">Announcement</option>
-                  <option value="legal">Legal</option>
-                  <option value="navigation">Navigation</option>
-                  <option value="homepage">Homepage</option>
-                </select>
-              </div>
-              <div id="cms-doc-list" class="adm-cms-list mt-4"></div>
-            </div>
-
-            <div class="adm-panel">
-              <div id="cms-editor-empty" class="uk-empty"></div>
-              <div id="cms-editor" class="adm-cms-editor hidden"></div>
-            </div>
+          <div class="adm-panel adm-cms-shell">
+            <div id="cms-editor-blank" class="adm-cms-blank"></div>
+            <div id="cms-editor" class="adm-cms-editor hidden"></div>
           </div>
         </section>
 
@@ -391,6 +362,7 @@
               <label class="adm-field"><span class="label">Instagram URL</span><input name="social_instagram" class="field"></label>
               <label class="adm-field"><span class="label">Default vendor commission <span class="help" style="font-weight:400">(%, applied to new stores)</span></span><input name="default_commission_rate" type="number" step=".01" min="0" max="100" class="field"></label>
               <label class="adm-field"><span class="label">Standard refund rate <span class="help" style="font-weight:400">(%, shown in the refund policy)</span></span><input name="refund_rate_percent" type="number" step=".01" min="0" max="100" class="field"></label>
+              <label class="adm-field"><span class="label">Min. ad-wallet balance <span class="help" style="font-weight:400">(USD, to publish an external-link listing)</span></span><input name="ad_min_wallet_balance" type="number" step="1" min="0" class="field"></label>
               <div class="adm-field--span2 flex items-center gap-3">
                 <button class="button button-primary" type="submit">Save settings</button>
                 <p id="settings-feedback" class="status-line text-xs my-0"></p>

@@ -1,11 +1,19 @@
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, mountFooter, mountHeader, renderIcons } from './ui.js';
+import { finishPageLoader, mountFooter, mountHeader, renderIcons } from './ui.js';
+import { inlineHtmlFromMarkdown } from './rte.js';
 
 const DOC_TITLES = {
   terms: 'Terms of Service',
   privacy: 'Privacy Policy',
+  cookies: 'Cookie Policy',
   refunds: 'Refund Policy',
   licence: 'Digital Licence Agreement',
+  'acceptable-use': 'Acceptable Use Policy',
+  'dispute-resolution': 'Dispute Resolution & Chargebacks',
+  'ip-dmca': 'Intellectual Property & Takedown Policy',
+  'vendor-agreement': 'Vendor Agreement',
+  'store-policy': 'Store & Listing Policy',
+  payouts: 'Payout & Settlement Policy',
 };
 
 function formatDate(iso) {
@@ -14,7 +22,10 @@ function formatDate(iso) {
 }
 
 function bodyBlockHtml(block) {
-  const text = escapeHtml(block.text || '');
+  // Block text carries lightweight inline markdown (**bold**, *italic*,
+  // `code`, [link](url)) written in the admin rich-text editor — render it
+  // rather than showing the literal markers.
+  const text = inlineHtmlFromMarkdown(block.text || '');
   switch (block.type) {
     case 'h2': return `<h2>${text}</h2>`;
     case 'h3': return `<h3>${text}</h3>`;

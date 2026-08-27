@@ -440,6 +440,25 @@ export async function mountHeader() {
     renderIcons();
     finishPageLoader();
 
+    // Publish the real height of the sticky header (utility bar + main nav +
+    // category bar) as `--header-h`. Every `position: sticky` top offset and
+    // the page's `scroll-padding-top` are expressed as `calc(var(--header-h) +
+    // …)`, so anything pinned below the header — dashboard sidebars, the cart
+    // and checkout summaries, in-page anchor jumps — clears it instead of
+    // tucking underneath. The height changes with the viewport (the category
+    // bar is hidden under 1024px, the nav shrinks) so we re-measure on resize.
+    const syncHeaderHeight = () => {
+      const h = target.getBoundingClientRect().height;
+      if (h) document.documentElement.style.setProperty('--header-h', `${Math.round(h)}px`);
+    };
+    syncHeaderHeight();
+    requestAnimationFrame(syncHeaderHeight);
+    if (document.fonts?.ready) document.fonts.ready.then(syncHeaderHeight).catch(() => {});
+    if (!document.body.dataset.headerHeightWired) {
+      document.body.dataset.headerHeightWired = 'true';
+      window.addEventListener('resize', () => requestAnimationFrame(syncHeaderHeight));
+    }
+
     // Real cart count for a signed-in shopper — no badge (not a "0") for
     // anonymous visitors, since there's nothing server-side to count for them.
     if (user) {
@@ -560,6 +579,8 @@ export function mountFooter() {
             <li><a href="./vendor" class="font-bold" style="color:#92660a">Start selling →</a></li>
             <li><a href="./vendor">Seller centre</a></li>
             <li><a href="./categories">What sells here</a></li>
+            <li><a href="./legal?doc=vendor-agreement">Vendor Agreement</a></li>
+            <li><a href="./legal?doc=payouts">Payout &amp; Settlement Policy</a></li>
             <li><a href="./support">Seller support</a></li>
           </ul>
         </div>
@@ -569,10 +590,12 @@ export function mountFooter() {
           <ul class="space-y-2 text-xs" style="color:var(--text-muted)">
             <li><a href="./legal?doc=terms">Terms of Service</a></li>
             <li><a href="./legal?doc=privacy">Privacy Policy</a></li>
+            <li><a href="./legal?doc=cookies">Cookie Policy</a></li>
             <li><a href="./legal?doc=refunds">Refund &amp; Return Policy</a></li>
             <li><a href="./legal?doc=licence">Digital License Agreement</a></li>
-            <li><a href="./support#faq">Security &amp; Compliance</a></li>
-            <li><a href="./contact">Contact Legal Team</a></li>
+            <li><a href="./legal?doc=acceptable-use">Acceptable Use Policy</a></li>
+            <li><a href="./legal?doc=ip-dmca">IP &amp; Takedown Policy</a></li>
+            <li><a href="./legal">All legal &amp; compliance</a></li>
           </ul>
         </div>
       </div>
