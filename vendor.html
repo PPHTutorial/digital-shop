@@ -24,7 +24,8 @@
   <meta name="twitter:title" content="Seller Centre | DigiStore">
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
-  <link rel="stylesheet" href="./css/app.css?v=0930facf">
+  <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="stylesheet" href="./css/app.css?v=2e86bd0f">
 </head>
 <body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
   <div id="page-loader" class="page-loader">
@@ -219,6 +220,13 @@
             <div class="vnd-stat-card"><span id="s-net-label">Net earnings</span><strong id="s-net">—</strong></div>
           </div>
           <div class="vnd-panel"><div id="vendor-sales-table"></div></div>
+
+          <div class="vnd-panel" id="vnd-affiliate-panel">
+            <div class="vnd-panel-head">
+              <div><h3>Affiliate-referred sales</h3><p id="vnd-affiliate-note">Sales an affiliate sent you, and the commission paid on them.</p></div>
+            </div>
+            <div id="vendor-affiliate-table"></div>
+          </div>
         </section>
 
         <!-- Payouts -->
@@ -408,6 +416,18 @@
               <label class="vnd-field vnd-field--span2">
                 <span class="label">Terms &amp; conditions</span>
                 <textarea class="field" name="terms" rows="3"></textarea>
+              </label>
+
+              <h3 class="vnd-form-section vnd-field--span2">Affiliate programme</h3>
+              <label class="vnd-check-line vnd-field--span2">
+                <input type="checkbox" name="affiliate_opt_in" value="1">
+                Let affiliates earn commission promoting my products
+              </label>
+              <label class="vnd-field">
+                <span class="label">Affiliate commission rate (%)</span>
+                <input class="field" name="affiliate_commission_rate" type="number" min="0" max="100" step="0.5"
+                  placeholder="Platform default">
+                <small class="help">Paid out of your share of each sale. Leave blank to use the platform default.</small>
               </label>
 
               <h3 class="vnd-form-section vnd-field--span2">Social links</h3>

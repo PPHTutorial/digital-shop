@@ -340,13 +340,53 @@ async function loadSales() {
   if (!salesFilterWired) {
     salesFilterWired = true;
     renderPeriodFilter(document.querySelector('#vnd-sales-period'), {
-      onChange: ({ range }) => { salesRange = range; salesPage = 1; paintSalesSummary(); paintSalesTable(); },
+      onChange: ({ range }) => { salesRange = range; salesPage = 1; paintSalesSummary(); paintSalesTable(); loadAffiliateSales(); },
     });
   }
 
   salesPage = 1;
   paintSalesSummary();
   paintSalesTable();
+  loadAffiliateSales();
+}
+
+async function loadAffiliateSales() {
+  const host = document.querySelector('#vendor-affiliate-table');
+  const note = document.querySelector('#vnd-affiliate-note');
+  if (!host) return;
+
+  if (vendor.affiliate_opt_in === false) {
+    if (note) note.textContent = 'Affiliate promotion is turned off for your products. Turn it on in Store settings → Affiliate programme.';
+    host.innerHTML = emptyState({ icon: 'link', title: 'Affiliates are off', body: 'Enable it in Store settings to let affiliates earn commission sending you sales.' });
+    return;
+  }
+
+  const rate = vendor.affiliate_commission_rate == null ? 'platform default' : `${vendor.affiliate_commission_rate}%`;
+  if (note) note.textContent = `Sales an affiliate sent you (your affiliate rate: ${rate}). Commission is settled by the platform.`;
+
+  const { data, error } = await supabase
+    .from('affiliate_earnings')
+    .select('id, created_at, gross_amount, commission_amount, commission_rate, currency, status, products(title)')
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (error) { host.innerHTML = emptyState({ icon: 'triangle-alert', title: 'Could not load affiliate sales', body: error.message }); return; }
+
+  const rows = (data || []).filter((r) => inPeriod(r.created_at, salesRange));
+  renderDataTable(host, {
+    columns: [
+      { key: 'product', label: 'Product', render: (r) => `<strong>${escapeHtml(r.products?.title || 'Product')}</strong>` },
+      { key: 'created_at', label: 'Date', render: (r) => shortDate(r.created_at) },
+      { key: 'gross_amount', label: 'Order', render: (r) => money(r.gross_amount, r.currency) },
+      { key: 'commission_amount', label: 'Affiliate comm.', render: (r) => `${money(r.commission_amount, r.currency)} (${r.commission_rate}%)` },
+      { key: 'status', label: 'Status', render: (r) => statusBadge(r.status, r.status) },
+    ],
+    rows: rows.slice(0, 50),
+    page: 1,
+    pageSize: 50,
+    total: rows.length,
+    emptyMessage: 'No affiliate-referred sales in this period yet.',
+  });
 }
 
 function paintSalesSummary() {
@@ -1325,6 +1365,8 @@ document.querySelector('#vendor-settings-form')?.addEventListener('submit', asyn
     return_policy: val('return_policy'),
     terms: val('terms'),
     social_links: socialLinks,
+    affiliate_opt_in: Boolean(form.elements.affiliate_opt_in?.checked),
+    affiliate_commission_rate: val('affiliate_commission_rate') === null ? null : Number(val('affiliate_commission_rate')),
     logo_url: document.querySelector('#logo-url').value || null,
     banner_url: document.querySelector('#banner-url').value || null,
     updated_at: new Date().toISOString(),
@@ -1656,6 +1698,8 @@ function fillSettings() {
   set('business_address', vendor.business_address);
   set('return_policy', vendor.return_policy);
   set('terms', vendor.terms);
+  set('affiliate_commission_rate', vendor.affiliate_commission_rate);
+  if (form.elements.affiliate_opt_in) form.elements.affiliate_opt_in.checked = vendor.affiliate_opt_in !== false;
   const social = vendor.social_links || {};
   VENDOR_SOCIAL_KEYS.forEach((key) => set(`social_${key}`, social[key]));
 

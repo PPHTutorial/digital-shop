@@ -7,6 +7,7 @@
   <url><loc>https://digistore.codeinktechnologies.com/contact</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://digistore.codeinktechnologies.com/support</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://digistore.codeinktechnologies.com/blog</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://digistore.codeinktechnologies.com/affiliate</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://digistore.codeinktechnologies.com/legal?doc=terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://digistore.codeinktechnologies.com/legal?doc=privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://digistore.codeinktechnologies.com/legal?doc=cookies</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>

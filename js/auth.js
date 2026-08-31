@@ -1,6 +1,7 @@
 import { supabase } from './client.js';
 import { CONFIG } from './config.js';
 import { mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
+import { getStoredReferral } from './affiliate-track.js';
 
 mountHeader();
 mountFooter();
@@ -79,8 +80,13 @@ form.addEventListener('submit', async (event) => {
   setButtonLoading(submit, true, mode === 'signup' ? 'Creating account…' : 'Signing in…');
   notice.textContent = '';
   const redirectTo = `${CONFIG.SITE_URL}${location.pathname.replace(/[^/]+$/, 'auth')}`;
+  // Carry any affiliate referral into signup metadata so the DB trigger
+  // (handle_new_user) can set profiles.referred_by.
+  const referral = getStoredReferral();
+  const signupData = { full_name: values.full_name };
+  if (referral) { signupData.ref_code = referral.code; signupData.ref_vid = referral.vid; }
   const result = mode === 'signup'
-    ? await supabase.auth.signUp({ email: values.email, password: values.password, options: { data: { full_name: values.full_name }, emailRedirectTo: redirectTo } })
+    ? await supabase.auth.signUp({ email: values.email, password: values.password, options: { data: signupData, emailRedirectTo: redirectTo } })
     : await supabase.auth.signInWithPassword({ email: values.email, password: values.password });
   setButtonLoading(submit, false);
   submit.textContent = mode === 'signup' ? 'Create Account' : 'Sign In to Account';

@@ -1,5 +1,9 @@
 import { supabase } from './client.js';
 import { CONFIG } from './config.js';
+import { enhanceSelect, refreshSelect } from './select.js';
+import { enhanceCheckbox, enhanceRadio, enhanceDateInput, enhanceDateTimeInput } from './form-controls.js';
+// Side-effect: captures ?ref=CODE into a first-party cookie on every page load.
+import './affiliate-track.js';
 
 export function startPageLoader() {
   if (document.querySelector('#page-loader')) return;
@@ -125,6 +129,169 @@ export function renderIcons() {
   document.head.append(script);
 }
 
+/* ==========================================================================
+   Theme (light / dark / system)
+   ---------------------------------------------------------------------------
+   css/app.css already carries the palette: `:root` is light, an explicit
+   `:root[data-theme="dark"]` block is dark, and
+   `@media (prefers-color-scheme: dark) :root:not([data-theme="light"])`
+   follows the OS when nothing explicit is set. These helpers are the only
+   thing that writes `data-theme`; the tiny inline script in each page's
+   <head> re-applies the stored choice before first paint (no flash).
+   ========================================================================== */
+
+const THEME_KEY = 'digistore-theme';
+export const THEME_MODES = ['system', 'light', 'dark'];
+const THEME_META = {
+  system: { icon: 'monitor', label: 'System' },
+  light: { icon: 'sun', label: 'Light' },
+  dark: { icon: 'moon', label: 'Dark' },
+};
+
+export function getStoredTheme() {
+  try { return localStorage.getItem(THEME_KEY) || 'system'; } catch { return 'system'; }
+}
+
+export function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === 'dark' || theme === 'light') root.setAttribute('data-theme', theme);
+  else root.removeAttribute('data-theme');
+}
+
+export function setTheme(theme) {
+  const next = THEME_MODES.includes(theme) ? theme : 'system';
+  try {
+    if (next === 'system') localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, next);
+  } catch { /* storage may be unavailable; theme still applies for this load */ }
+  applyTheme(next);
+  syncThemeToggles();
+  window.dispatchEvent(new CustomEvent('digistore:theme', { detail: { theme: next } }));
+}
+
+/** Call once on page load to restore whatever the visitor last chose. */
+export function initTheme() {
+  applyTheme(getStoredTheme());
+  syncThemeToggles();
+}
+
+/**
+ * Markup for a 3-way segmented control. `compact` drops the text labels
+ * (utility bar); the drawers use the full version. Multiple instances can
+ * live on one page — `syncThemeToggles()` keeps every copy in step.
+ */
+export function renderThemeToggle({ compact = false } = {}) {
+  const current = getStoredTheme();
+  const opts = THEME_MODES.map((mode) => {
+    const meta = THEME_META[mode];
+    return `<button type="button" class="theme-toggle__opt" data-theme-set="${mode}"
+      role="radio" aria-checked="${mode === current ? 'true' : 'false'}"
+      aria-label="${meta.label} theme" title="${meta.label} theme">
+      ${icon(meta.icon, 15)}<span class="theme-toggle__label">${meta.label}</span>
+    </button>`;
+  }).join('');
+  return `<div class="theme-toggle${compact ? ' theme-toggle--compact' : ''}" role="radiogroup" aria-label="Colour theme" data-theme-toggle>${opts}</div>`;
+}
+
+/** Reflect the stored choice onto every rendered toggle on the page. */
+export function syncThemeToggles() {
+  const current = getStoredTheme();
+  document.querySelectorAll('[data-theme-toggle]').forEach((group) => {
+    group.querySelectorAll('[data-theme-set]').forEach((btn) => {
+      btn.setAttribute('aria-checked', btn.dataset.themeSet === current ? 'true' : 'false');
+    });
+  });
+}
+
+/**
+ * Delegate clicks for every theme toggle to the document, once per page.
+ * Toggles are re-rendered by mountHeader on each auth change, so binding
+ * per-element would stack listeners — delegation sidesteps that.
+ */
+export function wireThemeToggles() {
+  if (document.body.dataset.themeToggleWired) return;
+  document.body.dataset.themeToggleWired = 'true';
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-theme-set]');
+    if (!btn) return;
+    setTheme(btn.dataset.themeSet);
+  });
+}
+
+/* ==========================================================================
+   Custom form controls, site-wide
+   ---------------------------------------------------------------------------
+   js/select.js and js/form-controls.js each keep the native element in the
+   DOM and layer a token-styled control on top; every enhancer is a no-op on
+   an element it has already handled (guards on `data-enhanced`). This is the
+   one entry point that applies all of them — used both for a one-shot pass
+   and by the MutationObserver in initControlsAutoEnhance().
+   Opt out by putting `data-no-enhance` on the control or any ancestor.
+   ========================================================================== */
+
+export function enhanceControls(scope = document) {
+  const root = scope || document;
+  if (root.nodeType !== 1 && root.nodeType !== 9) return;
+  const ok = (el) => !el.closest('[data-no-enhance]');
+  const label = (el) =>
+    el.closest('label')?.querySelector('.label, .field-label')?.textContent?.trim() ||
+    el.getAttribute('aria-label') || '';
+
+  root.querySelectorAll('select:not([data-enhanced])').forEach((el) => {
+    // Skip a select that has nothing in it yet — country/category pickers are
+    // populated async. The observer re-runs once the <option>s land.
+    if (ok(el) && el.options.length) { el._optCount = el.options.length; enhanceSelect(el, { label: label(el) }); }
+  });
+  // A select whose option list was swapped out with innerHTML= after it was
+  // enhanced needs its custom list re-read (callers should call refreshSelect,
+  // but this heals the ones that forget).
+  root.querySelectorAll('select[data-enhanced]').forEach((el) => {
+    if (el._optCount !== el.options.length) { el._optCount = el.options.length; refreshSelect(el); }
+  });
+  root.querySelectorAll('input[type="checkbox"]:not([data-enhanced])').forEach((el) => { if (ok(el)) enhanceCheckbox(el); });
+  root.querySelectorAll('input[type="radio"]:not([data-enhanced])').forEach((el) => { if (ok(el)) enhanceRadio(el); });
+  root.querySelectorAll('input[type="date"]:not([data-enhanced])').forEach((el) => { if (ok(el)) enhanceDateInput(el); });
+  root.querySelectorAll('input[type="datetime-local"]:not([data-enhanced])').forEach((el) => { if (ok(el)) enhanceDateTimeInput(el); });
+}
+
+let _controlsObserver = null;
+const RAW_CONTROL_SEL = 'select:not([data-enhanced]), input[type="checkbox"]:not([data-enhanced]), input[type="radio"]:not([data-enhanced]), input[type="date"]:not([data-enhanced]), input[type="datetime-local"]:not([data-enhanced])';
+
+/**
+ * Enhance what's on the page now, then watch <body> for injected markup and
+ * enhance that too — page scripts render lists, tables and modals well after
+ * this runs, and asking every call site to remember an enhance call is how
+ * coverage rots. Debounced to one pass per frame, and only re-scans when an
+ * added node actually carries an un-enhanced native control, so a custom
+ * control mutating its own innards (e.g. a select repainting its trigger)
+ * does not trigger a document sweep.
+ */
+export function initControlsAutoEnhance() {
+  if (_controlsObserver) return;
+  enhanceControls(document);
+  let queued = false;
+  const flush = () => { queued = false; enhanceControls(document); };
+  const hasRawControl = (node) =>
+    node.nodeType === 1 && (node.matches?.(RAW_CONTROL_SEL) || node.querySelector?.(RAW_CONTROL_SEL));
+  _controlsObserver = new MutationObserver((records) => {
+    if (queued) return;
+    for (const rec of records) {
+      // <option>s arriving into a select that was added empty (populated async).
+      if (rec.target?.nodeName === 'SELECT' && !rec.target.dataset.enhanced && rec.target.options.length) {
+        queued = true; requestAnimationFrame(flush); return;
+      }
+      for (const node of rec.addedNodes) {
+        if (hasRawControl(node)) {
+          queued = true;
+          requestAnimationFrame(flush);
+          return;
+        }
+      }
+    }
+  });
+  _controlsObserver.observe(document.body, { childList: true, subtree: true });
+}
+
 // Fetched once per page load and cached — every page's header shows the
 // same "top categories" quick-nav, and mountHeader's render() re-runs on
 // every auth-state change, so this must not re-query each time.
@@ -159,6 +326,13 @@ function loadTopCategories() {
 export async function mountHeader() {
   const target = document.querySelector('#site-header');
   if (!target) return;
+  // Re-assert the saved theme (the <head> inline script already did this for
+  // first paint; this covers pages that somehow lack it) and bind the toggle.
+  initTheme();
+  wireThemeToggles();
+  // Custom select/checkbox/radio/date controls, on this page and anything
+  // rendered into it later.
+  initControlsAutoEnhance();
   const render = async () => {
     const { user, profile } = await getAccount();
     const name = profile?.full_name || 'My account';
@@ -235,6 +409,7 @@ export async function mountHeader() {
           </div>
           <div class="utility-right">
             <span>${icon('shield-check', 13)} Tax &amp; VAT Compliant</span>
+            ${renderThemeToggle({ compact: true })}
           </div>
         </div>
       </div>
@@ -323,7 +498,9 @@ export async function mountHeader() {
         </form>
         ${drawerLinks}
         <a href="./categories">${icon('layout-grid')} Browse Categories</a>
+        <a href="./affiliate">${icon('link')} Affiliate programme</a>
         <a href="${sellHref}" class="drawer-sell">${icon('store')} ${sellLabel}</a>
+        <div class="drawer-theme"><span>Theme</span>${renderThemeToggle()}</div>
       </nav>`;
 
     // The account drawer carries only account/session actions — split out of
@@ -350,11 +527,14 @@ export async function mountHeader() {
                <a href="./account#orders-list">${icon('package')}<span>Orders</span></a>
                <a href="./checkout">${icon('shopping-cart')}<span>Cart / checkout</span></a>
                <a href="${sellHref}">${icon('store')}<span>${sellLabel}</span></a>
+               <a href="./affiliate">${icon('link')}<span>Affiliate programme</span></a>
                ${profile?.role === 'admin' ? `<a href="./admin">${icon('shield-check')}<span>Admin centre</span></a>` : ''}
                <button id="account-drawer-signout">${icon('log-out')}<span>Log out</span></button>`
             : `<a href="./auth">${icon('log-in')}<span>Log in</span></a>
-               <a href="./auth?mode=signup">${icon('user-plus')}<span>Create account</span></a>`
+               <a href="./auth?mode=signup">${icon('user-plus')}<span>Create account</span></a>
+               <a href="./affiliate">${icon('link')}<span>Affiliate programme</span></a>`
         }
+        <div class="drawer-theme"><span>Theme</span>${renderThemeToggle()}</div>
       </nav>`;
 
     document.body.append(scrim, drawer, acctScrim, acctDrawer);
@@ -594,8 +774,9 @@ export function mountFooter() {
         <div class="space-y-3">
           <h3 class="text-xs uppercase tracking-wider" style="color:var(--text);font-family:var(--font-display);font-weight:700">Sell With Us</h3>
           <ul class="space-y-2 text-xs" style="color:var(--text-muted)">
-            <li><a href="./vendor" class="font-bold" style="color:#92660a">Start selling →</a></li>
+            <li><a href="./vendor" class="font-bold" style="color:var(--accent-strong,#92660a)">Start selling →</a></li>
             <li><a href="./vendor">Seller centre</a></li>
+            <li><a href="./affiliate">Affiliate programme</a></li>
             <li><a href="./categories">What sells here</a></li>
             <li><a href="./legal?doc=vendor-agreement">Vendor Agreement</a></li>
             <li><a href="./legal?doc=payouts">Payout &amp; Settlement Policy</a></li>

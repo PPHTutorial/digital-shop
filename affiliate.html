@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Affiliate Programme | DigiStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" type="image/png" sizes="16x16" href="/img/brand/favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/brand/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/img/brand/icon-192.png">
+  <link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#072220">
+  <meta name="description" content="Earn commission promoting DigiStore digital products. Join the affiliate programme, share your referral link, and get paid for every sale you send.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="DigiStore">
+  <meta property="og:title" content="Affiliate Programme | DigiStore">
+  <meta property="og:description" content="Earn commission promoting DigiStore digital products.">
+  <meta property="og:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <meta property="og:url" content="https://digistore.codeinktechnologies.com/affiliate">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Affiliate Programme | DigiStore">
+  <meta name="twitter:description" content="Earn commission promoting DigiStore digital products.">
+  <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="stylesheet" href="./css/app.css?v=2e86bd0f">
+</head>
+<body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
+    </div>
+  </div>
+
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
+
+  <main class="flex-1">
+
+    <!-- Gate while we work out whether this account is enrolled -->
+    <div id="aff-gate" class="vnd-gate">
+      <div class="vnd-gate-card">
+        <div class="progress-track"></div>
+        <p>Loading the affiliate programme…</p>
+      </div>
+    </div>
+
+    <!-- Public pitch + terms + application form -->
+    <section id="aff-public" class="hidden aff-page">
+      <div class="aff-wrap">
+        <header class="aff-hero">
+          <span class="eyebrow">DIGISTORE AFFILIATE PROGRAMME</span>
+          <h1>Get paid to recommend digital products people actually want.</h1>
+          <p class="aff-hero__lede">
+            Share your referral link and earn commission on every purchase by a customer you introduced —
+            whether they buy DigiStore's own products or a marketplace seller's. Real-time reporting, a low
+            payout minimum, and payouts to bank, mobile money, PayPal or crypto.
+          </p>
+          <div class="aff-hero__cta">
+            <a href="#aff-join" class="button button-primary" data-aff-join-scroll>Join the programme</a>
+            <a href="#aff-terms" class="button">Read the terms</a>
+          </div>
+        </header>
+
+        <dl class="aff-facts" id="aff-facts">
+          <div><dt>Commission</dt><dd data-fact="rate">—</dd></div>
+          <div><dt>Cookie window</dt><dd data-fact="cookie">—</dd></div>
+          <div><dt>Minimum payout</dt><dd data-fact="min">—</dd></div>
+          <div><dt>Holding period</dt><dd data-fact="hold">—</dd></div>
+        </dl>
+
+        <div class="aff-block">
+          <h2 class="aff-block__title">How it works</h2>
+          <div class="aff-steps">
+            <div class="aff-step"><span>1</span><h3>Apply &amp; get verified</h3><p>Tell us where and how you'll promote. Every application is reviewed by an administrator before your link goes live.</p></div>
+            <div class="aff-step"><span>2</span><h3>Share your link</h3><p>Once approved, get a unique referral link plus deep-links to any product from your dashboard.</p></div>
+            <div class="aff-step"><span>3</span><h3>Earn &amp; withdraw</h3><p>Commission is tracked automatically, matures after the holding period, then you withdraw to your payout account.</p></div>
+          </div>
+        </div>
+
+        <section id="aff-join" class="aff-card">
+          <span class="eyebrow">JOIN</span>
+          <h2 class="aff-card__title">Apply to the affiliate programme</h2>
+          <p class="aff-card__lede">You need a DigiStore account first. An administrator verifies each application, usually within 1–2 business days — you can't earn until you're approved.</p>
+
+          <form id="aff-apply-form" class="aff-form">
+            <div class="aff-field aff-field--full">
+              <label for="aff-promo">Where will you promote DigiStore? <span class="aff-req">*</span></label>
+              <textarea id="aff-promo" class="field" name="promo_methods" required rows="3"
+                placeholder="e.g. my newsletter (12k subscribers), a YouTube channel about design tools, a blog…"></textarea>
+              <small class="help">The more specific, the faster the review.</small>
+            </div>
+            <div class="aff-field aff-field--full">
+              <label for="aff-website">Primary website / channel URL</label>
+              <input id="aff-website" class="field" type="url" name="website" placeholder="https://">
+            </div>
+            <div class="aff-field">
+              <label for="aff-payout-method">Preferred payout method</label>
+              <select id="aff-payout-method" class="field" name="payout_method">
+                <option value="bank">Bank transfer</option>
+                <option value="momo">Mobile money</option>
+                <option value="paypal">PayPal</option>
+                <option value="crypto">Crypto (USDT)</option>
+              </select>
+            </div>
+            <div class="aff-field">
+              <label for="aff-payout-currency">Payout currency</label>
+              <select id="aff-payout-currency" class="field" name="payout_currency">
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="GHS">GHS</option>
+                <option value="NGN">NGN</option>
+                <option value="KES">KES</option>
+                <option value="ZAR">ZAR</option>
+              </select>
+            </div>
+            <label class="aff-field aff-field--full aff-consent">
+              <input type="checkbox" name="accept_terms" value="1" required>
+              <span>I have read and accept the <a href="#aff-terms">Affiliate Programme Terms &amp; Conditions</a>.</span>
+            </label>
+            <div class="aff-field aff-field--full aff-form__actions">
+              <button type="submit" class="button button-primary">Submit application</button>
+              <p id="aff-apply-feedback" class="status-line"></p>
+            </div>
+          </form>
+          <p id="aff-signin-hint" class="help hidden" style="margin-top:12px">
+            <a href="./auth?mode=signup&next=affiliate" class="text-action">Create an account</a> or
+            <a href="./auth?next=affiliate" class="text-action">sign in</a> to apply.
+          </p>
+        </section>
+
+        <article id="aff-terms" class="aff-card aff-terms">
+          <h2 class="aff-card__title">Affiliate Programme Terms &amp; Conditions</h2>
+          <p class="aff-terms__meta">Last updated 1 September 2026. These terms form an agreement between you (the “Affiliate”) and Codeink Technologies, operator of DigiStore (the “Company”). Figures shown as “currently” are set in the Company's settings and displayed live at the top of this page; they can change under section 11.</p>
+
+          <h3>1. Eligibility</h3>
+          <p>You must be at least 18 years old (or the age of majority where you live), hold a valid DigiStore account and a payout account in your own name, and comply with all laws that apply to your promotional activity. One person or legal entity may hold one affiliate account. Current or former employees and contractors of the Company may not enrol without written permission.</p>
+
+          <h3>2. Enrolment &amp; approval</h3>
+          <p>Enrolment is by application. The Company reviews each application manually and may approve, decline, suspend, or terminate any account at its sole discretion, with or without reason. Approval is not transferable.</p>
+
+          <h3>3. Referral tracking &amp; attribution</h3>
+          <p>You promote using the referral link issued in your dashboard. When someone follows your link we store a first-party cookie and a visitor record. If that person creates a DigiStore account within the cookie window (currently 90 days) they are attributed to you, and you earn commission on their qualifying purchases from then on. Attribution requires cookies to be enabled and is not guaranteed where a buyer blocks tracking, uses a different device or browser, clears storage, or was already attributed to another affiliate. Last valid touch within the window wins. Purchases made on your own account, or by an account sharing your email address, never earn commission.</p>
+
+          <h3>4. Commissions</h3>
+          <p>You earn a percentage of each qualifying order. The rate is <strong>not a fixed value</strong>: the Company sets a default, individual sellers may set their own rate for their products, and the Company may set a specific rate for your account. The rate and the amount it was applied to are recorded on every commission line in your dashboard. Commission is calculated on paid orders only and excludes taxes, delivery fees, and any amount later refunded or charged back. A seller may choose not to participate, in which case that seller's products earn no commission. The commission currently defaults to 10% of the order value.</p>
+
+          <h3>5. Holding period</h3>
+          <p>Each commission is held as “pending” for a holding period (currently 14 days) that covers the buyer's refund window. After it elapses the commission becomes “available” to withdraw. If the underlying order is refunded, cancelled, or reversed at any time, the related commission is reversed, including after it has become available and, where already paid, by deduction from your next payout or by invoice.</p>
+
+          <h3>6. Payouts</h3>
+          <p>You may request a withdrawal once your available balance reaches the minimum (currently 50 in your payout currency). Payments are made to the method on file, normally within 30 days of an approved request. You are solely responsible for any taxes on your commissions and for the accuracy of your payout details. The Company may withhold payment while an account is under review for suspected breach. Balances on accounts inactive for 12 months may be forfeited.</p>
+
+          <h3>7. Prohibited conduct</h3>
+          <p>You must not: bid on the Company's brand names, trademarks, or common misspellings in paid search, or use them in display URLs; use cookie stuffing, forced clicks, pop-unders, iframes, adware, browser extensions/toolbars, or any method that sets the referral without a genuine click; register domains or social handles that impersonate or could be confused with DigiStore or Codeink Technologies; send unsolicited email, SMS, or messaging spam, or post link spam in comments or forums; misrepresent prices, discounts, availability, or product contents, or advertise coupons or offers that do not exist; place links alongside content that is misleading, defamatory, adult, hateful, violent, infringing, or otherwise illegal; represent yourself as the Company or make commitments, warranties, or support promises on its behalf. Breach of this section voids all pending and unpaid commissions on the affected account.</p>
+
+          <h3>8. Disclosure</h3>
+          <p>Wherever you post a referral link you must clearly and conspicuously disclose that it is an affiliate link and that you may earn a commission, in line with FTC guidance and any equivalent local rules.</p>
+
+          <h3>9. Trademarks &amp; content</h3>
+          <p>The Company grants you a limited, non-exclusive, revocable licence to use its name and logos solely to promote DigiStore products during your enrolment. You may not alter the marks, use them in a way that implies a partnership beyond the affiliate relationship, or continue using them after your account ends.</p>
+
+          <h3>10. Termination</h3>
+          <p>Either party may end this agreement at any time. On termination your referral links stop earning. Validly earned commissions above the payout minimum are paid on the normal schedule, except where the account is terminated for fraud or breach of section 7, in which case all pending and unpaid commissions are forfeited and the Company may reclaim amounts already paid on fraudulent or reversed orders.</p>
+
+          <h3>11. Changes</h3>
+          <p>The Company may change these terms, the commission rates, the cookie window, the holding period, and the payout minimum at any time. Material changes are notified by email to the address on your account. Continuing to use your referral links after a change takes effect means you accept it.</p>
+
+          <h3>12. Relationship, liability &amp; indemnity</h3>
+          <p>You are an independent contractor; nothing here creates an employment, agency, partnership, or joint-venture relationship. The programme is provided “as is” without warranties, and the Company's total liability under this agreement is limited to commissions payable to you in the 6 months before the event giving rise to the claim. You indemnify the Company against claims, losses, and expenses arising from your promotional activity or your breach of these terms.</p>
+
+          <h3>13. Governing law</h3>
+          <p>This agreement is governed by the laws of the jurisdiction in which Codeink Technologies is registered, and the courts of that jurisdiction have exclusive jurisdiction over any dispute. <em>(Confirm the governing jurisdiction with the Company before launch.)</em></p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Application pending -->
+    <section id="aff-pending" class="hidden vnd-gate">
+      <div class="vnd-gate-card vnd-gate-card--center">
+        <div class="vnd-status-icon"><i data-lucide="clock" width="26" height="26"></i></div>
+        <h1>Your application is under review</h1>
+        <p class="vnd-gate-lede">We review affiliate applications by hand, usually within 1–2 business days. You'll get an email when your account is approved and your referral link goes live.</p>
+        <a href="./" class="button">Back to the store</a>
+      </div>
+    </section>
+
+    <!-- Approved dashboard -->
+    <section id="aff-dashboard" class="hidden">
+      <div class="shell" style="padding-block:32px 64px;display:grid;gap:24px">
+        <div class="admin-screen-heading">
+          <div>
+            <span class="eyebrow">AFFILIATE DASHBOARD</span>
+            <h2>Your referrals &amp; earnings</h2>
+            <p id="aff-status-line">—</p>
+          </div>
+        </div>
+
+        <div class="vnd-panel">
+          <div class="vnd-panel-head"><h3>Your referral link</h3></div>
+          <div class="aff-link-row">
+            <input id="aff-link" class="field" readonly data-no-enhance>
+            <button id="aff-link-copy" class="button button-primary" type="button"><i data-lucide="copy" width="15" height="15"></i> Copy</button>
+          </div>
+          <p class="help">Add <code>?ref=YOURCODE</code> to any DigiStore URL to deep-link a specific product. Always disclose that it's an affiliate link.</p>
+          <div id="aff-qr" class="aff-qr" aria-hidden="true"></div>
+        </div>
+
+        <div class="acct-stats" id="aff-stats">
+          <div class="acct-stat-card"><span>Clicks</span><strong data-stat="clicks">—</strong></div>
+          <div class="acct-stat-card"><span>Sign-ups</span><strong data-stat="signups">—</strong></div>
+          <div class="acct-stat-card"><span>Conversions</span><strong data-stat="conversions">—</strong></div>
+          <div class="acct-stat-card"><span>Pending</span><strong data-stat="pending">—</strong></div>
+          <div class="acct-stat-card"><span>Available</span><strong data-stat="available">—</strong></div>
+          <div class="acct-stat-card"><span>Lifetime earned</span><strong data-stat="lifetime">—</strong></div>
+        </div>
+
+        <div class="vnd-panel">
+          <div class="vnd-panel-head">
+            <h3>Withdraw</h3>
+            <button id="aff-payout-btn" class="button button-primary" type="button" disabled>Request payout</button>
+          </div>
+          <p id="aff-payout-note" class="vnd-panel-note">—</p>
+          <div id="aff-payouts-table"></div>
+        </div>
+
+        <div class="vnd-panel">
+          <div class="vnd-panel-head"><h3>Commission ledger</h3></div>
+          <div id="aff-earnings-table"></div>
+        </div>
+
+        <div class="vnd-panel">
+          <div class="vnd-panel-head"><h3>Payout settings</h3></div>
+          <form id="aff-settings-form" class="vnd-form">
+            <label class="vnd-field">
+              <span class="label">Payout method</span>
+              <select class="field" name="payout_method">
+                <option value="bank">Bank transfer</option>
+                <option value="momo">Mobile money</option>
+                <option value="paypal">PayPal</option>
+                <option value="crypto">Crypto (USDT)</option>
+              </select>
+            </label>
+            <label class="vnd-field">
+              <span class="label">Payout currency</span>
+              <select class="field" name="payout_currency">
+                <option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option>
+                <option value="GHS">GHS</option><option value="NGN">NGN</option><option value="KES">KES</option><option value="ZAR">ZAR</option>
+              </select>
+            </label>
+            <label class="vnd-field vnd-field--span2">
+              <span class="label">Payout account details</span>
+              <textarea class="field" name="payout_details" rows="3" placeholder="Account name, number / IBAN / wallet address, bank or provider…"></textarea>
+            </label>
+            <label class="vnd-field vnd-field--span2">
+              <span class="label">Where you promote</span>
+              <textarea class="field" name="promo_methods" rows="2"></textarea>
+            </label>
+            <button type="submit" class="button button-primary form-submit">Save settings</button>
+            <p id="aff-settings-feedback" class="status-line vnd-field--span2"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module" src="./js/affiliate.js"></script>
+</body>
+</html>

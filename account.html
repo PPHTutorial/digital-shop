@@ -24,7 +24,8 @@
   <meta name="twitter:title" content="My Account | DigiStore">
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
-  <link rel="stylesheet" href="./css/app.css?v=0930facf">
+  <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="stylesheet" href="./css/app.css?v=2e86bd0f">
 </head>
 
 <body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
@@ -61,6 +62,12 @@
           <h3 id="acct-seller-title">Seller Centre</h3>
           <p id="acct-seller-copy">Sell digital templates, resources, and start earning payouts.</p>
           <a id="acct-seller-link" href="./vendor">Start Selling</a>
+        </div>
+
+        <div class="acct-seller-card">
+          <h3>Affiliate Programme</h3>
+          <p>Earn commission recommending DigiStore products. Get a referral link and track every sale.</p>
+          <a href="./affiliate">Open Affiliate Centre</a>
         </div>
       </aside>
 
@@ -164,6 +171,15 @@
               <label class="acct-check-line span-2"><input type="checkbox" name="marketing_opt_in" value="1"> Product news, launches, and marketing emails</label>
               <label class="acct-check-line span-2"><input type="checkbox" name="notify_product_news" value="1"> Updates to products I've purchased</label>
               <label class="acct-check-line span-2"><input type="checkbox" name="notify_order_updates" value="1"> Order and receipt emails</label>
+
+              <div class="form-field span-2">
+                <label>Appearance</label>
+                <div class="theme-toggle theme-toggle--inline" role="radiogroup" aria-label="Colour theme" data-theme-toggle style="margin-top:6px">
+                  <button type="button" class="theme-toggle__opt" data-theme-set="system" role="radio" aria-checked="false" aria-label="System theme"><i data-lucide="monitor" width="15" height="15"></i><span class="theme-toggle__label">System</span></button>
+                  <button type="button" class="theme-toggle__opt" data-theme-set="light" role="radio" aria-checked="false" aria-label="Light theme"><i data-lucide="sun" width="15" height="15"></i><span class="theme-toggle__label">Light</span></button>
+                  <button type="button" class="theme-toggle__opt" data-theme-set="dark" role="radio" aria-checked="false" aria-label="Dark theme"><i data-lucide="moon" width="15" height="15"></i><span class="theme-toggle__label">Dark</span></button>
+                </div>
+              </div>
 
               <button type="submit" class="button button-primary form-submit">Save profile</button>
               <p id="profile-feedback" class="status-line span-2"></p>

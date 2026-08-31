@@ -24,7 +24,8 @@
   <meta name="twitter:title" content="Admin Centre | DigiStore">
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
-  <link rel="stylesheet" href="./css/app.css?v=0930facf">
+  <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="stylesheet" href="./css/app.css?v=2e86bd0f">
 </head>
 <body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
   <div id="page-loader" class="page-loader">
@@ -79,6 +80,7 @@
 
           <span class="adm-nav-group">Marketplace</span>
           <a href="#stores" data-adm-link="stores"><i data-lucide="store" width="16" height="16"></i><span>Stores</span></a>
+          <a href="#affiliates" data-adm-link="affiliates"><i data-lucide="link" width="16" height="16"></i><span class="flex-1">Affiliates</span><span id="aff-badge" class="adm-nav-badge hidden"></span></a>
           <a href="#moderation" data-adm-link="moderation"><i data-lucide="shield-check" width="16" height="16"></i><span class="flex-1">Moderation</span><span id="mod-badge" class="adm-nav-badge hidden"></span></a>
 
           <span class="adm-nav-group">Support</span>
@@ -285,6 +287,27 @@
           <div class="adm-panel"><div id="stores-table"></div></div>
         </section>
 
+        <!-- Affiliates -->
+        <section class="adm-tab-panel" data-adm-panel="affiliates">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">MARKETPLACE</span><h2>Affiliate programme</h2><p>Approve applicants, tune per-affiliate rates, review commissions and settle payouts. Programme-wide defaults live in Site settings.</p></div>
+            <button id="refresh-affiliates" class="button" type="button">Refresh</button>
+          </div>
+          <div class="adm-stat-grid adm-stat-grid--3" id="aff-admin-stats"></div>
+          <div class="adm-panel" id="aff-tabs-root">
+            <div class="uk-tabs__list" role="tablist">
+              <button type="button" class="uk-tabs__btn is-active" data-uk-tab="applications">Applications <span id="aff-count-applications" class="uk-badge uk-badge--neutral"></span></button>
+              <button type="button" class="uk-tabs__btn" data-uk-tab="affiliates">Affiliates <span id="aff-count-affiliates" class="uk-badge uk-badge--neutral"></span></button>
+              <button type="button" class="uk-tabs__btn" data-uk-tab="commissions">Commissions</button>
+              <button type="button" class="uk-tabs__btn" data-uk-tab="payouts">Payout requests <span id="aff-count-payouts" class="uk-badge uk-badge--neutral"></span></button>
+            </div>
+            <div class="uk-tabs__panel is-active mt-4" data-uk-tab-panel="applications" id="aff-adm-applications"></div>
+            <div class="uk-tabs__panel mt-4" data-uk-tab-panel="affiliates" id="aff-adm-affiliates"></div>
+            <div class="uk-tabs__panel mt-4" data-uk-tab-panel="commissions" id="aff-adm-commissions"></div>
+            <div class="uk-tabs__panel mt-4" data-uk-tab-panel="payouts" id="aff-adm-payouts"></div>
+          </div>
+        </section>
+
         <!-- A08 Moderation queue -->
         <section class="adm-tab-panel" data-adm-panel="moderation">
           <div class="adm-panel-head">
@@ -294,6 +317,7 @@
           <div class="adm-panel" id="mod-tabs-root">
             <div class="uk-tabs__list" role="tablist">
               <button type="button" class="uk-tabs__btn is-active" data-uk-tab="vendors">Seller applications <span id="mod-count-vendors" class="uk-badge uk-badge--neutral"></span></button>
+              <button type="button" class="uk-tabs__btn" data-uk-tab="affiliates">Affiliate applications <span id="mod-count-affiliates" class="uk-badge uk-badge--neutral"></span></button>
               <button type="button" class="uk-tabs__btn" data-uk-tab="campaigns">Ad campaigns <span id="mod-count-campaigns" class="uk-badge uk-badge--neutral"></span></button>
               <button type="button" class="uk-tabs__btn" data-uk-tab="ad-listings">External-link listings <span id="mod-count-ad_listings" class="uk-badge uk-badge--neutral"></span></button>
               <button type="button" class="uk-tabs__btn" data-uk-tab="payout-accounts">Payout accounts <span id="mod-count-payout_accounts" class="uk-badge uk-badge--neutral"></span></button>
@@ -301,6 +325,7 @@
               <button type="button" class="uk-tabs__btn" data-uk-tab="payouts">Payout requests <span id="mod-count-payouts" class="uk-badge uk-badge--neutral"></span></button>
             </div>
             <div class="uk-tabs__panel is-active mt-4" data-uk-tab-panel="vendors" id="mod-vendors"></div>
+            <div class="uk-tabs__panel mt-4" data-uk-tab-panel="affiliates" id="mod-affiliates"></div>
             <div class="uk-tabs__panel mt-4" data-uk-tab-panel="campaigns" id="mod-campaigns"></div>
             <div class="uk-tabs__panel mt-4" data-uk-tab-panel="ad-listings" id="mod-ad-listings"></div>
             <div class="uk-tabs__panel mt-4" data-uk-tab-panel="payout-accounts" id="mod-payout-accounts"></div>
@@ -398,6 +423,29 @@
               <label class="adm-field"><span class="label">Min. ad-wallet balance <span class="help" style="font-weight:400">(USD, to publish an external-link listing)</span></span><input name="ad_min_wallet_balance" type="number" step="1" min="0" class="field"></label>
               <label class="adm-field"><span class="label">External-link listing deposit <span class="help" style="font-weight:400">(USD, refundable hold taken on approval)</span></span><input name="ad_listing_deposit" type="number" step="1" min="0" class="field"></label>
               <label class="adm-field"><span class="label">Max product file size <span class="help" style="font-weight:400">(MB, for a published hosted file)</span></span><input name="max_product_file_mb" type="number" step="1" min="1" class="field"></label>
+
+              <div class="adm-field--span2" style="margin-top:8px"><span class="label" style="font-size:.72rem">AFFILIATE PROGRAMME</span></div>
+              <label class="adm-field"><span class="label">Programme status</span>
+                <select name="affiliate_program_enabled" class="field">
+                  <option value="true">Open — accepting applications</option>
+                  <option value="false">Closed</option>
+                </select></label>
+              <label class="adm-field"><span class="label">Default commission rate <span class="help" style="font-weight:400">(%, when no seller / per-affiliate rate applies)</span></span><input name="affiliate_commission_rate" type="number" step=".01" min="0" max="100" class="field"></label>
+              <label class="adm-field"><span class="label">Commission basis</span>
+                <select name="affiliate_commission_basis" class="field">
+                  <option value="gross">Gross order value</option>
+                  <option value="platform_net">Platform net (after seller commission)</option>
+                </select></label>
+              <label class="adm-field"><span class="label">Commission funded by</span>
+                <select name="affiliate_commission_source" class="field">
+                  <option value="platform">Platform margin</option>
+                  <option value="vendor">Seller's share</option>
+                  <option value="split">Split</option>
+                </select></label>
+              <label class="adm-field"><span class="label">Cookie window <span class="help" style="font-weight:400">(days a referral stays valid)</span></span><input name="affiliate_cookie_days" type="number" step="1" min="1" max="730" class="field"></label>
+              <label class="adm-field"><span class="label">Holding period <span class="help" style="font-weight:400">(days before commission matures)</span></span><input name="affiliate_hold_days" type="number" step="1" min="0" max="180" class="field"></label>
+              <label class="adm-field"><span class="label">Minimum payout <span class="help" style="font-weight:400">(in the affiliate's payout currency)</span></span><input name="affiliate_min_payout" type="number" step="1" min="0" class="field"></label>
+
               <div class="adm-field--span2 flex items-center gap-3">
                 <button class="button button-primary" type="submit">Save settings</button>
                 <p id="settings-feedback" class="status-line text-xs my-0"></p>

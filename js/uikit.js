@@ -7,19 +7,16 @@
  * ui.js: `<script type="module" src="./js/uikit.js"></script>` or an
  * `import { ... } from './uikit.js'` from another module.
  */
-import { icon, escapeHtml, renderIcons } from './ui.js';
-import { enhanceSelect } from './select.js';
-import { enhanceCheckbox, enhanceRadio, enhanceDateInput } from './form-controls.js';
+import { icon, escapeHtml, renderIcons, enhanceControls } from './ui.js';
+
+// enhanceControls now lives in ui.js (it runs site-wide from mountHeader);
+// re-exported here for the page scripts that import it from uikit.
+export { enhanceControls } from './ui.js';
 
 // Every openModal() call funnels arbitrary form markup (selects, checkboxes,
-// radios, date inputs) into the DOM at once — this is the one place that can
-// progressively-enhance all of it without every call site remembering to.
-function enhanceModalControls(scopeEl) {
-  scopeEl.querySelectorAll('select').forEach((el) => enhanceSelect(el, { label: el.closest('label')?.querySelector('.label')?.textContent?.trim() || '' }));
-  scopeEl.querySelectorAll('input[type="checkbox"]').forEach((el) => enhanceCheckbox(el));
-  scopeEl.querySelectorAll('input[type="radio"]').forEach((el) => enhanceRadio(el));
-  scopeEl.querySelectorAll('input[type="date"]').forEach((el) => enhanceDateInput(el));
-}
+// radios, date inputs) into the DOM at once — enhance it immediately rather
+// than waiting for the site-wide observer's next frame.
+const enhanceModalControls = (scopeEl) => enhanceControls(scopeEl);
 
 /* ==========================================================================
    Modal / dialog primitive
@@ -472,31 +469,9 @@ export function renderDataTable(host, opts) {
 }
 
 /* ==========================================================================
-   Theme toggle (light / dark / system) — supports the tokens defined in
-   css/app.css. Persists the explicit choice; "system" clears it.
+   Theme toggle (light / dark / system) — the implementation lives in ui.js
+   (so the site-wide header bootstrap can call it without a circular import);
+   re-exported here for the callers that already reach for it via uikit.
    ========================================================================== */
 
-const THEME_KEY = 'digistore-theme';
-
-export function getStoredTheme() {
-  try { return localStorage.getItem(THEME_KEY) || 'system'; } catch { return 'system'; }
-}
-
-export function applyTheme(theme) {
-  const root = document.documentElement;
-  if (theme === 'dark' || theme === 'light') root.setAttribute('data-theme', theme);
-  else root.removeAttribute('data-theme');
-}
-
-export function setTheme(theme) {
-  try {
-    if (theme === 'system') localStorage.removeItem(THEME_KEY);
-    else localStorage.setItem(THEME_KEY, theme);
-  } catch { /* storage may be unavailable; theme still applies for this load */ }
-  applyTheme(theme);
-}
-
-/** Call once on page load to restore whatever the visitor last chose. */
-export function initTheme() {
-  applyTheme(getStoredTheme());
-}
+export { getStoredTheme, applyTheme, setTheme, initTheme } from './ui.js';

@@ -104,7 +104,7 @@ const SCREEN_TITLES = {
   overview: 'Overview', customers: 'Customers', transactions: 'Transactions', products: 'Products',
   categories: 'Categories', promotions: 'Promotions', content: 'CMS & Journal', stores: 'Stores',
   moderation: 'Moderation', tickets: 'Tickets', notifications: 'Notifications', admins: 'Admins',
-  settings: 'Site settings', audit: 'Audit log',
+  affiliates: 'Affiliates', settings: 'Site settings', audit: 'Audit log',
 };
 
 const SCREEN_LOADERS = {};
@@ -1994,19 +1994,20 @@ const modEmpty = (message) => emptyState({ icon: 'inbox', title: 'Nothing to rev
 async function loadModeration() {
   const { data, error } = await supabase.rpc('moderation_queue');
   if (error) {
-    ['mod-vendors', 'mod-campaigns', 'mod-ad-listings', 'mod-payout-accounts', 'mod-topups', 'mod-payouts'].forEach((id) => {
+    ['mod-vendors', 'mod-affiliates', 'mod-campaigns', 'mod-ad-listings', 'mod-payout-accounts', 'mod-topups', 'mod-payouts'].forEach((id) => {
       document.querySelector(`#${id}`).innerHTML = emptyState({ icon: 'triangle-alert', title: 'Could not load queue', body: error.message });
     });
     return;
   }
 
   const counts = {
-    vendors: data.vendors?.length || 0, campaigns: data.campaigns?.length || 0,
+    vendors: data.vendors?.length || 0, affiliates: data.affiliates?.length || 0,
+    campaigns: data.campaigns?.length || 0,
     ad_listings: data.ad_listings?.length || 0,
     payout_accounts: data.payout_accounts?.length || 0,
     topups: data.topups?.length || 0, payouts: data.payouts?.length || 0,
   };
-  const pendingTotal = counts.vendors + counts.campaigns + counts.ad_listings
+  const pendingTotal = counts.vendors + counts.affiliates + counts.campaigns + counts.ad_listings
     + counts.payout_accounts + counts.topups + counts.payouts;
   const badge = document.querySelector('#mod-badge');
   if (badge) { badge.textContent = pendingTotal; badge.classList.toggle('hidden', pendingTotal === 0); }
@@ -2029,6 +2030,22 @@ async function loadModeration() {
           </div>
         </div>`).join('')
     : modEmpty('No seller applications waiting.');
+
+  document.querySelector('#mod-affiliates').innerHTML = data.affiliates?.length
+    ? data.affiliates.map((a) => `
+        <div class="adm-mod-row">
+          <div class="adm-mod-row__meta">
+            <strong>${escapeHtml(a.applicant_name || a.code)}</strong>
+            <span>${escapeHtml(a.applicant_email || '')} · code ${escapeHtml(a.code)} · ${escapeHtml(a.payout_method)} / ${escapeHtml(a.payout_currency)} · applied ${shortDate(a.created_at)}</span>
+            ${a.website ? `<p class="adm-mod-row__note">→ <a href="${escapeHtml(a.website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(a.website)}</a></p>` : ''}
+            ${a.promo_methods ? `<p class="adm-mod-row__note">${escapeHtml(a.promo_methods)}</p>` : ''}
+          </div>
+          <div class="adm-mod-row__actions">
+            <button class="button button-primary !min-h-8 !px-3 text-xs" data-approve-affiliate="${a.id}">Approve</button>
+            <button class="button button-danger !min-h-8 !px-3 text-xs" data-reject-affiliate="${a.id}">Reject</button>
+          </div>
+        </div>`).join('')
+    : modEmpty('No affiliate applications waiting.');
 
   document.querySelector('#mod-campaigns').innerHTML = data.campaigns?.length
     ? data.campaigns.map((c) => `
@@ -2119,7 +2136,8 @@ async function loadModeration() {
 
 document.addEventListener('click', async (event) => {
   const el = event.target.closest(
-    '[data-approve-vendor],[data-reject-vendor],[data-approve-campaign],[data-reject-campaign],' +
+    '[data-approve-vendor],[data-reject-vendor],[data-approve-affiliate],[data-reject-affiliate],' +
+    '[data-approve-campaign],[data-reject-campaign],' +
     '[data-approve-ad],[data-reject-ad],[data-verify-account],[data-reject-account],' +
     '[data-approve-topup],[data-reject-topup],[data-pay-payout],[data-fail-payout]'
   );
@@ -2133,6 +2151,11 @@ document.addEventListener('click', async (event) => {
     const reason = window.prompt('Why is this application being rejected? (shown to the applicant)');
     if (reason === null) return;
     result = await supabase.rpc('moderate_vendor', { p_vendor_id: d.rejectVendor, p_status: 'rejected', p_reason: reason });
+  } else if (d.approveAffiliate) {
+    result = await supabase.from('affiliates').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', d.approveAffiliate);
+  } else if (d.rejectAffiliate) {
+    if (window.prompt('Type "reject" to confirm rejecting this affiliate application.') !== 'reject') return;
+    result = await supabase.from('affiliates').update({ status: 'rejected' }).eq('id', d.rejectAffiliate);
   } else if (d.approveCampaign) {
     result = await supabase.rpc('moderate_campaign', { p_campaign_id: d.approveCampaign, p_approve: true });
   } else if (d.rejectCampaign) {
@@ -2174,6 +2197,172 @@ document.addEventListener('click', async (event) => {
 
 document.querySelector('#refresh-moderation')?.addEventListener('click', loadModeration);
 initTabs(document.querySelector('#mod-tabs-root'));
+
+/* ==========================================================================
+   Affiliates
+   ========================================================================== */
+
+const affEmpty = (msg) => emptyState({ icon: 'link', title: 'Nothing here', body: msg });
+
+async function loadAffiliates() {
+  const [affRes, earnRes, payRes] = await Promise.all([
+    supabase.from('affiliates')
+      .select('id, code, status, commission_rate, website, promo_methods, payout_method, payout_currency, total_clicks, total_signups, total_conversions, total_earned, created_at, user_id')
+      .order('created_at', { ascending: false }),
+    supabase.from('affiliate_earnings')
+      .select('id, created_at, commission_amount, commission_rate, currency, status, gross_amount, affiliate_id')
+      .order('created_at', { ascending: false }).limit(200),
+    supabase.from('affiliate_payouts')
+      .select('id, requested_at, amount, currency, status, reference, affiliate_id')
+      .order('requested_at', { ascending: false }).limit(100),
+  ]);
+
+  const affiliates = affRes.data || [];
+  const earnings = earnRes.data || [];
+  const payouts = payRes.data || [];
+
+  // affiliates.user_id -> auth.users; profiles share that id but there is no
+  // PostgREST FK to embed on, so fetch the names in a second pass.
+  const userIds = [...new Set(affiliates.map((a) => a.user_id))];
+  const nameByUser = {};
+  if (userIds.length) {
+    const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', userIds);
+    (profs || []).forEach((p) => { nameByUser[p.id] = p.full_name; });
+  }
+  affiliates.forEach((a) => { a.profiles = { full_name: nameByUser[a.user_id] || '' }; });
+  const nameOf = (id) => affiliates.find((a) => a.id === id)?.code || '—';
+
+  const pending = affiliates.filter((a) => a.status === 'pending');
+  const active = affiliates.filter((a) => a.status !== 'pending');
+  const openPayouts = payouts.filter((p) => p.status === 'requested');
+
+  const setCount = (id, n) => { const el = document.querySelector(`#${id}`); if (el) el.textContent = n || ''; };
+  setCount('aff-count-applications', pending.length);
+  setCount('aff-count-affiliates', active.length);
+  setCount('aff-count-payouts', openPayouts.length);
+  const badge = document.querySelector('#aff-badge');
+  if (badge) { const n = pending.length + openPayouts.length; badge.textContent = n; badge.classList.toggle('hidden', n === 0); }
+
+  const totalPaid = earnings.filter((e) => e.status === 'paid').reduce((s, e) => s + Number(e.commission_amount || 0), 0);
+  const totalPendingComm = earnings.filter((e) => e.status === 'pending' || e.status === 'available').reduce((s, e) => s + Number(e.commission_amount || 0), 0);
+  document.querySelector('#aff-admin-stats').innerHTML = `
+    <div class="adm-stat-card"><span>Affiliates</span><strong>${compactNumber(affiliates.length)}</strong><small>${pending.length} pending</small></div>
+    <div class="adm-stat-card"><span>Unpaid commission</span><strong>${money(totalPendingComm)}</strong><small>pending + available</small></div>
+    <div class="adm-stat-card"><span>Paid out</span><strong>${money(totalPaid)}</strong><small>${openPayouts.length} requests open</small></div>`;
+
+  // Applications
+  document.querySelector('#aff-adm-applications').innerHTML = pending.length
+    ? pending.map((a) => `
+        <div class="adm-mod-row">
+          <div class="adm-mod-row__meta">
+            <strong>${escapeHtml(a.profiles?.full_name || a.code)}</strong>
+            <span>code ${escapeHtml(a.code)} · ${escapeHtml(a.payout_method)} / ${escapeHtml(a.payout_currency)} · applied ${shortDate(a.created_at)}</span>
+            ${a.website ? `<p class="adm-mod-row__note">→ <a href="${escapeHtml(a.website)}" target="_blank" rel="noopener noreferrer">${escapeHtml(a.website)}</a></p>` : ''}
+            ${a.promo_methods ? `<p class="adm-mod-row__note">${escapeHtml(a.promo_methods)}</p>` : ''}
+          </div>
+          <div class="adm-mod-row__actions">
+            <button class="button button-primary !min-h-8 !px-3 text-xs" data-aff-approve="${a.id}">Approve</button>
+            <button class="button button-danger !min-h-8 !px-3 text-xs" data-aff-reject="${a.id}">Reject</button>
+          </div>
+        </div>`).join('')
+    : affEmpty('No affiliate applications waiting.');
+
+  // Affiliates table
+  renderDataTable(document.querySelector('#aff-adm-affiliates'), {
+    columns: [
+      { key: 'code', label: 'Code', render: (r) => `<strong>${escapeHtml(r.code)}</strong><br><span class="text-xs" style="color:var(--text-muted)">${escapeHtml(r.profiles?.full_name || '')}</span>` },
+      { key: 'status', label: 'Status', render: (r) => statusBadge(r.status, r.status) },
+      { key: 'commission_rate', label: 'Rate', render: (r) => r.commission_rate == null ? '<span style="color:var(--text-soft)">default</span>' : `${r.commission_rate}%` },
+      { key: 'total_clicks', label: 'Clicks', render: (r) => compactNumber(r.total_clicks) },
+      { key: 'total_conversions', label: 'Conv.', render: (r) => compactNumber(r.total_conversions) },
+      { key: 'total_earned', label: 'Earned', render: (r) => money(r.total_earned, r.payout_currency) },
+    ],
+    rows: active,
+    page: 1, pageSize: 100, total: active.length,
+    rowActions: (r) => `
+      <button class="button !min-h-7 !px-2 text-xs" data-aff-rate="${r.id}" data-code="${escapeHtml(r.code)}">Rate</button>
+      ${r.status === 'approved'
+        ? `<button class="button button-danger !min-h-7 !px-2 text-xs" data-aff-suspend="${r.id}">Suspend</button>`
+        : `<button class="button button-primary !min-h-7 !px-2 text-xs" data-aff-approve="${r.id}">Reinstate</button>`}`,
+    emptyMessage: 'No affiliates yet.',
+  });
+
+  // Commissions
+  renderDataTable(document.querySelector('#aff-adm-commissions'), {
+    columns: [
+      { key: 'created_at', label: 'Date', render: (r) => shortDate(r.created_at) },
+      { key: 'affiliate_id', label: 'Affiliate', render: (r) => escapeHtml(nameOf(r.affiliate_id)) },
+      { key: 'gross_amount', label: 'Order', render: (r) => money(r.gross_amount, r.currency) },
+      { key: 'commission_amount', label: 'Commission', render: (r) => `${money(r.commission_amount, r.currency)} (${r.commission_rate}%)` },
+      { key: 'status', label: 'Status', render: (r) => statusBadge(r.status, r.status) },
+    ],
+    rows: earnings.slice(0, 100),
+    page: 1, pageSize: 100, total: earnings.length,
+    rowActions: (r) => r.status === 'reversed' ? '' :
+      `<button class="button button-danger !min-h-7 !px-2 text-xs" data-aff-reverse="${r.id}">Reverse</button>`,
+    emptyMessage: 'No commissions recorded yet.',
+  });
+
+  // Payout requests
+  renderDataTable(document.querySelector('#aff-adm-payouts'), {
+    columns: [
+      { key: 'requested_at', label: 'Requested', render: (r) => shortDate(r.requested_at) },
+      { key: 'affiliate_id', label: 'Affiliate', render: (r) => escapeHtml(nameOf(r.affiliate_id)) },
+      { key: 'amount', label: 'Amount', render: (r) => money(r.amount, r.currency) },
+      { key: 'status', label: 'Status', render: (r) => statusBadge(r.status, r.status) },
+      { key: 'reference', label: 'Ref', render: (r) => escapeHtml(r.reference || '—') },
+    ],
+    rows: payouts,
+    page: 1, pageSize: 100, total: payouts.length,
+    rowActions: (r) => r.status === 'requested' || r.status === 'processing'
+      ? `<button class="button button-primary !min-h-7 !px-2 text-xs" data-aff-payout-paid="${r.id}">Mark paid</button>
+         <button class="button button-danger !min-h-7 !px-2 text-xs" data-aff-payout-fail="${r.id}">Fail</button>`
+      : '',
+    emptyMessage: 'No payout requests.',
+  });
+}
+
+document.querySelector('#refresh-affiliates')?.addEventListener('click', loadAffiliates);
+initTabs(document.querySelector('#aff-tabs-root'));
+
+document.querySelector('[data-adm-panel="affiliates"]')?.addEventListener('click', async (event) => {
+  const t = event.target.closest('button[data-aff-approve], button[data-aff-reject], button[data-aff-suspend], button[data-aff-rate], button[data-aff-reverse], button[data-aff-payout-paid], button[data-aff-payout-fail]');
+  if (!t) return;
+  let result;
+
+  if (t.dataset.affApprove) {
+    result = await supabase.from('affiliates').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', t.dataset.affApprove);
+  } else if (t.dataset.affReject) {
+    if (!(await confirmDialog({ title: 'Reject application?', body: 'The applicant can re-apply later.', confirmLabel: 'Reject' }))) return;
+    result = await supabase.from('affiliates').update({ status: 'rejected' }).eq('id', t.dataset.affReject);
+  } else if (t.dataset.affSuspend) {
+    if (!(await confirmDialog({ title: 'Suspend affiliate?', body: 'Their link stops earning until reinstated.', confirmLabel: 'Suspend' }))) return;
+    result = await supabase.from('affiliates').update({ status: 'suspended' }).eq('id', t.dataset.affSuspend);
+  } else if (t.dataset.affRate) {
+    const current = prompt(`Commission rate for ${t.dataset.code} (%). Leave blank to use the platform / seller default.`);
+    if (current === null) return;
+    const rate = current.trim() === '' ? null : Number(current);
+    if (rate !== null && (Number.isNaN(rate) || rate < 0 || rate > 100)) { toast('Enter 0–100 or leave blank.', 'error'); return; }
+    result = await supabase.from('affiliates').update({ commission_rate: rate }).eq('id', t.dataset.affRate);
+  } else if (t.dataset.affReverse) {
+    if (!(await confirmDialog({ title: 'Reverse this commission?', body: 'It will not be paid out.', confirmLabel: 'Reverse' }))) return;
+    result = await supabase.from('affiliate_earnings').update({ status: 'reversed' }).eq('id', t.dataset.affReverse);
+  } else if (t.dataset.affPayoutPaid) {
+    const ref = prompt('Payment reference (optional):') || null;
+    result = await supabase.from('affiliate_payouts').update({ status: 'paid', reference: ref, processed_at: new Date().toISOString() }).eq('id', t.dataset.affPayoutPaid);
+  } else if (t.dataset.affPayoutFail) {
+    const reason = prompt('Failure reason:') || 'Payment failed';
+    result = await supabase.from('affiliate_payouts').update({ status: 'failed', failure_reason: reason, processed_at: new Date().toISOString() }).eq('id', t.dataset.affPayoutFail);
+    if (!result.error) {
+      // release the earnings so they can be requested again
+      await supabase.from('affiliate_earnings').update({ status: 'available', payout_id: null }).eq('payout_id', t.dataset.affPayoutFail);
+    }
+  }
+
+  if (result?.error) { toast(result.error.message, 'error'); return; }
+  toast('Done.');
+  await loadAffiliates();
+});
 
 /* ==========================================================================
    A07 — CMS / Content editor (the deep screen)
@@ -2737,6 +2926,14 @@ async function loadSettings(force = false) {
   form.elements.ad_min_wallet_balance.value = data.ad_min_wallet_balance ?? 100;
   form.elements.ad_listing_deposit.value = data.ad_listing_deposit ?? 50;
   form.elements.max_product_file_mb.value = Math.round((data.max_product_file_bytes ?? 5242880) / 1048576);
+  form.elements.affiliate_program_enabled.value = String(data.affiliate_program_enabled ?? true);
+  form.elements.affiliate_commission_rate.value = data.affiliate_commission_rate ?? 10;
+  form.elements.affiliate_commission_basis.value = data.affiliate_commission_basis || 'gross';
+  form.elements.affiliate_commission_source.value = data.affiliate_commission_source || 'platform';
+  form.elements.affiliate_cookie_days.value = data.affiliate_cookie_days ?? 90;
+  form.elements.affiliate_hold_days.value = data.affiliate_hold_days ?? 14;
+  form.elements.affiliate_min_payout.value = data.affiliate_min_payout ?? 50;
+  document.querySelectorAll('#settings-form select').forEach((s) => s.dispatchEvent(new Event('change', { bubbles: true })));
 }
 
 document.querySelector('#settings-form')?.addEventListener('submit', async (event) => {
@@ -2762,6 +2959,13 @@ document.querySelector('#settings-form')?.addEventListener('submit', async (even
     ad_min_wallet_balance: Number(form.elements.ad_min_wallet_balance.value) || 0,
     ad_listing_deposit: Number(form.elements.ad_listing_deposit.value) || 0,
     max_product_file_bytes: Math.max(1, Number(form.elements.max_product_file_mb.value) || 5) * 1048576,
+    affiliate_program_enabled: form.elements.affiliate_program_enabled.value === 'true',
+    affiliate_commission_rate: Number(form.elements.affiliate_commission_rate.value) || 0,
+    affiliate_commission_basis: form.elements.affiliate_commission_basis.value,
+    affiliate_commission_source: form.elements.affiliate_commission_source.value,
+    affiliate_cookie_days: Math.max(1, Number(form.elements.affiliate_cookie_days.value) || 90),
+    affiliate_hold_days: Math.max(0, Number(form.elements.affiliate_hold_days.value) || 0),
+    affiliate_min_payout: Math.max(0, Number(form.elements.affiliate_min_payout.value) || 0),
     updated_by: account.user.id,
   };
   setBusy(button, true, 'Saving…');
@@ -2875,6 +3079,7 @@ document.querySelector('#audit-entity-filter')?.addEventListener('change', () =>
 document.querySelector('#refresh-audit')?.addEventListener('click', () => loadAudit(true));
 
 SCREEN_LOADERS.moderation = loadModeration;
+SCREEN_LOADERS.affiliates = loadAffiliates;
 SCREEN_LOADERS.content = () => loadCms();
 SCREEN_LOADERS.settings = () => { loadSettings(); loadAdRates(); };
 SCREEN_LOADERS.audit = () => loadAudit();
