@@ -345,15 +345,57 @@ export function statusBadge(status, label) {
  * Wires a tab list to its panels. `root` must contain `[data-uk-tab]`
  * buttons (each with a matching `data-uk-tab-panel` target elsewhere in the
  * document) — used for dashboard sub-navigation (vendor/admin consoles).
+ *
+ * When there are 5+ tabs (or `root` carries `data-tabs-collapse`), a
+ * dropdown trigger is injected: below the `--bp-lg` breakpoint the strip
+ * collapses into a popover so the tabs never wrap into an unreadable block.
+ * Purely additive — the trigger is `display:none` on wide screens.
  */
 export function initTabs(root, { onChange } = {}) {
   if (!root) return;
   const buttons = [...root.querySelectorAll('[data-uk-tab]')];
+  const list = root.querySelector('.uk-tabs__list');
+
+  const collapsible = !!list && (buttons.length >= 5 || root.hasAttribute('data-tabs-collapse'));
+  let toggle = null;
+  let setOpen = () => {};
+  if (collapsible) {
+    root.classList.add('uk-tabs', 'uk-tabs--collapse');
+    // Wrap the trigger + list in their own head so the collapsed dropdown
+    // anchors just under the toggle, not the full height of the panel (which
+    // otherwise pushes it below all the tab content).
+    const head = document.createElement('div');
+    head.className = 'uk-tabs__collapse-head';
+    root.insertBefore(head, list);
+    head.appendChild(list);
+    toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'uk-tabs__toggle';
+    toggle.setAttribute('aria-haspopup', 'true');
+    toggle.setAttribute('aria-expanded', 'false');
+    head.insertBefore(toggle, list);
+    setOpen = (open) => {
+      root.classList.toggle('is-tabs-open', open);
+      toggle.setAttribute('aria-expanded', String(open));
+    };
+    toggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setOpen(!root.classList.contains('is-tabs-open'));
+    });
+    list.addEventListener('click', (event) => { if (event.target.closest('[data-uk-tab]')) setOpen(false); });
+    document.addEventListener('click', (event) => { if (!root.contains(event.target)) setOpen(false); });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') setOpen(false); });
+  }
+
   const activate = (key) => {
     buttons.forEach((b) => b.classList.toggle('is-active', b.dataset.ukTab === key));
     document.querySelectorAll('[data-uk-tab-panel]').forEach((p) => {
       p.classList.toggle('is-active', p.dataset.ukTabPanel === key);
     });
+    if (toggle) {
+      const active = buttons.find((b) => b.dataset.ukTab === key);
+      if (active) toggle.innerHTML = active.innerHTML;
+    }
     onChange?.(key);
   };
   buttons.forEach((b) => b.addEventListener('click', () => activate(b.dataset.ukTab)));

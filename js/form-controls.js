@@ -113,6 +113,41 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') closeOpenDate();
 });
 
+/**
+ * Re-anchor an open picker panel under its trigger with position:fixed in real
+ * viewport coordinates — the same escape hatch js/select.js uses so an
+ * `overflow:hidden`/scrolling ancestor (modal body, data-table wrapper,
+ * dashboard sidebar) can't clip it and its stacking order is its own
+ * z-index rather than whatever card it sits inside. Flips above the trigger
+ * when space below is tight and nudges back on-screen horizontally. Below
+ * 640px the CSS bottom-sheet rules own placement, so this clears its inline
+ * styles and bails.
+ */
+function positionPickerPanel(trigger, panel) {
+  if (window.matchMedia('(max-width: 640px)').matches) {
+    panel.style.cssText = '';
+    return;
+  }
+  const rect = trigger.getBoundingClientRect();
+  const width = Math.min(320, Math.max(260, rect.width));
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const openUpward = spaceBelow < 360 && rect.top > spaceBelow;
+  let left = rect.left;
+  if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - 8 - width);
+  panel.style.position = 'fixed';
+  panel.style.width = `${width}px`;
+  panel.style.maxWidth = 'none';
+  panel.style.left = `${left}px`;
+  panel.style.right = 'auto';
+  if (openUpward) {
+    panel.style.top = 'auto';
+    panel.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+  } else {
+    panel.style.top = `${rect.bottom + 8}px`;
+    panel.style.bottom = 'auto';
+  }
+}
+
 function pad2(n) { return String(n).padStart(2, '0'); }
 function toISO(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 function parseISO(s) {
@@ -159,10 +194,9 @@ export function enhanceDateInput(input, { placeholder = 'Select date' } = {}) {
     close() {
       wrap.classList.remove('is-open');
       trigger.setAttribute('aria-expanded', 'false');
-      panel.style.top = '';
-      panel.style.bottom = '';
-      panel.style.left = '';
-      panel.style.right = '';
+      panel.style.cssText = '';
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
       if (openDateInstance === instance) openDateInstance = null;
     },
     open() {
@@ -176,28 +210,12 @@ export function enhanceDateInput(input, { placeholder = 'Select date' } = {}) {
       trigger.setAttribute('aria-expanded', 'true');
       openDateInstance = instance;
       reposition();
+      window.addEventListener('scroll', reposition, true);
+      window.addEventListener('resize', reposition);
     },
   };
 
-  // Flip the panel above the trigger, or pin it to the right edge, when the
-  // default placement would overflow the viewport — the same overflow class
-  // of issue enhanceSelect's bottom-sheet mode sidesteps by pinning to the
-  // viewport on narrow screens; on wide screens we just nudge the panel back
-  // on-screen instead.
-  function reposition() {
-    if (window.matchMedia('(max-width: 640px)').matches) return; // sheet mode, CSS handles placement
-    requestAnimationFrame(() => {
-      const rect = panel.getBoundingClientRect();
-      if (rect.right > window.innerWidth - 8) {
-        panel.style.left = 'auto';
-        panel.style.right = '0';
-      }
-      if (rect.bottom > window.innerHeight - 8) {
-        panel.style.top = 'auto';
-        panel.style.bottom = 'calc(100% + 8px)';
-      }
-    });
-  }
+  const reposition = () => positionPickerPanel(trigger, panel);
 
   function fmt(d) {
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
@@ -337,10 +355,15 @@ export function enhanceDateTimeInput(input, { placeholder = 'Select date & time'
   let mm = cur ? cur.m : 0;
   let viewDate = new Date((cur ? cur.date : new Date()).getFullYear(), (cur ? cur.date : new Date()).getMonth(), 1);
 
+  const reposition = () => positionPickerPanel(trigger, panel);
+
   const instance = {
     close() {
       wrap.classList.remove('is-open');
       trigger.setAttribute('aria-expanded', 'false');
+      panel.style.cssText = '';
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
       if (openDateInstance === instance) openDateInstance = null;
     },
     open() {
@@ -351,6 +374,9 @@ export function enhanceDateTimeInput(input, { placeholder = 'Select date & time'
       wrap.classList.add('is-open');
       trigger.setAttribute('aria-expanded', 'true');
       openDateInstance = instance;
+      reposition();
+      window.addEventListener('scroll', reposition, true);
+      window.addEventListener('resize', reposition);
     },
   };
 

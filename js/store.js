@@ -4,6 +4,7 @@ import { loadServableCampaigns, attachAdTracking, promoteSponsored } from './ads
 import { enhanceSelect } from './select.js';
 import { enhanceCheckboxes, enhanceRadios } from './form-controls.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
+import { AD_LISTING_COLS, stripAdListings } from './ad-listing.js';
 
 let adCampaigns = new Map();
 
@@ -382,17 +383,17 @@ function renderCatalog() {
   if (!filtered.length) {
     grid.innerHTML = catalogEmpty
       ? `
-      <div class="w-full col-span-full py-16 text-center rounded-2xl border p-8 space-y-3" style="background:var(--surface);border-color:var(--border)">
-        <div class="text-4xl">🛍️</div>
-        <h3 class="font-black text-xl" style="color:var(--text)">No products yet</h3>
-        <p class="text-xs max-w-sm mx-auto" style="color:var(--text-muted)">The catalog is empty right now. Check back soon.</p>
+      <div class="store-empty col-span-full">
+        <div class="store-empty__emoji">🛍️</div>
+        <h3>No products yet</h3>
+        <p>The catalog is empty right now. Check back soon.</p>
       </div>`
       : `
-      <div class="w-full col-span-full py-16 text-center rounded-2xl border p-8 space-y-3" style="background:var(--surface);border-color:var(--border)">
-        <div class="text-4xl">🔍</div>
-        <h3 class="font-black text-xl" style="color:var(--text)">No products found</h3>
-        <p class="text-xs max-w-sm mx-auto" style="color:var(--text-muted)">No products matched your selected criteria. Try adjusting your filters or search keywords.</p>
-        <button type="button" id="reset-filters-btn" class="button button-primary !min-h-9 !px-4 text-xs font-bold">Clear All Filters</button>
+      <div class="store-empty col-span-full">
+        <div class="store-empty__emoji">🔍</div>
+        <h3>No products found</h3>
+        <p>No products matched your selected criteria. Try adjusting your filters or search keywords.</p>
+        <button type="button" id="reset-filters-btn" class="button button-primary store-empty__cta">Clear All Filters</button>
       </div>`;
     document.querySelector('#reset-filters-btn')?.addEventListener('click', resetAllFilters);
     pagination.innerHTML = '';
@@ -526,7 +527,7 @@ async function renderVendorStore(slug) {
     return true;
   }
 
-  const products = data.products || [];
+  const products = stripAdListings(data.products || []);
 
   document.querySelector('#vendor-header').classList.remove('hidden');
   document.querySelector('#store-header').classList.add('hidden');
@@ -602,7 +603,7 @@ async function init() {
 
   const [productsResult, categoriesResult] = await Promise.all([
     supabase.from('products')
-      .select('id,title,slug,category,description,short_description,price,original_price,currency,cover_url,file_type,file_size_bytes,purchase_count,rating_sum,rating_count,is_featured,is_published,created_at,vendor_id,vendor:vendors(display_name,slug)')
+      .select('id,title,slug,category,description,short_description,price,original_price,currency,cover_url,file_type,file_size_bytes,purchase_count,rating_sum,rating_count,is_featured,is_published,created_at,vendor_id,vendor:vendors(display_name,slug)' + AD_LISTING_COLS)
       .eq('is_published', true).order('created_at', { ascending: false }),
     supabase.from('categories').select('name,slug,description,sort_order').eq('is_active', true).order('sort_order').order('name'),
   ]);
@@ -617,7 +618,7 @@ async function init() {
     return;
   }
 
-  allProducts = data || [];
+  allProducts = stripAdListings(data || []);
 
   const prices = allProducts.map((p) => Number(p.price || 0)).filter((n) => Number.isFinite(n));
   priceBounds = { min: 0, max: prices.length ? Math.max(...prices, 1) : 500 };

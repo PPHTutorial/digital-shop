@@ -16,13 +16,16 @@ import {
   statusBadge,
 } from './uikit.js';
 import { enhanceSelect, refreshSelect } from './select.js';
+import { inPeriod, renderPeriodFilter } from './filters.js';
+import { EXTERNAL_LISTINGS_OPEN } from './ad-listing.js';
 import { countryOptions, currencyForCountry, currencyOptions } from './geo.js';
 import { buildRte, getRteValue, valueToHtml, wireRte } from './rte.js';
 import { buildDropzone, extOf, wireDropzone } from './filedrop.js';
 import { openImageEditor } from './imgedit.js';
 import { openFileViewer } from './preview.js';
+import { openAdTopupModal } from './ad-wallet.js';
 
-const editImage = (file) => new Promise((resolve) => openImageEditor(file, { maxBytes: 5 * 1024 * 1024, onApply: resolve }));
+const editImage = (file, maxBytes = 5 * 1024 * 1024) => new Promise((resolve) => openImageEditor(file, { maxBytes, onApply: resolve }));
 
 async function adMinWalletBalance() {
   const { data } = await supabase.from('site_settings').select('ad_min_wallet_balance').eq('id', 1).maybeSingle().then((r) => r, () => ({ data: null }));
@@ -35,9 +38,6 @@ let vendor = null;
 let categories = [];
 let myProducts = [];
 let wallet = null;
-
-/** Mirrors the minimum enforced by create_ad_funding() in the database. */
-const MIN_TOPUP = 25;
 
 /* ==========================================================================
    Jurisdiction — which payout rails exist where
@@ -245,7 +245,7 @@ const PRODUCTS_PAGE_SIZE = 10;
 async function loadProducts() {
   const { data, error } = await supabase
     .from('products')
-    .select('id,title,slug,category,price,original_price,currency,cover_url,is_published,purchase_count,rating_sum,rating_count,created_at')
+    .select('id,title,slug,category,price,original_price,currency,cover_url,is_published,is_ad,ad_status,ad_deposit_held,purchase_count,rating_sum,rating_count,created_at')
     .eq('vendor_id', vendor.id)
     .order('created_at', { ascending: false });
 
@@ -303,6 +303,9 @@ function paintProductsTable() {
     onPage: (p) => { productsPage = p; paintProductsTable(); },
     rowActions: (p) => `
       <button class="button !min-h-8 !px-3 text-xs" type="button" data-edit="${p.id}">Edit</button>
+      ${p.is_ad && p.ad_status === 'active'
+        ? `<button class="button !min-h-8 !px-3 text-xs" type="button" data-remove-ad="${p.id}">Remove listing</button>`
+        : ''}
       <button class="button !min-h-8 !px-3 text-xs button-danger" type="button" data-delete="${p.id}">Delete</button>`,
     emptyMessage: 'You have not added a product yet.',
   });
@@ -312,7 +315,13 @@ function paintProductsTable() {
 
 let salesRows = [];
 let salesPage = 1;
+let salesRange = null;
+let salesFilterWired = false;
 const SALES_PAGE_SIZE = 10;
+
+function scopedSales() {
+  return salesRows.filter((r) => inPeriod(r.created_at, salesRange));
+}
 
 async function loadSales() {
   const { data, error } = await supabase
@@ -320,7 +329,7 @@ async function loadSales() {
     .select('id,gross_amount,commission_amount,commission_rate,net_amount,currency,status,created_at,available_at,products(title)')
     .eq('vendor_id', vendor.id)
     .order('created_at', { ascending: false })
-    .limit(200);
+    .limit(1000);
 
   const host = document.querySelector('#vendor-sales-table');
   if (!host) return;
@@ -328,25 +337,35 @@ async function loadSales() {
 
   salesRows = data || [];
 
-  const currency = salesRows[0]?.currency || vendor.payout_currency || 'USD';
-  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const recent = salesRows.filter((r) => new Date(r.created_at).getTime() >= cutoff);
-  const gross30 = recent.reduce((sum, r) => sum + Number(r.gross_amount), 0);
-  const net30 = recent.reduce((sum, r) => sum + Number(r.net_amount), 0);
-  const commission30 = recent.reduce((sum, r) => sum + Number(r.commission_amount), 0);
-  document.querySelector('#s-gross').textContent = compactMoney(gross30, currency);
-  document.querySelector('#s-net').textContent = compactMoney(net30, currency);
-  document.querySelector('#s-commission').textContent = compactMoney(commission30, currency);
-  document.querySelector('#s-commission-label').textContent = `Commission (${vendor.commission_rate}%, 30d)`;
+  if (!salesFilterWired) {
+    salesFilterWired = true;
+    renderPeriodFilter(document.querySelector('#vnd-sales-period'), {
+      onChange: ({ range }) => { salesRange = range; salesPage = 1; paintSalesSummary(); paintSalesTable(); },
+    });
+  }
 
   salesPage = 1;
+  paintSalesSummary();
   paintSalesTable();
+}
+
+function paintSalesSummary() {
+  const rows = scopedSales();
+  const currency = rows[0]?.currency || salesRows[0]?.currency || vendor.payout_currency || 'USD';
+  const gross = rows.reduce((sum, r) => sum + Number(r.gross_amount), 0);
+  const net = rows.reduce((sum, r) => sum + Number(r.net_amount), 0);
+  const commission = rows.reduce((sum, r) => sum + Number(r.commission_amount), 0);
+  document.querySelector('#s-gross').textContent = compactMoney(gross, currency);
+  document.querySelector('#s-net').textContent = compactMoney(net, currency);
+  document.querySelector('#s-commission').textContent = compactMoney(commission, currency);
+  document.querySelector('#s-commission-label').textContent = `Commission (${vendor.commission_rate}%)`;
 }
 
 function paintSalesTable() {
   const host = document.querySelector('#vendor-sales-table');
+  const rows = scopedSales();
   const start = (salesPage - 1) * SALES_PAGE_SIZE;
-  const pageRows = salesRows.slice(start, start + SALES_PAGE_SIZE);
+  const pageRows = rows.slice(start, start + SALES_PAGE_SIZE);
 
   renderDataTable(host, {
     columns: [
@@ -364,9 +383,9 @@ function paintSalesTable() {
     rows: pageRows,
     page: salesPage,
     pageSize: SALES_PAGE_SIZE,
-    total: salesRows.length,
+    total: rows.length,
     onPage: (p) => { salesPage = p; paintSalesTable(); },
-    emptyMessage: 'No sales recorded yet.',
+    emptyMessage: 'No sales in this period.',
   });
 }
 
@@ -507,92 +526,9 @@ async function loadWalletHistory() {
   });
 }
 
-/* --- Wallet top-up modal ----------------------------------------------------- */
-
-function openTopupModal() {
-  const { dialog } = openModal({
-    id: 'topup-modal',
-    title: 'Add funds to your ad wallet',
-    body: `
-      <p style="margin-bottom:16px">Your wallet is credited automatically as soon as the payment clears.</p>
-      <form id="topup-form">
-        <span class="label">Amount</span>
-        <div class="mt-1 flex flex-wrap gap-2" id="topup-presets">
-          ${[25, 50, 100, 250].map((n) => `<button type="button" class="button !min-h-9 !px-4 text-xs" data-amount="${n}">$${n}</button>`).join('')}
-        </div>
-        <input class="field mt-3 font-bold" name="amount" type="number" step="1" min="${MIN_TOPUP}" value="${MIN_TOPUP}" required>
-        <small class="help">Minimum $${MIN_TOPUP}. Enter any higher amount you like.</small>
-
-        <div class="mt-4">
-          <span class="label">Pay with</span>
-          <div class="mt-2 grid gap-2">
-            <label class="vnd-check-line" style="align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:var(--radius-md)">
-              <input type="radio" name="provider" value="flutterwave" checked>
-              <span>
-                <strong style="display:block">Card, bank transfer or mobile money</strong>
-                <span style="font-size:.76rem;color:var(--text-muted)">Visa, Mastercard, bank transfer, MTN MoMo, M-Pesa</span>
-              </span>
-            </label>
-            <label class="vnd-check-line" style="align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:var(--radius-md)">
-              <input type="radio" name="provider" value="nowpayments">
-              <span>
-                <strong style="display:block">Cryptocurrency</strong>
-                <span style="font-size:.76rem;color:var(--text-muted)">Bitcoin, Ethereum, USDT and 300+ coins</span>
-              </span>
-            </label>
-          </div>
-        </div>
-        <p id="topup-feedback" class="status-line mt-3 text-xs"></p>
-      </form>`,
-    footer: `
-      <button type="button" class="button" data-uk-cancel>Cancel</button>
-      <button type="submit" form="topup-form" class="button button-primary">Continue to payment</button>`,
-  });
-
-  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
-  dialog.querySelector('#topup-presets').addEventListener('click', (event) => {
-    const button = event.target.closest('[data-amount]');
-    if (!button) return;
-    dialog.querySelector('#topup-form').elements.amount.value = button.dataset.amount;
-  });
-
-  dialog.querySelector('#topup-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const feedback = dialog.querySelector('#topup-feedback');
-    const button = dialog.querySelector('button[form="topup-form"]');
-    const amount = Number(form.elements.amount.value);
-
-    if (!Number.isFinite(amount) || amount < MIN_TOPUP) {
-      feedback.textContent = `The minimum top-up is $${MIN_TOPUP}.`;
-      feedback.className = 'status-line error mt-3 text-xs';
-      return;
-    }
-
-    const provider = form.querySelector('input[name="provider"]:checked')?.value || 'flutterwave';
-
-    setBusy(button, true, 'Opening payment…');
-    feedback.textContent = 'Preparing a secure payment page…';
-    feedback.className = 'status-line mt-3 text-xs';
-
-    const siteUrl = /localhost|127\.0\.0\.1/.test(window.location.origin)
-      ? window.location.origin
-      : 'https://digistore.codeinktechnologies.com';
-
-    const { data, error } = await supabase.functions.invoke('create-ad-funding-payment', {
-      body: { amount, provider, site_url: siteUrl },
-    });
-
-    if (error || !data?.payment_url) {
-      setBusy(button, false);
-      feedback.textContent = data?.error || error?.message || 'The payment page could not be opened.';
-      feedback.className = 'status-line error mt-3 text-xs';
-      return;
-    }
-
-    window.location.href = data.payment_url;
-  });
-}
+/* --- Wallet top-up modal --------------------------------------------------- */
+// The modal itself lives in js/ad-wallet.js (shared with the admin console).
+const openTopupModal = (opts) => openAdTopupModal(opts);
 
 /**
  * The funding callback returns here with ?funding=<state>. The wallet is
@@ -832,7 +768,9 @@ function slugify(value) {
 
 function openProductModal(product = null) {
   const gallery = Array.isArray(product?.gallery_urls) ? [...product.gallery_urls] : [];
-  const startAsLink = !!product?.external_url;
+  // External-link listings are paused for launch — the editor only offers file
+  // delivery, and the server rejects is_ad writes (migration 20260831170000).
+  const startAsLink = EXTERNAL_LISTINGS_OPEN && !!product?.external_url;
   const cur = vendor.payout_currency || 'USD';
 
   const { dialog } = openModal({
@@ -887,13 +825,15 @@ function openProductModal(product = null) {
 
         <div class="adm-field">
           <span class="label">What buyers get</span>
+          ${EXTERNAL_LISTINGS_OPEN ? `
           <div class="seg" role="tablist">
             <button type="button" class="seg__btn ${startAsLink ? '' : 'is-active'}" data-delivery="file">Uploaded file</button>
             <button type="button" class="seg__btn ${startAsLink ? 'is-active' : ''}" data-delivery="link">External link</button>
-          </div>
+          </div>` : ''}
           <div id="v-file-pane" class="${startAsLink ? 'hidden' : ''}" style="margin-top:10px">
-            ${buildDropzone({ id: 'v-product-file', label: 'Drop the product file or click', hint: 'PNG · JPG · WebP · ZIP · PDF · DOCX · EPUB — max 5 MB' })}
+            ${buildDropzone({ id: 'v-product-file', label: 'Drop the product file or click', hint: 'Images, audio, video, PDF, docs, fonts, 3D, ZIP/APK — no executables. Images are auto-compressed to the size limit; ZIP/APK are scanned.' })}
           </div>
+          ${EXTERNAL_LISTINGS_OPEN ? `
           <div id="v-link-pane" class="${startAsLink ? '' : 'hidden'}" style="margin-top:10px">
             <input class="field" type="url" id="v-external-url" placeholder="https://…" value="${escapeHtml(product?.external_url || '')}">
             <div class="adm-ad-notice">
@@ -909,7 +849,7 @@ function openProductModal(product = null) {
             </div>
             <label class="adm-check-line" style="margin-top:10px"><input type="checkbox" id="v-ext-consent"> I take responsibility for this destination — no phishing, scams, malware, or misleading content, and it complies with the Acceptable Use Policy.</label>
             <p class="adm-panel-note" style="margin-top:6px">Identity / biometric verification for ad publishers is coming — for now this consent is on record.</p>
-          </div>
+          </div>` : ''}
         </div>
 
         <div class="adm-field">
@@ -957,38 +897,67 @@ function openProductModal(product = null) {
 
   // Delivery mode
   const modeInput = dialog.querySelector('#v-delivery-mode');
-  const filePane = dialog.querySelector('#v-file-pane');
-  const linkPane = dialog.querySelector('#v-link-pane');
-  const walletLine = dialog.querySelector('#v-wallet-line');
   const adGate = { minBalance: 100, balance: Number(wallet?.balance ?? 0) };
-  const setDeliveryMode = async (mode) => {
-    modeInput.value = mode;
-    dialog.querySelectorAll('[data-delivery]').forEach((b) => b.classList.toggle('is-active', b.dataset.delivery === mode));
-    filePane.classList.toggle('hidden', mode !== 'file');
-    linkPane.classList.toggle('hidden', mode !== 'link');
-    if (mode === 'link') {
-      setFormatBadge('LINK');
-      if (walletLine.hidden) {
-        adGate.minBalance = await adMinWalletBalance();
-        walletLine.hidden = false;
-        const low = adGate.balance < adGate.minBalance;
-        dialog.querySelector('#v-wallet-balance').innerHTML =
-          `${cur} ${adGate.balance.toFixed(2)} <span class="help">· min ${cur} ${adGate.minBalance.toFixed(2)}${low ? ' — <strong style="color:var(--danger)">top up first</strong>' : ''}</span>`;
+
+  if (EXTERNAL_LISTINGS_OPEN) {
+    const filePane = dialog.querySelector('#v-file-pane');
+    const linkPane = dialog.querySelector('#v-link-pane');
+    const walletLine = dialog.querySelector('#v-wallet-line');
+    const renderWalletLine = () => {
+      const low = adGate.balance < adGate.minBalance;
+      dialog.querySelector('#v-wallet-balance').innerHTML =
+        `${cur} ${adGate.balance.toFixed(2)} <span class="help">· min ${cur} ${adGate.minBalance.toFixed(2)}${low ? ' — <strong style="color:var(--danger)">top up first</strong>' : ''}</span>`;
+    };
+    const setDeliveryMode = async (mode) => {
+      modeInput.value = mode;
+      dialog.querySelectorAll('[data-delivery]').forEach((b) => b.classList.toggle('is-active', b.dataset.delivery === mode));
+      filePane.classList.toggle('hidden', mode !== 'file');
+      linkPane.classList.toggle('hidden', mode !== 'link');
+      if (mode === 'link') {
+        setFormatBadge('LINK');
+        if (walletLine.hidden) {
+          adGate.minBalance = await adMinWalletBalance();
+          walletLine.hidden = false;
+          renderWalletLine();
+        }
+      } else {
+        setFormatBadge(dialog.querySelector('#v-file-type').value || '');
       }
-    } else {
-      setFormatBadge(dialog.querySelector('#v-file-type').value || '');
-    }
-  };
-  dialog.querySelectorAll('[data-delivery]').forEach((b) => b.addEventListener('click', () => setDeliveryMode(b.dataset.delivery)));
-  dialog.querySelector('#v-wallet-topup').addEventListener('click', () => { dialog.close(); location.hash = '#wallet'; });
-  if (startAsLink) setDeliveryMode('link');
+    };
+    dialog.querySelectorAll('[data-delivery]').forEach((b) => b.addEventListener('click', () => setDeliveryMode(b.dataset.delivery)));
+    // Top up in place — the product modal stays open underneath, so a cancelled
+    // top-up returns the seller to their half-filled listing. A completed one
+    // redirects to the gateway (the draft is lost either way at that point).
+    dialog.querySelector('#v-wallet-topup').addEventListener('click', () => {
+      const topup = openTopupModal();
+      topup.dialog.addEventListener('close', async () => {
+        const { data } = await supabase.from('ad_wallets').select('balance').eq('vendor_id', vendor.id).maybeSingle();
+        if (data) { adGate.balance = Number(data.balance ?? adGate.balance); renderWalletLine(); }
+      }, { once: true });
+    });
+    if (startAsLink) setDeliveryMode('link');
+  }
 
   // Product file
+  let maxFileBytes = 5 * 1024 * 1024;
+  supabase.from('site_settings').select('max_product_file_bytes').eq('id', 1).maybeSingle()
+    .then(({ data }) => { if (data?.max_product_file_bytes) maxFileBytes = Number(data.max_product_file_bytes); }, () => {});
   const fileDz = wireDropzone(dialog.querySelector('#v-product-file').closest('.filedrop'), {
-    onFiles: async ([file]) => {
-      if (file.size > 5 * 1024 * 1024) {
-        fileDz.setStatus(`That file is ${(file.size / 1048576).toFixed(1)} MB — the limit is 5 MB. Compress it or host large media as an external link.`, 'error');
-        return;
+    onFiles: async ([picked]) => {
+      let file = picked;
+      if (file.size > maxFileBytes) {
+        const capMb = (maxFileBytes / 1048576).toFixed(0);
+        const isImage = /^image\//.test(file.type) || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+        if (!isImage) {
+          fileDz.setStatus(`That file is ${(file.size / 1048576).toFixed(1)} MB — the limit is ${capMb} MB. Compress it or host large media as an external link.`, 'error');
+          return;
+        }
+        fileDz.setStatus(`Compressing image to fit ${capMb} MB…`);
+        file = await editImage(picked, maxFileBytes);
+        if (!file || file.size > maxFileBytes) {
+          fileDz.setStatus(`Could not get this image under ${capMb} MB — start from a smaller source.`, 'error');
+          return;
+        }
       }
       fileDz.setStatus('Uploading…');
       const path = await uploadTo('books', 'files', file, null);
@@ -998,6 +967,23 @@ function openProductModal(product = null) {
       dialog.querySelector('#v-file-type').value = extOf(file.name) || dialog.querySelector('#v-file-type').value;
       setFormatBadge(dialog.querySelector('#v-file-type').value);
       fileDz.setPreview(`${file.name} · ${(file.size / 1024).toFixed(0)} KB`);
+
+      // Archives (.zip/.apk) are scanned server-side for the "wrapper around an
+      // external link" pattern — publishing one is blocked until it clears.
+      if (/^(zip|apk)$/i.test(extOf(file.name) || '')) {
+        fileDz.setStatus('Scanning archive…');
+        const { data: scan, error: scanErr } = await supabase.functions.invoke('inspect-product-archive', { body: { file_path: path } });
+        if (scanErr || scan?.verdict === 'error') {
+          dialog.querySelector('#v-file-path').value = '';
+          fileDz.setStatus('The archive could not be inspected — try again, or publish it as an external link.', 'error');
+          return;
+        }
+        if (scan?.verdict === 'external_wrapper') {
+          dialog.querySelector('#v-file-path').value = '';
+          fileDz.setStatus('This archive looks like a wrapper around an external link. Use the External link option instead of uploading a file.', 'error');
+          return;
+        }
+      }
       fileDz.setStatus('Uploaded.', 'ok');
     },
   });
@@ -1049,7 +1035,7 @@ function openProductModal(product = null) {
     const mode = modeInput.value;
     const isAd = mode === 'link';
     const filePath = dialog.querySelector('#v-file-path').value;
-    const externalUrl = dialog.querySelector('#v-external-url').value.trim();
+    const externalUrl = dialog.querySelector('#v-external-url')?.value.trim() || '';
 
     if (isAd) {
       if (!/^https?:\/\/.+/i.test(externalUrl)) { fail('Enter the full external URL (https://…).'); return; }
@@ -1298,19 +1284,49 @@ document.querySelector('#logo-file')?.addEventListener('change', async (event) =
   document.querySelector('#logo-preview').innerHTML = `<img src="${escapeHtml(data.publicUrl)}" alt="">`;
 });
 
+document.querySelector('#banner-file')?.addEventListener('change', async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const path = await uploadTo('product-images', 'branding', file, document.querySelector('#banner-status'));
+  if (!path) return;
+  const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+  document.querySelector('#banner-url').value = data.publicUrl;
+  document.querySelector('#banner-preview').innerHTML = `<img src="${escapeHtml(data.publicUrl)}" alt="">`;
+});
+
+// Social platforms surfaced on the settings form (keys match SOCIAL_LINKS in js/ui.js).
+const VENDOR_SOCIAL_KEYS = ['twitter', 'instagram', 'facebook', 'linkedin', 'youtube', 'tiktok', 'github'];
+
 document.querySelector('#vendor-settings-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
   const feedback = document.querySelector('#settings-feedback');
   const button = form.querySelector('button[type="submit"]');
+  const val = (name) => (form.elements[name]?.value || '').trim() || null;
+
+  const socialLinks = {};
+  VENDOR_SOCIAL_KEYS.forEach((key) => {
+    const v = val(`social_${key}`);
+    if (v) socialLinks[key] = v;
+  });
 
   setBusy(button, true, 'Saving…');
   const { error } = await supabase.from('vendors').update({
     display_name: form.elements.display_name.value.trim(),
-    bio: form.elements.bio.value.trim() || null,
+    bio: val('bio'),
     country: form.elements.country.value,
-    support_email: form.elements.support_email.value.trim() || null,
+    website_url: val('website_url'),
+    support_email: val('support_email'),
+    support_phone: val('support_phone'),
+    support_hours: val('support_hours'),
+    legal_name: val('legal_name'),
+    tax_id: val('tax_id'),
+    business_address: val('business_address'),
+    return_policy: val('return_policy'),
+    terms: val('terms'),
+    social_links: socialLinks,
     logo_url: document.querySelector('#logo-url').value || null,
+    banner_url: document.querySelector('#banner-url').value || null,
     updated_at: new Date().toISOString(),
   }).eq('id', vendor.id);
   setBusy(button, false);
@@ -1523,12 +1539,29 @@ function setBusy(button, busy, label) {
 
 function wireDelegates() {
   document.addEventListener('click', async (event) => {
-    const target = event.target.closest('[data-edit],[data-delete],[data-delete-account],[data-toggle-campaign]');
+    const target = event.target.closest('[data-edit],[data-delete],[data-remove-ad],[data-delete-account],[data-toggle-campaign]');
     if (!target) return;
 
     if (target.dataset.edit) {
       const { data } = await supabase.from('products').select('*').eq('id', target.dataset.edit).single();
       if (data) openProductModal(data);
+      return;
+    }
+
+    if (target.dataset.removeAd) {
+      const ok = await confirmDialog({
+        title: 'Remove this external-link listing?',
+        body: 'It comes off the storefront immediately and your refundable deposit is returned to your ad wallet. You can resubmit it later for review.',
+        confirmLabel: 'Remove listing',
+        danger: true,
+      });
+      if (!ok) return;
+      const { data, error } = await supabase.rpc('remove_ad_listing', { p_product_id: target.dataset.removeAd });
+      if (error) { toast(error.message, 'error'); return; }
+      const back = Number(data?.deposit_returned || 0);
+      toast(back ? `Listing removed. ${back.toFixed(2)} returned to your ad wallet.` : 'Listing removed.');
+      await loadProducts();
+      await refreshDashboard();
       return;
     }
 
@@ -1611,9 +1644,21 @@ async function refreshDashboard() {
 
 function fillSettings() {
   const form = document.querySelector('#vendor-settings-form');
-  form.elements.display_name.value = vendor.display_name || '';
-  form.elements.bio.value = vendor.bio || '';
-  form.elements.support_email.value = vendor.support_email || '';
+  const set = (name, value) => { if (form.elements[name]) form.elements[name].value = value ?? ''; };
+  set('display_name', vendor.display_name);
+  set('bio', vendor.bio);
+  set('website_url', vendor.website_url);
+  set('support_email', vendor.support_email);
+  set('support_phone', vendor.support_phone);
+  set('support_hours', vendor.support_hours);
+  set('legal_name', vendor.legal_name);
+  set('tax_id', vendor.tax_id);
+  set('business_address', vendor.business_address);
+  set('return_policy', vendor.return_policy);
+  set('terms', vendor.terms);
+  const social = vendor.social_links || {};
+  VENDOR_SOCIAL_KEYS.forEach((key) => set(`social_${key}`, social[key]));
+
   const settingsCountry = document.querySelector('#settings-country');
   settingsCountry.innerHTML = countryOptions(vendor.country);
   enhanceSelect(settingsCountry, { label: 'Country' });
@@ -1623,6 +1668,10 @@ function fillSettings() {
   enhanceSelect(settingsPayoutCur, { label: 'Payout currency' });
   refreshSelect(settingsPayoutCur);
   document.querySelector('#logo-url').value = vendor.logo_url || '';
+  document.querySelector('#banner-url').value = vendor.banner_url || '';
+  document.querySelector('#banner-preview').innerHTML = vendor.banner_url
+    ? `<img src="${escapeHtml(vendor.banner_url)}" alt="">`
+    : 'No banner';
 
   const initial = (vendor.display_name || '?').trim().charAt(0).toUpperCase();
   const avatarMarkup = vendor.logo_url

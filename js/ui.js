@@ -1,4 +1,5 @@
 import { supabase } from './client.js';
+import { CONFIG } from './config.js';
 
 export function startPageLoader() {
   if (document.querySelector('#page-loader')) return;
@@ -132,8 +133,10 @@ function loadTopCategories() {
   if (topCategoriesPromise) return topCategoriesPromise;
   topCategoriesPromise = (async () => {
     try {
+      let productsQuery = supabase.from('products').select('category').eq('is_published', true);
+      if (CONFIG.ADS_LIVE) productsQuery = productsQuery.eq('is_ad', false);
       const [productsResult, categoriesResult] = await Promise.all([
-        supabase.from('products').select('category').eq('is_published', true),
+        productsQuery,
         supabase.from('categories').select('name,slug').eq('is_active', true),
       ]);
       const counts = new Map();

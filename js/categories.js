@@ -8,15 +8,18 @@
  * description is real — no per-tile placeholder copy or invented item counts.
  */
 import { supabase } from './client.js';
+import { CONFIG } from './config.js';
 import { escapeHtml, icon, renderIcons, mountHeader, mountFooter, finishPageLoader, setButtonLoading, toast } from './ui.js';
 import { categoryLook } from './category-look.js';
 
 /** Categories plus a live product count, cheapest way: one products read. */
 export async function loadCategories() {
+  let productsQuery = supabase.from('products').select('category').eq('is_published', true);
+  if (CONFIG.ADS_LIVE) productsQuery = productsQuery.eq('is_ad', false);
   const [categoriesResult, productsResult] = await Promise.all([
     supabase.from('categories').select('name,slug,description,image_url,sort_order')
       .eq('is_active', true).order('sort_order').order('name'),
-    supabase.from('products').select('category').eq('is_published', true),
+    productsQuery,
   ]);
 
   const counts = new Map();

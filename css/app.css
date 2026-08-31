@@ -1,26 +1,39 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@500;600;700;800;900&family=Manrope:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap");
 
-/* Firefox global support */
+/* Scrollbars: only the page itself (html/body) shows one. Every in-app scroll
+   surface — modal bodies, dialogs, popovers, dropdown/date panels, tables,
+   sidebars — still scrolls, just without a visible bar. */
+
+/* Firefox */
+* {
+  scrollbar-width: none;
+}
+
 html, body {
-  scrollbar-width: thin; 
-  scrollbar-color: #888 #f1f1f1; 
+  scrollbar-width: thin;
+  scrollbar-color: #888 #f1f1f1;
 }
 
-/* Chrome, Edge, Safari, and Opera global support */
+/* Chrome, Edge, Safari, Opera */
 ::-webkit-scrollbar {
-  width: 6px; 
-  height: 6px; 
+  width: 0;
+  height: 0;
 }
 
-/* Global scrollbar draggable handle */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+/* Page scrollbar handle + track (only html/body paint a bar now) */
 ::-webkit-scrollbar-thumb {
-  background: #888;   
-  border-radius: 4px; 
+  background: #888;
+  border-radius: 4px;
 }
 
-/* Global scrollbar background track */
 ::-webkit-scrollbar-track {
-  background: #f1f1f1; 
+  background: #f1f1f1;
 }
 
 /* ==========================================================================
@@ -1907,6 +1920,9 @@ a:hover {
 .xselect {
   position: relative;
   display: block;
+  /* Match .field's vertical rhythm so a custom select drops into a form row
+     the same way a native input does. */
+  margin-top: 0.5rem;
 }
 
 .xselect__native {
@@ -1927,14 +1943,15 @@ a:hover {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  min-height: 46px;
-  /* Generous right padding so the chevron never crowds the edge. */
-  padding: 10px 16px 10px 18px;
+  /* Box model kept identical to .field (padding / border / radius / font) so
+     the trigger is the exact height of a sibling text input on the same row. */
+  min-height: 0;
+  padding: 0.85rem 1rem;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--surface);
   color: var(--text);
-  font-size: 14px;
+  font-size: 1rem;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
@@ -2273,6 +2290,8 @@ body.xselect-locked {
 .xdate {
   position: relative;
   display: block;
+  /* Match .field's vertical rhythm — see .xselect. */
+  margin-top: 0.5rem;
 }
 
 .xdate__trigger {
@@ -2281,13 +2300,15 @@ body.xselect-locked {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  min-height: 44px;
-  padding: 10px 14px;
+  /* Box model kept identical to .field so the trigger matches a sibling
+     text input's height on the same form row. */
+  min-height: 0;
+  padding: 0.85rem 1rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   background: var(--surface);
   color: var(--text);
-  font-size: 13.5px;
+  font-size: 1rem;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -2326,7 +2347,10 @@ body.xselect-locked {
 
 .xdate__panel {
   position: absolute;
-  z-index: 60;
+  /* Above app chrome (sticky headers, .uk-popover, .xselect__panel) so the
+     calendar is never buried; js/form-controls.js re-anchors it with
+     position:fixed in viewport coords so an overflow ancestor can't clip it. */
+  z-index: 620;
   top: calc(100% + 8px);
   left: 0;
   width: max(260px, 100%);
@@ -2783,6 +2807,40 @@ body.xselect-locked {
   transition: transform .18s ease;
 }
 
+/* --- "Leaving DigiStore" interstitial --------------------------------- */
+.leaving-int__lead {
+  margin: 0 0 14px;
+}
+
+.leaving-int__dest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.leaving-int__dest svg,
+.leaving-int__dest i {
+  flex: none;
+  color: var(--warning);
+}
+
+.leaving-int__tips {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+}
+
+.leaving-int__tips li + li {
+  margin-top: 6px;
+}
+
 .tag {
   display: inline-flex;
   border-radius: 99px;
@@ -2843,7 +2901,8 @@ body.xselect-locked {
     display: none;
   }
 
-  .account-chip span:last-child {
+  /* Keep the account chip to just the avatar + caret on small screens. */
+  .account-chip span:not(.avatar) {
     display: none;
   }
 
@@ -2866,17 +2925,23 @@ body.xselect-locked {
     font-size: 12px;
   }
 
-  .mobile-menu-button,
-  .account-menu-button {
+  .mobile-menu-button {
     display: inline-grid !important;
     place-items: center;
   }
 
-  /* The desktop hover/click popover panel is replaced below 1024px by the
-     account drawer (opened from #account-menu-button) — same breakpoint the
-     hamburger nav drawer already switches at. */
+  /* The account menu stays a click popover at every width — the old account
+     side-drawer (#account-menu-button / #account-drawer) is not used here. */
+  .account-menu-button {
+    display: none !important;
+  }
+
   .account-popover {
-    display: none;
+    display: block;
+  }
+
+  .account-popover-panel {
+    max-width: calc(100vw - 32px);
   }
 
   .toast-region {
@@ -5351,10 +5416,19 @@ dialog[open].admin-modal-container {
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* Centre in the host panel/cell rather than hugging its top-left corner. */
+  justify-content: center;
   text-align: center;
   gap: 10px;
+  min-height: 240px;
   padding: 48px 24px;
   color: var(--text-muted);
+}
+
+/* Dropped into the CMS media library's CSS grid, the empty state would be
+   squeezed into one 190px column — drop the grid while it's the only child. */
+.adm-media-grid:has(> .uk-empty:only-child) {
+  display: block;
 }
 
 .uk-empty__icon {
@@ -5467,6 +5541,92 @@ dialog[open].admin-modal-container {
 .uk-tabs__panel.is-active {
   display: block;
   animation: page-enter .2s ease both;
+}
+
+/* Collapsible tab strip (initTabs, 5+ tabs). The trigger only shows below lg. */
+/* Transparent to layout on wide screens; becomes the dropdown's anchor below lg. */
+.uk-tabs__collapse-head {
+  display: contents;
+}
+
+.uk-tabs__toggle {
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: .85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.uk-tabs__toggle .uk-badge {
+  margin-left: auto;
+}
+
+.uk-tabs__toggle::after {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform .18s ease;
+}
+
+.uk-tabs--collapse.is-tabs-open .uk-tabs__toggle::after {
+  transform: rotate(-135deg) translateY(-2px);
+}
+
+@media (max-width: 1023px) {
+  .uk-tabs__collapse-head {
+    display: block;
+    position: relative;
+  }
+
+  .uk-tabs--collapse .uk-tabs__toggle {
+    display: flex;
+  }
+
+  .uk-tabs--collapse .uk-tabs__list {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: none;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 2px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .uk-tabs--collapse.is-tabs-open .uk-tabs__list {
+    display: flex;
+  }
+
+  .uk-tabs--collapse .uk-tabs__btn {
+    width: 100%;
+    text-align: left;
+    border-bottom: 0;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .uk-tabs--collapse .uk-tabs__btn.is-active {
+    background: var(--accent-wash);
+    border-bottom-color: transparent;
+  }
 }
 
 /* --- Data table ------------------------------------------------------------ */
@@ -5617,6 +5777,45 @@ dialog[open].admin-modal-container {
   .store-layout {
     grid-template-columns: 1fr;
   }
+}
+
+/* Storefront "no products" / "no results" — one centred card, spanning the
+   whole product grid, matching the .uk-empty treatment used elsewhere. */
+.store-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  min-height: 380px;
+  padding: 48px 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.store-empty__emoji {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.store-empty h3 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.store-empty p {
+  max-width: 44ch;
+  font-size: .85rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.store-empty__cta {
+  margin-top: 8px;
 }
 
 .store-sidebar {
@@ -6912,18 +7111,35 @@ dialog[open].admin-modal-container {
   opacity: 1;
 }
 
+/* Empty cart breaks out of the two-column cart grid and centres on the page. */
+.cart-empty-wrap {
+  max-width: 1440px;
+  margin: auto;
+  padding: 24px clamp(20px, 6vw, 80px) 64px;
+}
+
 .cart-empty {
-  padding: 64px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  gap: 10px;
+  min-height: 420px;
+  padding: 64px 24px;
   border-radius: var(--radius-lg);
   background: var(--surface);
   border: 1px solid var(--border);
 }
 
-.cart-empty i,
-.cart-empty svg {
-  color: var(--text-soft);
-  margin-bottom: 12px;
+.cart-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
 }
 
 .cart-empty h2 {
@@ -6934,9 +7150,14 @@ dialog[open].admin-modal-container {
 }
 
 .cart-empty p {
-  margin-top: 6px;
+  max-width: 42ch;
   color: var(--text-muted);
   font-size: .88rem;
+  line-height: 1.55;
+}
+
+.cart-empty__cta {
+  margin-top: 8px;
 }
 
 /* --- Account dashboard ---------------------------------------------------- */
@@ -7225,6 +7446,86 @@ dialog[open].admin-modal-container {
   width: auto;
   padding: 0 28px;
   justify-self: start;
+}
+
+.acct-form-section,
+.vnd-form-section {
+  margin: 8px 0 -4px;
+  font-family: var(--font-display);
+  font-size: .95rem;
+  font-weight: 800;
+  color: var(--text);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.acct-form-section:first-child,
+.vnd-form-section:first-child {
+  margin-top: 0;
+}
+
+/* Social-link inputs: a compact two-up grid inside one span-2 field. */
+.vnd-social-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .vnd-social-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.acct-avatar-field {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.acct-avatar-field__preview {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: var(--ink-950);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.acct-avatar-field__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.acct-welcome__avatar img,
+.acct-avatar-field__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.acct-check-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: .85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.acct-check-line input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
 }
 
 /* --- Order Success (1:4014) -------------------------------------------- */
@@ -8341,6 +8642,25 @@ dialog[open].admin-modal-container {
   object-fit: cover;
 }
 
+.vnd-banner-preview {
+  flex: none;
+  width: 160px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  background: var(--ink-950);
+  color: var(--text-soft);
+  font-size: .68rem;
+  overflow: hidden;
+}
+
+.vnd-banner-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* --- Modal helpers reused by the vendor console's openModal() forms ----- */
 .uk-modal--wide {
   width: min(94vw, 640px);
@@ -9447,6 +9767,8 @@ body.dash-wide #site-footer > .shell {
 
 .imgedit__row .xselect {
   flex: 1;
+  /* This row is a centered control strip, not a stacked form field. */
+  margin-top: 0;
 }
 
 .imgedit__row {
@@ -9475,6 +9797,7 @@ body.dash-wide #site-footer > .shell {
 
 .imgedit__row .field {
   flex: 1;
+  margin-top: 0;
 }
 
 .imgedit__note {
@@ -10106,4 +10429,55 @@ body.dash-wide #site-footer > .shell {
 .adm-filter-row select,
 .adm-filter-row input {
   max-width: 220px;
+}
+
+/* --- Shared period / date-range filter (js/filters.js) ------------------- */
+.period-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.period-filter__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.period-filter__group .label {
+  font-size: .68rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.period-filter__group .field,
+.period-filter__group .xselect {
+  margin-top: 0;
+  min-width: 150px;
+  max-width: 200px;
+}
+
+.period-filter__custom .field {
+  min-width: 140px;
+}
+
+/* Overview keeps the control compact in the panel header. */
+.adm-panel-head .period-filter {
+  flex: none;
+}
+
+.adm-overview-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.adm-overview-filters .field,
+.adm-overview-filters .xselect {
+  margin-top: 0;
+  min-width: 150px;
+  max-width: 200px;
 }

@@ -4,6 +4,7 @@ import { convertAmount, formatCurrency, getExchangeRates } from './currency.js';
 import { refreshCartBadges } from './cart-actions.js';
 import { enhanceSelects } from './select.js';
 import { enhanceRadios } from './form-controls.js';
+import { AD_LISTING_COLS, isAdListing } from './ad-listing.js';
 
 enhanceSelects('#flw-currency-select, #flw-method-select, #crypto-currency-select', {
   'flw-currency-select': 'Pay in your currency',
@@ -137,10 +138,10 @@ async function load() {
 
   if (directSlug) {
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(directSlug);
-    let query = supabase.from('products').select('id,slug,title,price,currency,cover_url,is_published');
+    let query = supabase.from('products').select('id,slug,title,price,currency,cover_url,is_published' + AD_LISTING_COLS);
     query = isUUID ? query.eq('id', directSlug) : query.eq('slug', directSlug);
     const { data } = await query.maybeSingle();
-    if (data && data.is_published) {
+    if (data && data.is_published && !isAdListing(data)) {
       items = [{
         product_id: data.id, slug: data.slug, title: data.title, cover_url: data.cover_url,
         currency: (data.currency || 'USD').toUpperCase(), unit_price: Number(data.price), quantity: directQty,
@@ -150,11 +151,11 @@ async function load() {
   } else if (user) {
     const { data } = await supabase
       .from('cart_items')
-      .select('id,quantity,product:products(id,slug,title,price,currency,cover_url,is_published)')
+      .select('id,quantity,product:products(id,slug,title,price,currency,cover_url,is_published' + AD_LISTING_COLS + ')')
       .eq('user_id', user.id)
       .order('added_at', { ascending: false });
     items = (data || [])
-      .filter((r) => r.product?.is_published)
+      .filter((r) => r.product?.is_published && !isAdListing(r.product))
       .map((r) => ({
         cart_row_id: r.id, product_id: r.product.id, slug: r.product.slug, title: r.product.title,
         cover_url: r.product.cover_url, currency: (r.product.currency || 'USD').toUpperCase(),

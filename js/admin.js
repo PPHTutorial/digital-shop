@@ -19,14 +19,17 @@ import {
   rowMenu, setButtonBusy, statusBadge, wireRowMenus,
 } from './uikit.js';
 import { enhanceSelects, refreshSelect } from './select.js';
+import { periodRange, inPeriod, renderPeriodFilter } from './filters.js';
+import { EXTERNAL_LISTINGS_OPEN } from './ad-listing.js';
 import { enhanceDateTimeInput } from './form-controls.js';
 import { buildRte, formatForType, getRteValue, valueToHtml, wireRte } from './rte.js';
 import { buildDropzone, extOf, wireDropzone } from './filedrop.js';
 import { fileGlyph, openFileViewer } from './preview.js';
 import { openImageEditor } from './imgedit.js';
+import { openAdTopupModal } from './ad-wallet.js';
 
 /** Run a picked image through the crop/compress editor; resolves to a File. */
-const editImage = (file) => new Promise((resolve) => openImageEditor(file, { maxBytes: 5 * 1024 * 1024, onApply: resolve }));
+const editImage = (file, maxBytes = 5 * 1024 * 1024) => new Promise((resolve) => openImageEditor(file, { maxBytes, onApply: resolve }));
 
 let account = null;
 
@@ -127,6 +130,9 @@ window.addEventListener('hashchange', activateScreen);
 
 let dashboardData = null;
 let overviewLoaded = false;
+let overviewRange = periodRange('all');
+let overviewVendorId = '';
+let overviewCategory = '';
 
 function chart(points) {
   const max = Math.max(1, ...points.map((p) => p.revenue));
@@ -136,6 +142,143 @@ function chart(points) {
       <div style="width:100%;min-width:4px;border-radius:3px 3px 0 0;background:var(--accent);height:${Math.max(5, (p.revenue / max) * 150)}px"></div>
       <small style="font-size:9px;color:var(--text-soft)">${index % stride === 0 ? p.date.slice(5) : ''}</small>
     </div>`).join('')}</div>`;
+}
+
+/* --- Dashboard period widgets ------------------------------------------------
+   Painted from a `periodMetrics`-shaped object: either the edge function's
+   window-scoped aggregation, or clientPeriodMetrics() as a network fallback. */
+function paintOverview(pm) {
+  const d = dashboardData || {};
+  const m = d.metrics || {};
+  const unbounded = !pm.bounded;
+  const customers = unbounded ? Number(m.customers || 0) : Number(pm.newCustomers || 0);
+
+  document.querySelector('#m-revenue').textContent = compactMoney(pm.revenue || 0);
+  document.querySelector('#m-orders').textContent = compactNumber(pm.paidOrders || 0);
+  document.querySelector('#m-customers').textContent = compactNumber(customers);
+  document.querySelector('#m-tickets').textContent = compactNumber(m.openTickets || 0);
+  const aov = pm.paidOrders ? pm.revenue / pm.paidOrders : 0;
+  document.querySelector('#m-aov').textContent = `Average order $${aov.toFixed(2)}`;
+  document.querySelector('#m-conversion').textContent = unbounded
+    ? `${(d.users || []).filter((u) => u.last_sign_in_at).length} signed in before`
+    : `${pm.newCustomers || 0} new in this period`;
+  document.querySelector('#m-catalog').textContent = `${m.activeProducts || 0} of ${(d.products || []).length} products live`;
+
+  const total = (pm.revenueByDay || []).reduce((sum, it) => sum + Number(it.revenue), 0);
+  document.querySelector('#m-revenue-change').textContent = unbounded
+    ? `${compactMoney(pm.revenue || 0)} across paid orders`
+    : `${compactMoney(total)} in the selected period`;
+  document.querySelector('#revenue-chart').innerHTML = chart(pm.revenueByDay || []);
+  document.querySelector('#top-products').innerHTML = renderRankList(pm.topProducts || [], 'revenue', (item) => `${item.orders} paid order${item.orders === 1 ? '' : 's'}`);
+  document.querySelector('#category-performance').innerHTML = renderRankList(pm.categoryStats || [], 'revenue', (item) => `${item.products} product${item.products === 1 ? '' : 's'}`);
+  renderIcons();
+}
+
+function clientPeriodMetrics(range) {
+  const d = dashboardData || {};
+  const productById = new Map((d.products || []).map((p) => [p.id, p]));
+  const matchesFilters = (productId) => {
+    if (!overviewVendorId && !overviewCategory) return true;
+    const p = productById.get(productId);
+    if (!p) return false;
+    if (overviewVendorId && p.vendor_id !== overviewVendorId) return false;
+    if (overviewCategory && (p.category || 'General') !== overviewCategory) return false;
+    return true;
+  };
+  const products = (d.products || []).filter((p) => {
+    if (overviewVendorId && p.vendor_id !== overviewVendorId) return false;
+    if (overviewCategory && (p.category || 'General') !== overviewCategory) return false;
+    return true;
+  });
+  const paid = (d.orders || []).filter((o) => o.status === 'paid' && inPeriod(o.created_at, range) && matchesFilters(o.product_id));
+  const byProduct = new Map();
+  paid.forEach((o) => {
+    const cur = byProduct.get(o.product_id) || { orders: 0, revenue: 0 };
+    cur.orders += 1;
+    cur.revenue += Number(o.amount || 0);
+    byProduct.set(o.product_id, cur);
+  });
+  const topProducts = [...byProduct.entries()]
+    .map(([id, v]) => ({ id, title: products.find((p) => p.id === id)?.title || 'Unlisted product', orders: v.orders, revenue: v.revenue }))
+    .sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  const categoryStats = [...new Set(products.map((p) => p.category || 'General'))]
+    .map((category) => {
+      const ids = new Set(products.filter((p) => (p.category || 'General') === category).map((p) => p.id));
+      const matching = paid.filter((o) => ids.has(o.product_id));
+      return { category, products: ids.size, revenue: matching.reduce((sum, o) => sum + Number(o.amount || 0), 0) };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
+  return {
+    bounded: true,
+    revenue: paid.reduce((sum, o) => sum + Number(o.amount || 0), 0),
+    paidOrders: paid.length,
+    newCustomers: (d.users || []).filter((u) => inPeriod(u.created_at, range)).length,
+    revenueByDay: (d.revenueByDay || []).filter((it) => inPeriod(it.date, range)),
+    topProducts,
+    categoryStats,
+  };
+}
+
+async function wireOverviewScopeFilters(categories) {
+  const vendorSel = document.querySelector('#overview-vendor');
+  const catSel = document.querySelector('#overview-category');
+
+  if (catSel) {
+    const names = [...new Set([
+      ...(categories || []).map((c) => c.name),
+      ...(dashboardData?.products || []).map((p) => p.category || 'General'),
+    ].filter(Boolean))].sort();
+    catSel.innerHTML = `<option value="">All categories</option>${names
+      .map((n) => `<option value="${escapeHtml(n)}"${n === overviewCategory ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}`;
+    refreshSelect(catSel);
+  }
+
+  if (vendorSel && !vendorSel.dataset.loaded) {
+    vendorSel.dataset.loaded = '1';
+    const { data: vendorRows } = await supabase.from('vendors').select('id,display_name').order('display_name');
+    vendorSel.innerHTML = `<option value="">All stores</option>${(vendorRows || [])
+      .map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.display_name)}</option>`).join('')}`;
+    refreshSelect(vendorSel);
+  }
+
+  if (!document.querySelector('#overview-vendor')?.dataset.wired) {
+    if (vendorSel) {
+      vendorSel.dataset.wired = '1';
+      vendorSel.addEventListener('change', () => { overviewVendorId = vendorSel.value; refreshOverviewPeriod(overviewRange); });
+    }
+    if (catSel) {
+      catSel.addEventListener('change', () => { overviewCategory = catSel.value; refreshOverviewPeriod(overviewRange); });
+    }
+  }
+}
+
+let overviewPeriodReq = 0;
+async function refreshOverviewPeriod(range) {
+  overviewRange = range;
+  const unbounded = !range || (!range.from && !range.to);
+  // The cached all-time periodMetrics is only valid when nothing narrows it.
+  if (unbounded && !overviewVendorId && !overviewCategory) {
+    paintOverview({ ...(dashboardData?.periodMetrics || {}), bounded: false });
+    return;
+  }
+  const reqId = ++overviewPeriodReq;
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-dashboard', {
+      body: {
+        from: unbounded ? null : range.from.toISOString(),
+        to: unbounded ? null : range.to.toISOString(),
+        vendorId: overviewVendorId || null,
+        category: overviewCategory || null,
+        overviewOnly: true,
+      },
+    });
+    if (reqId !== overviewPeriodReq) return; // a newer selection is already in flight
+    if (error || data?.error || !data?.periodMetrics) throw new Error(data?.error || error?.message || 'periodMetrics missing');
+    paintOverview({ ...data.periodMetrics, bounded: !unbounded });
+  } catch {
+    if (reqId !== overviewPeriodReq) return;
+    paintOverview({ ...clientPeriodMetrics(range), bounded: !unbounded });
+  }
 }
 
 function renderRankList(items, valueKey, meta) {
@@ -234,7 +377,7 @@ async function loadGovernance() {
 
 async function loadPlatformAnalytics() {
   const [{ data: vendorsAll }, { data: campaigns }, { data: walletTx }] = await Promise.all([
-    supabase.from('vendors').select('id,user_id,display_name,status,applied_at,approved_at'),
+    supabase.from('vendors').select('id,user_id,slug,display_name,status,applied_at,approved_at,commission_rate,payout_currency,country,total_sales_count,bio'),
     supabase.from('ad_campaigns').select('id,name,status,spend,budget,currency,created_at').order('spend', { ascending: false }),
     supabase.from('ad_wallet_transactions').select('amount,type,created_at').eq('type', 'spend').order('created_at', { ascending: false }).limit(2000),
   ]);
@@ -322,32 +465,27 @@ async function loadOverview(force = false) {
   }
   overviewLoaded = true;
   dashboardData = data;
-  const { metrics, orders, users, tickets, products, promos, categories = [], revenueByDay, topProducts = [], categoryStats = [] } = data;
+  const { metrics, orders, users, tickets, products, promos, categories = [] } = data;
 
-  document.querySelector('#m-revenue').textContent = compactMoney(metrics.revenue);
-  document.querySelector('#m-orders').textContent = compactNumber(metrics.paidOrders);
-  document.querySelector('#m-customers').textContent = compactNumber(metrics.customers);
-  document.querySelector('#m-tickets').textContent = compactNumber(metrics.openTickets);
-  const averageOrder = metrics.paidOrders ? metrics.revenue / metrics.paidOrders : 0;
-  document.querySelector('#m-aov').textContent = `Average order $${averageOrder.toFixed(2)}`;
-  document.querySelector('#m-conversion').textContent = `${users.filter((u) => u.last_sign_in_at).length} signed in before`;
-  document.querySelector('#m-catalog').textContent = `${metrics.activeProducts} of ${products.length} products live`;
-
-  const renderRevenue = () => {
-    const days = Number(document.querySelector('#revenue-period')?.value || 30);
-    const selected = revenueByDay.slice(-days);
-    const total = selected.reduce((sum, item) => sum + Number(item.revenue), 0);
-    document.querySelector('#m-revenue-change').textContent = `${compactMoney(total)} in the selected period`;
-    document.querySelector('#revenue-chart').innerHTML = chart(selected);
-  };
-  document.querySelector('#revenue-period').onchange = renderRevenue;
-  renderRevenue();
+  // The dashboard period filter is served by the edge function: it returns
+  // `periodMetrics` (revenue / paid orders / new customers / revenue-by-day /
+  // top products / category performance) computed over an uncapped,
+  // window-scoped aggregation. Changing the period re-invokes in `overviewOnly`
+  // mode so only these widgets repaint — the data tables keep their state.
+  const periodHost = document.querySelector('#overview-period');
+  if (periodHost && !periodHost.dataset.wired) {
+    periodHost.dataset.wired = '1';
+    renderPeriodFilter(periodHost, {
+      value: 'all',
+      onChange: ({ range }) => refreshOverviewPeriod(range),
+    });
+  }
+  wireOverviewScopeFilters(categories);
+  refreshOverviewPeriod(overviewRange);
 
   document.querySelector('#operations-list').innerHTML = `
     <div class="adm-stat-card !p-4"><span>Published products</span><strong>${compactNumber(metrics.activeProducts)}</strong><small>${compactNumber(products.length - metrics.activeProducts)} drafts remaining</small></div>
     <div class="adm-stat-card !p-4"><span>Support queue</span><strong>${compactNumber(metrics.openTickets)}</strong><small>${compactNumber(tickets.filter((t) => t.status === 'pending').length)} awaiting follow-up</small></div>`;
-  document.querySelector('#top-products').innerHTML = renderRankList(topProducts, 'revenue', (item) => `${item.orders} paid order${item.orders === 1 ? '' : 's'}`);
-  document.querySelector('#category-performance').innerHTML = renderRankList(categoryStats, 'revenue', (item) => `${item.products} product${item.products === 1 ? '' : 's'}`);
 
   document.querySelector('#customers-insight').textContent = `${users.length} customer profile${users.length === 1 ? '' : 's'} on record`;
   document.querySelector('#orders-insight').textContent = `${orders.filter((o) => o.status === 'paid').length} paid · ${orders.filter((o) => o.status === 'pending').length} pending`;
@@ -370,11 +508,18 @@ async function loadOverview(force = false) {
    Customers (A02)
    ========================================================================== */
 
-let customersState = { page: 1, pageSize: 10, users: [], orders: [] };
+let customersState = { page: 1, pageSize: 10, users: [], orders: [], range: periodRange('all') };
 
 function renderCustomers(users, orders) {
   customersState.users = users;
   customersState.orders = orders;
+  const periodHost = document.querySelector('#customers-period');
+  if (periodHost && !periodHost.dataset.wired) {
+    periodHost.dataset.wired = '1';
+    renderPeriodFilter(periodHost, {
+      onChange: ({ range }) => { customersState.range = range; customersState.page = 1; paintCustomers(); },
+    });
+  }
   paintCustomers();
 }
 
@@ -387,6 +532,7 @@ function filteredCustomers() {
     const isAdmin = u.role === 'admin';
     if (scope === 'customer' && isAdmin) return false;
     if (scope === 'admin' && !isAdmin) return false;
+    if (!inPeriod(u.created_at, customersState.range)) return false;
     if (!search) return true;
     return (u.full_name || '').toLowerCase().includes(search) || (u.email || '').toLowerCase().includes(search);
   });
@@ -570,17 +716,48 @@ function openCustomerOrdersModal(user) {
    Transactions (A03)
    ========================================================================== */
 
-let ordersState = { page: 1, pageSize: 10, filter: 'all', orders: [] };
+let ordersState = { page: 1, pageSize: 10, filter: 'all', orders: [], range: periodRange('all'), provider: '' };
 
 function renderTransactions(orders) {
   ordersState.orders = orders;
   ordersState.page = 1;
+  wireTransactionFilters();
   paintOrdersSummary();
   paintOrdersTable();
 }
 
+// Period + payment-provider scope applied before the status tabs / summary.
+function scopedOrders() {
+  return ordersState.orders.filter((o) =>
+    inPeriod(o.created_at, ordersState.range)
+    && (!ordersState.provider || (o.provider || '') === ordersState.provider));
+}
+
+function wireTransactionFilters() {
+  const providerSel = document.querySelector('#txn-provider');
+  if (providerSel) {
+    const providers = [...new Set(ordersState.orders.map((o) => o.provider).filter(Boolean))].sort();
+    providerSel.innerHTML = `<option value="">All providers</option>${providers
+      .map((p) => `<option value="${escapeHtml(p)}"${p === ordersState.provider ? ' selected' : ''}>${escapeHtml(p)}</option>`).join('')}`;
+    refreshSelect(providerSel);
+  }
+  const periodHost = document.querySelector('#txn-period');
+  if (periodHost && !periodHost.dataset.wired) {
+    periodHost.dataset.wired = '1';
+    renderPeriodFilter(periodHost, {
+      onChange: ({ range }) => { ordersState.range = range; ordersState.page = 1; paintOrdersSummary(); paintOrdersTable(); },
+    });
+    providerSel?.addEventListener('change', () => {
+      ordersState.provider = providerSel.value;
+      ordersState.page = 1;
+      paintOrdersSummary();
+      paintOrdersTable();
+    });
+  }
+}
+
 function paintOrdersSummary() {
-  const orders = ordersState.orders;
+  const orders = scopedOrders();
   const counts = { paid: 0, pending: 0, cancelled: 0, failed: 0, refunded: 0 };
   orders.forEach((o) => { if (counts[o.status] !== undefined) counts[o.status]++; });
   /* const summaryEl = document.querySelector('#orders-status-summary');
@@ -609,7 +786,8 @@ function paintOrdersSummary() {
 function paintOrdersTable() {
   const host = document.querySelector('#orders-table');
   if (!host) return;
-  const filtered = ordersState.filter === 'all' ? ordersState.orders : ordersState.orders.filter((o) => o.status === ordersState.filter);
+  const scoped = scopedOrders();
+  const filtered = ordersState.filter === 'all' ? scoped : scoped.filter((o) => o.status === ordersState.filter);
   const start = (ordersState.page - 1) * ordersState.pageSize;
   const pageRows = filtered.slice(start, start + ordersState.pageSize);
 
@@ -685,7 +863,7 @@ async function openOrderDetailModal(order) {
    Products (A04)
    ========================================================================== */
 
-let productsState = { page: 1, pageSize: 10, products: [], categories: [] };
+let productsState = { page: 1, pageSize: 10, products: [], categories: [], range: periodRange('all'), category: '' };
 
 function categoryOptions(selected = 'General') {
   const managed = productsState.categories.map((c) => c.name);
@@ -697,14 +875,47 @@ function categoryOptions(selected = 'General') {
 function renderProducts(products, categories) {
   productsState.products = products;
   productsState.categories = categories;
+  wireProductFilters();
   paintProducts();
+}
+
+function scopedProducts() {
+  return productsState.products.filter((p) =>
+    inPeriod(p.created_at, productsState.range)
+    && (!productsState.category || (p.category || 'General') === productsState.category));
+}
+
+function wireProductFilters() {
+  const catSel = document.querySelector('#products-category-filter');
+  if (catSel) {
+    const names = [...new Set([
+      ...productsState.categories.map((c) => c.name),
+      ...productsState.products.map((p) => p.category || 'General'),
+    ].filter(Boolean))].sort();
+    catSel.innerHTML = `<option value="">All categories</option>${names
+      .map((n) => `<option value="${escapeHtml(n)}"${n === productsState.category ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}`;
+    refreshSelect(catSel);
+  }
+  const periodHost = document.querySelector('#products-period');
+  if (periodHost && !periodHost.dataset.wired) {
+    periodHost.dataset.wired = '1';
+    renderPeriodFilter(periodHost, {
+      onChange: ({ range }) => { productsState.range = range; productsState.page = 1; paintProducts(); },
+    });
+    catSel?.addEventListener('change', () => {
+      productsState.category = catSel.value;
+      productsState.page = 1;
+      paintProducts();
+    });
+  }
 }
 
 function paintProducts() {
   const host = document.querySelector('#products-table');
   if (!host) return;
+  const list = scopedProducts();
   const start = (productsState.page - 1) * productsState.pageSize;
-  const pageRows = productsState.products.slice(start, start + productsState.pageSize);
+  const pageRows = list.slice(start, start + productsState.pageSize);
 
   renderDataTable(host, {
     columns: [
@@ -723,11 +934,15 @@ function paintProducts() {
     rows: pageRows,
     page: productsState.page,
     pageSize: productsState.pageSize,
-    total: productsState.products.length,
+    total: list.length,
     onPage: (p) => { productsState.page = p; paintProducts(); },
     rowActions: (p) => rowMenu([
+      { label: 'View product page', icon: 'external-link', act: 'view', id: p.slug || p.id },
       { label: 'Edit product', icon: 'pencil', act: 'edit', id: p.id },
       { label: 'Copy checkout link', icon: 'link', act: 'copy', id: p.slug || p.id },
+      ...(p.is_ad && p.ad_status === 'active'
+        ? [{ label: 'Remove ad listing', icon: 'shield-x', act: 'removead', id: p.id }]
+        : []),
       { sep: true },
       { label: 'Delete product', icon: 'trash-2', act: 'del', id: p.id, danger: true },
     ]),
@@ -735,11 +950,13 @@ function paintProducts() {
   });
 
   wireRowMenus(host, {
+    view: (id) => window.open(`${window.location.origin}/product?product=${encodeURIComponent(id)}`, '_blank', 'noopener'),
     copy: (id) => {
       navigator.clipboard.writeText(`${window.location.origin}/checkout?product=${encodeURIComponent(id)}`);
       toast('Checkout link copied.');
     },
     edit: (id) => openProductModal(productsState.products.find((p) => p.id === id)),
+    removead: (id) => openAdTakedownModal(productsState.products.find((p) => p.id === id)),
     del: async (id) => {
       const ok = await confirmDialog({ title: 'Delete this product?', body: 'This removes it from the catalog permanently. Past orders are unaffected.', confirmLabel: 'Delete product' });
       if (!ok) return;
@@ -749,6 +966,52 @@ function paintProducts() {
       supabase.functions.invoke('sitemap').catch(() => { });
       await loadOverview(true);
     },
+  });
+}
+
+/**
+ * Pull a live external-link listing off the storefront. Clean removals return
+ * the refundable deposit to the seller's ad wallet; ticking "withhold" keeps it
+ * as the penalty for a misleading / scam / policy-violating listing.
+ */
+function openAdTakedownModal(p) {
+  if (!p) return;
+  const held = Number(p.ad_deposit_held || 0);
+  const { dialog, close } = openModal({
+    id: 'ad-takedown-modal',
+    title: 'Remove external-link listing',
+    danger: true,
+    body: `
+      <p>“${escapeHtml(p.title)}” will be unpublished and set back to <strong>rejected</strong>. Its product page and every catalog placement disappear immediately.</p>
+      <label class="adm-field" style="margin-top:14px">
+        <span class="label">Reason <span class="help" style="font-weight:400">(kept on the wallet ledger)</span></span>
+        <textarea id="ad-td-reason" class="field" rows="2" placeholder="e.g. the destination is a phishing page"></textarea>
+      </label>
+      <label class="adm-check-line" style="margin-top:12px">
+        <input type="checkbox" id="ad-td-forfeit">
+        Withhold the ${held ? money(held) : 'refundable'} deposit — misleading, scam, or policy-violating. Leave unticked to refund the seller.
+      </label>`,
+    footer: `
+      <button type="button" class="button" data-uk-cancel>Cancel</button>
+      <button type="button" class="button button-danger" data-uk-remove>Remove listing</button>`,
+  });
+
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', close);
+  dialog.querySelector('[data-uk-remove]').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    setBusy(button, true, 'Removing…');
+    const { data, error } = await supabase.rpc('remove_ad_listing', {
+      p_product_id: p.id,
+      p_forfeit: dialog.querySelector('#ad-td-forfeit').checked,
+      p_note: dialog.querySelector('#ad-td-reason').value.trim() || null,
+    });
+    setBusy(button, false);
+    if (error) { toast(error.message, 'error'); return; }
+    const back = Number(data?.deposit_returned || 0);
+    const kept = Number(data?.deposit_forfeited || 0);
+    toast(`Listing removed.${back ? ` ${money(back)} refunded to the seller.` : ''}${kept ? ` ${money(kept)} withheld.` : ''}`);
+    close();
+    await loadOverview(true);
   });
 }
 
@@ -795,7 +1058,9 @@ async function inspectArchiveForExternalLinks(file) {
 
 function openProductModal(product = null) {
   const gallery = Array.isArray(product?.gallery_urls) ? [...product.gallery_urls] : [];
-  const startAsLink = !!product?.external_url;
+  // External-link listings are paused for launch (see js/config.js); the editor
+  // only offers file delivery and the server rejects is_ad writes.
+  const startAsLink = EXTERNAL_LISTINGS_OPEN && !!product?.external_url;
 
   const { dialog } = openModal({
     id: 'product-modal',
@@ -854,13 +1119,15 @@ function openProductModal(product = null) {
 
         <div class="adm-field">
           <span class="label">What buyers get</span>
+          ${EXTERNAL_LISTINGS_OPEN ? `
           <div class="seg" role="tablist">
             <button type="button" class="seg__btn ${startAsLink ? '' : 'is-active'}" data-delivery="file">Uploaded file</button>
             <button type="button" class="seg__btn ${startAsLink ? 'is-active' : ''}" data-delivery="link">External link</button>
-          </div>
+          </div>` : ''}
           <div id="p-file-pane" class="${startAsLink ? 'hidden' : ''}" style="margin-top:10px">
-            ${buildDropzone({ id: 'p-file', label: 'Drop the product file or click', hint: 'PNG · JPG · WebP · ZIP · MP3 · MP4 · PDF · DOCX · EPUB — max 5 MB' })}
+            ${buildDropzone({ id: 'p-file', label: 'Drop the product file or click', hint: 'Images, audio, video, PDF, docs, fonts, 3D, ZIP/APK — no executables. Images are auto-compressed to the size limit; ZIP/APK are scanned.' })}
           </div>
+          ${EXTERNAL_LISTINGS_OPEN ? `
           <div id="p-link-pane" class="${startAsLink ? '' : 'hidden'}" style="margin-top:10px">
             <input class="field" type="url" id="p-external-url" placeholder="https://…" value="${escapeHtml(product?.external_url || '')}">
             <div class="adm-ad-notice">
@@ -876,7 +1143,7 @@ function openProductModal(product = null) {
             </div>
             <label class="adm-check-line" style="margin-top:10px"><input type="checkbox" id="p-ext-consent"> I take responsibility for this destination — no phishing, scams, malware, or misleading content, and it complies with the Acceptable Use Policy.</label>
             <p class="adm-panel-note" style="margin-top:6px">Identity / biometric verification for ad publishers is coming — for now this consent is on record.</p>
-          </div>
+          </div>` : ''}
         </div>
 
        
@@ -926,48 +1193,70 @@ function openProductModal(product = null) {
 
   // Delivery mode: uploaded file vs external link (= ad placement)
   const modeInput = dialog.querySelector('#p-delivery-mode');
-  const filePane = dialog.querySelector('#p-file-pane');
-  const linkPane = dialog.querySelector('#p-link-pane');
-  const walletLine = dialog.querySelector('#p-wallet-line');
-  const adGate = { minBalance: 100, balance: null, hasWallet: false };
-  const setDeliveryMode = async (mode) => {
-    modeInput.value = mode;
-    dialog.querySelectorAll('[data-delivery]').forEach((b) => b.classList.toggle('is-active', b.dataset.delivery === mode));
-    filePane.classList.toggle('hidden', mode !== 'file');
-    linkPane.classList.toggle('hidden', mode !== 'link');
-    if (mode === 'link') {
-      setFormatBadge('LINK');
-      if (walletLine.hidden) {
-        const { wallet, minBalance } = await loadOwnAdWallet();
-        adGate.minBalance = minBalance;
-        adGate.hasWallet = !!wallet;
-        adGate.balance = wallet ? Number(wallet.balance) : null;
-        walletLine.hidden = false;
-        const cur = wallet?.currency || 'USD';
-        const short = wallet
-          ? `${cur} ${adGate.balance.toFixed(2)}`
-          : 'no seller wallet';
-        const low = wallet && adGate.balance < minBalance;
-        dialog.querySelector('#p-wallet-balance').innerHTML =
-          `${short} <span class="help">· min ${cur} ${minBalance.toFixed(2)} to publish${low ? ' — <strong style="color:var(--danger)">top up first</strong>' : ''}</span>`;
+  const adGate = { minBalance: 100, balance: null, hasWallet: false, currency: 'USD' };
+
+  if (EXTERNAL_LISTINGS_OPEN) {
+    const filePane = dialog.querySelector('#p-file-pane');
+    const linkPane = dialog.querySelector('#p-link-pane');
+    const walletLine = dialog.querySelector('#p-wallet-line');
+    const renderWalletLine = () => {
+      const short = adGate.hasWallet ? `${adGate.currency} ${adGate.balance.toFixed(2)}` : 'no seller wallet';
+      const low = adGate.hasWallet && adGate.balance < adGate.minBalance;
+      dialog.querySelector('#p-wallet-balance').innerHTML =
+        `${short} <span class="help">· min ${adGate.currency} ${adGate.minBalance.toFixed(2)} to publish${low ? ' — <strong style="color:var(--danger)">top up first</strong>' : ''}</span>`;
+      dialog.querySelector('#p-wallet-topup').textContent = adGate.hasWallet ? 'Top up' : 'About wallets';
+    };
+    const refreshWallet = async () => {
+      const { wallet, minBalance } = await loadOwnAdWallet();
+      adGate.minBalance = minBalance;
+      adGate.hasWallet = !!wallet;
+      adGate.balance = wallet ? Number(wallet.balance) : null;
+      adGate.currency = wallet?.currency || 'USD';
+      renderWalletLine();
+    };
+    const setDeliveryMode = async (mode) => {
+      modeInput.value = mode;
+      dialog.querySelectorAll('[data-delivery]').forEach((b) => b.classList.toggle('is-active', b.dataset.delivery === mode));
+      filePane.classList.toggle('hidden', mode !== 'file');
+      linkPane.classList.toggle('hidden', mode !== 'link');
+      if (mode === 'link') {
+        setFormatBadge('LINK');
+        if (walletLine.hidden) { walletLine.hidden = false; await refreshWallet(); }
+      } else {
+        setFormatBadge(dialog.querySelector('#p-file-type').value || '');
       }
-    } else {
-      setFormatBadge(dialog.querySelector('#p-file-type').value || '');
-    }
-  };
-  dialog.querySelectorAll('[data-delivery]').forEach((b) => b.addEventListener('click', () => setDeliveryMode(b.dataset.delivery)));
-  dialog.querySelector('#p-wallet-topup').addEventListener('click', () => {
-    toast('Open Seller centre → Ad wallet to add funds.', 'info');
-  });
-  if (startAsLink) setDeliveryMode('link');
+    };
+    dialog.querySelectorAll('[data-delivery]').forEach((b) => b.addEventListener('click', () => setDeliveryMode(b.dataset.delivery)));
+    dialog.querySelector('#p-wallet-topup').addEventListener('click', () => {
+      if (!adGate.hasWallet) {
+        toast('You have no seller ad wallet — platform listings publish directly, no funding needed.', 'info');
+        return;
+      }
+      openAdTopupModal({ onClose: refreshWallet });
+    });
+    if (startAsLink) setDeliveryMode('link');
+  }
 
   // Downloadable file
+  let maxFileBytes = 5 * 1024 * 1024;
+  supabase.from('site_settings').select('max_product_file_bytes').eq('id', 1).maybeSingle()
+    .then(({ data }) => { if (data?.max_product_file_bytes) maxFileBytes = Number(data.max_product_file_bytes); }, () => {});
   const fileDz = wireDropzone(dialog.querySelector('#p-file').closest('.filedrop'), {
-    onFiles: async ([file]) => {
-      const MAX = 5 * 1024 * 1024;
-      if (file.size > MAX) {
-        fileDz.setStatus(`That file is ${(file.size / 1048576).toFixed(1)} MB — the limit is 5 MB. Compress it or host large media as an external link.`, 'error');
-        return;
+    onFiles: async ([picked]) => {
+      let file = picked;
+      if (file.size > maxFileBytes) {
+        const capMb = (maxFileBytes / 1048576).toFixed(0);
+        const isImage = /^image\//.test(file.type) || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+        if (!isImage) {
+          fileDz.setStatus(`That file is ${(file.size / 1048576).toFixed(1)} MB — the limit is ${capMb} MB. Compress it or host large media as an external link.`, 'error');
+          return;
+        }
+        fileDz.setStatus(`Compressing image to fit ${capMb} MB…`);
+        file = await editImage(picked, maxFileBytes);
+        if (!file || file.size > maxFileBytes) {
+          fileDz.setStatus(`Could not get this image under ${capMb} MB — start from a smaller source.`, 'error');
+          return;
+        }
       }
       if (/\.(zip|rar|7z|tar|gz)$/i.test(file.name)) {
         fileDz.setStatus('Inspecting archive…');
@@ -985,6 +1274,23 @@ function openProductModal(product = null) {
       dialog.querySelector('#p-file-type').value = extOf(file.name) || dialog.querySelector('#p-file-type').value;
       setFormatBadge(dialog.querySelector('#p-file-type').value);
       fileDz.setPreview(`${file.name} · ${(file.size / 1024).toFixed(0)} KB`);
+
+      // Authoritative server-side archive scan — a published zip/apk cannot
+      // clear the products trigger without an 'ok' verdict on record.
+      if (/^(zip|apk)$/i.test(extOf(file.name) || '')) {
+        fileDz.setStatus('Scanning archive…');
+        const { data: srv, error: srvErr } = await supabase.functions.invoke('inspect-product-archive', { body: { file_path: path } });
+        if (srvErr || srv?.verdict === 'error') {
+          dialog.querySelector('#p-file-path').value = '';
+          fileDz.setStatus('The archive could not be inspected — try again, or declare it as an external link.', 'error');
+          return;
+        }
+        if (srv?.verdict === 'external_wrapper') {
+          dialog.querySelector('#p-file-path').value = '';
+          fileDz.setStatus('This archive looks like a wrapper around an external link. Declare it as an External link instead so it goes through ad review.', 'error');
+          return;
+        }
+      }
       fileDz.setStatus('Uploaded.', 'ok');
     },
   });
@@ -1035,7 +1341,7 @@ function openProductModal(product = null) {
     const id = form.elements.id.value;
     const mode = dialog.querySelector('#p-delivery-mode').value;
     const filePath = dialog.querySelector('#p-file-path').value;
-    const externalUrl = dialog.querySelector('#p-external-url').value.trim();
+    const externalUrl = dialog.querySelector('#p-external-url')?.value.trim() || '';
     const isAd = mode === 'link';
 
     if (isAd) {
@@ -1180,6 +1486,7 @@ function renderPromos(promos) {
     ],
     rows: promos, page: 1, pageSize: promos.length || 1, total: promos.length,
     rowActions: (p) => rowMenu([
+      { label: 'Edit code', icon: 'pencil', act: 'edit', id: p.id },
       { label: p.is_active ? 'Pause code' : 'Activate code', icon: p.is_active ? 'pause' : 'play', act: 'toggle', id: p.id, data: { active: p.is_active } },
       { sep: true },
       { label: 'Delete code', icon: 'trash-2', act: 'del', id: p.id, danger: true },
@@ -1187,6 +1494,7 @@ function renderPromos(promos) {
     emptyMessage: 'No promotion codes yet.',
   });
   wireRowMenus(host, {
+    edit: (id) => openPromoModal(promos.find((p) => p.id === id)),
     toggle: async (id, btn) => {
       const current = btn.dataset.active === 'true';
       const { error } = await supabase.from('promo_codes').update({ is_active: !current }).eq('id', id);
@@ -1201,21 +1509,31 @@ function renderPromos(promos) {
   });
 }
 
-document.querySelector('#new-promo')?.addEventListener('click', () => {
+function openPromoModal(promo = null) {
+  const editing = !!promo;
   const { dialog } = openModal({
-    id: 'promo-modal', title: 'New promotion code',
+    id: 'promo-modal', title: editing ? `Edit ${promo.code}` : 'New promotion code',
     body: `
       <form id="promo-form">
-        <label class="adm-field"><span class="label">Code</span><input class="field font-mono uppercase font-bold" name="code" required placeholder="e.g. SAVE20"></label>
+        <label class="adm-field"><span class="label">Code</span><input class="field font-mono uppercase font-bold" name="code" required placeholder="e.g. SAVE20" value="${escapeHtml(promo?.code || '')}"></label>
         <div class="adm-modal-grid" style="margin-top:14px">
-          <label class="adm-field"><span class="label">Discount type</span><select class="field" name="discount_type"><option value="percent">Percentage (%)</option><option value="fixed">Fixed amount ($)</option></select></label>
-          <label class="adm-field"><span class="label">Value</span><input class="field" name="discount_value" type="number" step=".01" min="0.01" required></label>
+          <label class="adm-field"><span class="label">Discount type</span><select class="field" name="discount_type">
+            <option value="percent"${promo?.discount_type === 'percent' ? ' selected' : ''}>Percentage (%)</option>
+            <option value="fixed"${promo?.discount_type === 'fixed' ? ' selected' : ''}>Fixed amount ($)</option>
+          </select></label>
+          <label class="adm-field"><span class="label">Value</span><input class="field" name="discount_value" type="number" step=".01" min="0.01" required value="${promo?.discount_value ?? ''}"></label>
         </div>
-        <label class="adm-field" style="margin-top:14px"><span class="label">Max redemptions (optional)</span><input class="field" name="max_redemptions" type="number" min="1" placeholder="Unlimited if empty"></label>
+        <div class="adm-modal-grid" style="margin-top:14px">
+          <label class="adm-field"><span class="label">Max redemptions (optional)</span><input class="field" name="max_redemptions" type="number" min="1" placeholder="Unlimited if empty" value="${promo?.max_redemptions ?? ''}"></label>
+          <label class="adm-field"><span class="label">Expires (optional)</span><input class="field" name="ends_at" type="datetime-local" value="${promo?.ends_at ? toLocalDateTimeValue(promo.ends_at) : ''}"></label>
+        </div>
+        ${editing ? `<label class="adm-check-line" style="margin-top:12px"><input type="checkbox" name="is_active" ${promo.is_active ? 'checked' : ''}> Active</label>` : ''}
         <p id="promo-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
       </form>`,
-    footer: `<button type="button" class="button" data-uk-cancel>Cancel</button><button type="submit" form="promo-form" class="button button-primary">Create code</button>`,
+    footer: `<button type="button" class="button" data-uk-cancel>Cancel</button><button type="submit" form="promo-form" class="button button-primary">${editing ? 'Save changes' : 'Create code'}</button>`,
   });
+  const endsInput = dialog.querySelector('[name="ends_at"]');
+  if (endsInput) enhanceDateTimeInput(endsInput);
   dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
   dialog.querySelector('#promo-form').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -1227,16 +1545,22 @@ document.querySelector('#new-promo')?.addEventListener('click', () => {
       discount_type: form.elements.discount_type.value,
       discount_value: Number(form.elements.discount_value.value),
       max_redemptions: form.elements.max_redemptions.value ? parseInt(form.elements.max_redemptions.value, 10) : null,
+      ends_at: form.elements.ends_at.value ? new Date(form.elements.ends_at.value).toISOString() : null,
     };
+    if (editing) payload.is_active = form.elements.is_active.checked;
     setBusy(button, true, 'Saving…');
-    const { error } = await supabase.from('promo_codes').insert(payload);
+    const { error } = editing
+      ? await supabase.from('promo_codes').update(payload).eq('id', promo.id)
+      : await supabase.from('promo_codes').insert(payload);
     setBusy(button, false);
     if (error) { feedback.textContent = error.message; feedback.className = 'status-line error text-xs my-0'; return; }
     dialog.close();
-    toast('Promotion code created.');
+    toast(editing ? 'Promotion code updated.' : 'Promotion code created.');
     await loadOverview(true);
   });
-});
+}
+
+document.querySelector('#new-promo')?.addEventListener('click', () => openPromoModal());
 
 /* ==========================================================================
    Stores — approved/suspended vendor management (separate from the pending-
@@ -1265,17 +1589,120 @@ function paintStores() {
     rowActions: (v) => {
       if (v.status === 'pending' || v.status === 'rejected') return `<span style="font-size:.72rem;color:var(--text-soft)">See Moderation queue</span>`;
       const ownerIsAdmin = ownerAdminMap.get(v.user_id) === 'admin';
-      if (!hasPerm('manage_users') || (ownerIsAdmin && !hasPerm('manage_admins'))) return '';
-      return v.status === 'approved'
-        ? rowMenu([{ label: 'Suspend store', icon: 'ban', act: 'suspend', id: v.id, danger: true }])
-        : rowMenu([{ label: 'Reinstate store', icon: 'check', act: 'reinstate', id: v.id }]);
+      const canManage = hasPerm('manage_users') && !(ownerIsAdmin && !hasPerm('manage_admins'));
+      const items = [];
+      if (v.slug) items.push({ label: 'View storefront', icon: 'external-link', act: 'view', id: v.id });
+      items.push({ label: 'Store details', icon: 'info', act: 'details', id: v.id });
+      if (canManage) {
+        items.push({ label: 'Adjust commission', icon: 'percent', act: 'commission', id: v.id });
+        items.push({ label: 'Message seller', icon: 'mail', act: 'message', id: v.id });
+        items.push({ sep: true });
+        items.push(v.status === 'approved'
+          ? { label: 'Suspend store', icon: 'ban', act: 'suspend', id: v.id, danger: true }
+          : { label: 'Reinstate store', icon: 'check', act: 'reinstate', id: v.id });
+      }
+      return items.length ? rowMenu(items) : '';
     },
     emptyMessage: 'No stores yet.',
   });
 
+  const findStore = (id) => storesState.vendors.find((v) => v.id === id);
   wireRowMenus(host, {
-    suspend: (id) => openStoreStatusModal(storesState.vendors.find((v) => v.id === id), 'suspended'),
-    reinstate: (id) => openStoreStatusModal(storesState.vendors.find((v) => v.id === id), 'approved'),
+    view: (id) => { const v = findStore(id); if (v?.slug) window.open(`./store?vendor=${encodeURIComponent(v.slug)}`, '_blank', 'noopener'); },
+    details: (id) => openStoreDetailsModal(findStore(id)),
+    commission: (id) => openStoreCommissionModal(findStore(id)),
+    message: (id) => openStoreMessageModal(findStore(id)),
+    suspend: (id) => openStoreStatusModal(findStore(id), 'suspended'),
+    reinstate: (id) => openStoreStatusModal(findStore(id), 'approved'),
+  });
+}
+
+function openStoreDetailsModal(vendor) {
+  if (!vendor) return;
+  const rows = [
+    ['Status', vendor.status],
+    ['Slug', vendor.slug || '—'],
+    ['Country', vendor.country || '—'],
+    ['Payout currency', vendor.payout_currency || 'USD'],
+    ['Commission', vendor.commission_rate != null ? `${vendor.commission_rate}%` : '—'],
+    ['Lifetime sales', vendor.total_sales_count ?? 0],
+    ['Applied', shortDate(vendor.applied_at)],
+    ['Approved', shortDate(vendor.approved_at)],
+  ];
+  const { dialog } = openModal({
+    id: 'store-details-modal',
+    title: vendor.display_name,
+    body: `
+      <dl class="adm-def-list" style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:.84rem">
+        ${rows.map(([k, v]) => `<dt style="color:var(--text-muted)">${escapeHtml(k)}</dt><dd style="margin:0">${escapeHtml(String(v))}</dd>`).join('')}
+      </dl>
+      ${vendor.bio ? `<p style="margin-top:14px;padding:12px 14px;border-radius:var(--radius-md);background:var(--surface-sunken);border:1px solid var(--border);font-size:.82rem;line-height:1.6">${escapeHtml(vendor.bio)}</p>` : ''}`,
+    footer: `${vendor.slug ? `<a class="button" href="./store?vendor=${encodeURIComponent(vendor.slug)}" target="_blank" rel="noopener">Open storefront</a>` : ''}<button type="button" class="button button-primary" data-uk-cancel>Close</button>`,
+  });
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
+}
+
+function openStoreCommissionModal(vendor) {
+  if (!vendor) return;
+  const { dialog } = openModal({
+    id: 'store-commission-modal',
+    title: `Commission — ${vendor.display_name}`,
+    body: `
+      <form id="store-commission-form">
+        <p style="font-size:.84rem;color:var(--text-muted)">The platform keeps this percentage of every sale. It applies to new orders from now on; settled earnings are unaffected.</p>
+        <label class="adm-field" style="margin-top:14px"><span class="label">Commission rate (%)</span><input class="field" name="rate" type="number" step=".01" min="0" max="100" required value="${vendor.commission_rate ?? ''}"></label>
+        <p id="store-commission-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
+      </form>`,
+    footer: `<button type="button" class="button" data-uk-cancel>Cancel</button><button type="submit" form="store-commission-form" class="button button-primary">Save rate</button>`,
+  });
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
+  dialog.querySelector('#store-commission-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = dialog.querySelector('button[form="store-commission-form"]');
+    const feedback = dialog.querySelector('#store-commission-feedback');
+    const rate = Number(event.currentTarget.elements.rate.value);
+    if (!(rate >= 0 && rate <= 100)) { feedback.textContent = 'Enter a rate between 0 and 100.'; feedback.className = 'status-line error text-xs my-0'; return; }
+    setBusy(button, true, 'Saving…');
+    const { error } = await supabase.from('vendors').update({ commission_rate: rate }).eq('id', vendor.id);
+    setBusy(button, false);
+    if (error) { feedback.textContent = error.message; feedback.className = 'status-line error text-xs my-0'; return; }
+    dialog.close();
+    toast('Commission rate updated.');
+    await loadOverview(true);
+  });
+}
+
+function openStoreMessageModal(vendor) {
+  if (!vendor) return;
+  const { dialog } = openModal({
+    id: 'store-message-modal',
+    title: `Message ${vendor.display_name}`,
+    body: `
+      <form id="store-message-form">
+        <p style="font-size:.84rem;color:var(--text-muted)">Sends an in-app notification to the store owner.</p>
+        <label class="adm-field" style="margin-top:14px"><span class="label">Subject</span><input class="field" name="title" required maxlength="120"></label>
+        <label class="adm-field" style="margin-top:14px"><span class="label">Message</span><textarea class="field" name="body" rows="4" required maxlength="2000"></textarea></label>
+        <p id="store-message-feedback" class="status-line text-xs my-0" style="margin-top:10px"></p>
+      </form>`,
+    footer: `<button type="button" class="button" data-uk-cancel>Cancel</button><button type="submit" form="store-message-form" class="button button-primary">Send</button>`,
+  });
+  dialog.querySelector('[data-uk-cancel]').addEventListener('click', () => dialog.close());
+  dialog.querySelector('#store-message-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = dialog.querySelector('button[form="store-message-form"]');
+    const feedback = dialog.querySelector('#store-message-feedback');
+    setBusy(button, true, 'Sending…');
+    const { error } = await supabase.rpc('admin_send_notification', {
+      p_title: form.elements.title.value.trim(),
+      p_body: form.elements.body.value.trim(),
+      p_audience: 'specific_user',
+      p_target_user_id: vendor.user_id,
+    });
+    setBusy(button, false);
+    if (error) { feedback.textContent = error.message; feedback.className = 'status-line error text-xs my-0'; return; }
+    dialog.close();
+    toast('Message sent to the seller.');
   });
 }
 
@@ -1567,7 +1994,7 @@ const modEmpty = (message) => emptyState({ icon: 'inbox', title: 'Nothing to rev
 async function loadModeration() {
   const { data, error } = await supabase.rpc('moderation_queue');
   if (error) {
-    ['mod-vendors', 'mod-campaigns', 'mod-topups', 'mod-payouts'].forEach((id) => {
+    ['mod-vendors', 'mod-campaigns', 'mod-ad-listings', 'mod-payout-accounts', 'mod-topups', 'mod-payouts'].forEach((id) => {
       document.querySelector(`#${id}`).innerHTML = emptyState({ icon: 'triangle-alert', title: 'Could not load queue', body: error.message });
     });
     return;
@@ -1575,9 +2002,12 @@ async function loadModeration() {
 
   const counts = {
     vendors: data.vendors?.length || 0, campaigns: data.campaigns?.length || 0,
+    ad_listings: data.ad_listings?.length || 0,
+    payout_accounts: data.payout_accounts?.length || 0,
     topups: data.topups?.length || 0, payouts: data.payouts?.length || 0,
   };
-  const pendingTotal = counts.vendors + counts.campaigns + counts.topups + counts.payouts;
+  const pendingTotal = counts.vendors + counts.campaigns + counts.ad_listings
+    + counts.payout_accounts + counts.topups + counts.payouts;
   const badge = document.querySelector('#mod-badge');
   if (badge) { badge.textContent = pendingTotal; badge.classList.toggle('hidden', pendingTotal === 0); }
   Object.entries(counts).forEach(([key, n]) => {
@@ -1616,6 +2046,49 @@ async function loadModeration() {
         </div>`).join('')
     : modEmpty('No campaigns waiting for review.');
 
+  document.querySelector('#mod-ad-listings').innerHTML = data.ad_listings?.length
+    ? data.ad_listings.map((a) => `
+        <div class="adm-mod-row">
+          <div class="adm-mod-row__meta">
+            <strong>${escapeHtml(a.title)}</strong>
+            <span>${escapeHtml(a.vendor_name)} · ${money(a.price, a.currency)} · submitted ${shortDate(a.created_at)}</span>
+            <p class="adm-mod-row__note">→ <a href="${escapeHtml(a.external_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(a.external_url)}</a></p>
+            <p class="adm-mod-row__note">Deposit on approval ${money(a.deposit || 0, a.currency)} · wallet ${money(a.wallet_balance || 0, a.currency)}${Number(a.wallet_balance || 0) < Number(a.deposit || 0) ? ' — ' + statusBadge('pending', 'Wallet short') : ''}</p>
+            ${a.short_description ? `<p class="adm-mod-row__note">${escapeHtml(a.short_description)}</p>` : ''}
+          </div>
+          <div class="adm-mod-row__actions">
+            <button class="button button-primary !min-h-8 !px-3 text-xs" data-approve-ad="${a.id}">Approve</button>
+            <button class="button button-danger !min-h-8 !px-3 text-xs" data-reject-ad="${a.id}">Reject</button>
+          </div>
+        </div>`).join('')
+    : modEmpty('No external-link listings waiting.');
+
+  document.querySelector('#mod-payout-accounts').innerHTML = data.payout_accounts?.length
+    ? data.payout_accounts.map((a) => {
+      const dest = a.method === 'mobile_money'
+        ? `${a.momo_provider || 'Mobile money'} ····${a.account_last4 || ''}`
+        : a.method === 'bank_transfer'
+          ? `${a.bank_name || 'Bank'} ····${a.account_last4 || ''}`
+          : a.method === 'paypal'
+            ? `PayPal ${a.paypal_email || ''}`
+            : a.method === 'crypto'
+              ? `${a.crypto_asset || 'Crypto'} ····${a.account_last4 || ''}`
+              : (a.method || 'account');
+      return `
+        <div class="adm-mod-row">
+          <div class="adm-mod-row__meta">
+            <strong>${escapeHtml(a.vendor_name)}</strong>
+            <span>${escapeHtml(String(a.method || '').replace(/_/g, ' '))} · ${escapeHtml(a.country || '')} · ${escapeHtml(a.currency || 'USD')} · added ${shortDate(a.created_at)}</span>
+            <p class="adm-mod-row__note">${escapeHtml(a.account_name || '')} — ${escapeHtml(dest)}</p>
+          </div>
+          <div class="adm-mod-row__actions">
+            <button class="button button-primary !min-h-8 !px-3 text-xs" data-verify-account="${a.id}">Verify</button>
+            <button class="button button-danger !min-h-8 !px-3 text-xs" data-reject-account="${a.id}">Reject</button>
+          </div>
+        </div>`;
+    }).join('')
+    : modEmpty('No payout accounts waiting for verification.');
+
   document.querySelector('#mod-topups').innerHTML = data.topups?.length
     ? data.topups.map((t) => `
         <div class="adm-mod-row">
@@ -1647,6 +2120,7 @@ async function loadModeration() {
 document.addEventListener('click', async (event) => {
   const el = event.target.closest(
     '[data-approve-vendor],[data-reject-vendor],[data-approve-campaign],[data-reject-campaign],' +
+    '[data-approve-ad],[data-reject-ad],[data-verify-account],[data-reject-account],' +
     '[data-approve-topup],[data-reject-topup],[data-pay-payout],[data-fail-payout]'
   );
   if (!el) return;
@@ -1665,6 +2139,18 @@ document.addEventListener('click', async (event) => {
     const note = window.prompt('Why is this campaign being rejected? (shown to the seller)');
     if (note === null) return;
     result = await supabase.rpc('moderate_campaign', { p_campaign_id: d.rejectCampaign, p_approve: false, p_note: note });
+  } else if (d.approveAd) {
+    result = await supabase.rpc('moderate_ad_listing', { p_product_id: d.approveAd, p_approve: true });
+  } else if (d.rejectAd) {
+    const note = window.prompt('Why is this listing being rejected? (shown to the seller)');
+    if (note === null) return;
+    result = await supabase.rpc('moderate_ad_listing', { p_product_id: d.rejectAd, p_approve: false, p_note: note });
+  } else if (d.verifyAccount) {
+    result = await supabase.rpc('review_payout_account', { p_account_id: d.verifyAccount, p_approve: true });
+  } else if (d.rejectAccount) {
+    const note = window.prompt('Why is this payout account being rejected? (shown to the seller)');
+    if (note === null) return;
+    result = await supabase.rpc('review_payout_account', { p_account_id: d.rejectAccount, p_approve: false, p_note: note });
   } else if (d.approveTopup) {
     const reference = window.prompt('Payment reference for this top-up (optional):') ?? null;
     result = await supabase.rpc('settle_ad_topup', { p_request_id: d.approveTopup, p_approve: true, p_reference: reference });
@@ -2249,6 +2735,8 @@ async function loadSettings(force = false) {
   form.elements.default_commission_rate.value = data.default_commission_rate ?? 15;
   form.elements.refund_rate_percent.value = data.refund_rate_percent ?? 30;
   form.elements.ad_min_wallet_balance.value = data.ad_min_wallet_balance ?? 100;
+  form.elements.ad_listing_deposit.value = data.ad_listing_deposit ?? 50;
+  form.elements.max_product_file_mb.value = Math.round((data.max_product_file_bytes ?? 5242880) / 1048576);
 }
 
 document.querySelector('#settings-form')?.addEventListener('submit', async (event) => {
@@ -2272,6 +2760,8 @@ document.querySelector('#settings-form')?.addEventListener('submit', async (even
     default_commission_rate: Number(form.elements.default_commission_rate.value) || 0,
     refund_rate_percent: Number(form.elements.refund_rate_percent.value) || 0,
     ad_min_wallet_balance: Number(form.elements.ad_min_wallet_balance.value) || 0,
+    ad_listing_deposit: Number(form.elements.ad_listing_deposit.value) || 0,
+    max_product_file_bytes: Math.max(1, Number(form.elements.max_product_file_mb.value) || 5) * 1048576,
     updated_by: account.user.id,
   };
   setBusy(button, true, 'Saving…');
@@ -2458,8 +2948,11 @@ async function boot() {
 
   wireDashSidebar();
   enhanceSelects('#admin-shell select', {
-    'revenue-period': 'Revenue period',
     'customer-role-filter': 'Role',
+    'txn-provider': 'Payment provider',
+    'products-category-filter': 'Category',
+    'overview-vendor': 'Store',
+    'overview-category': 'Category',
     'cms-new-type': 'Document type',
     'cms-type-filter': 'Filter by type',
     'ticket-status-filter': 'Status',

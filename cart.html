@@ -24,7 +24,7 @@
   <meta name="twitter:title" content="Your Cart | DigiStore">
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
-  <link rel="stylesheet" href="./css/app.css">
+  <link rel="stylesheet" href="./css/app.css?v=0930facf">
 </head>
 
 <body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
@@ -63,12 +63,12 @@
       </aside>
     </div>
 
-    <div id="cart-empty" class="cart-layout hidden">
-      <div class="cart-empty" style="grid-column:1/-1">
-        <i data-lucide="shopping-bag" width="40" height="40"></i>
+    <div id="cart-empty" class="cart-empty-wrap hidden">
+      <div class="cart-empty">
+        <span class="cart-empty__icon"><i data-lucide="shopping-bag" width="26" height="26"></i></span>
         <h2>Your cart is empty</h2>
         <p>Browse the catalog and add something you'll actually use.</p>
-        <a class="button button-primary mt-4" href="./store">Browse Products</a>
+        <a class="button button-primary cart-empty__cta" href="./store">Browse Products</a>
       </div>
     </div>
   </main>

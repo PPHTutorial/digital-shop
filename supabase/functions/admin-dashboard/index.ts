@@ -54,16 +54,135 @@ Deno.serve(async (request) => {
       }
     }
 
+    // ---- Period filter -------------------------------------------------------
+    // The client sends the resolved window as ISO strings (single source of
+    // truth — see js/filters.js). `overviewOnly` is the lightweight repaint
+    // path used when only the dashboard period changed.
+    let periodBody: any = {};
+    if (request.method === 'POST') {
+      try { periodBody = await request.json(); } catch { /* no body */ }
+    }
+    const fromIso: string | null = typeof periodBody?.from === 'string' && periodBody.from ? periodBody.from : null;
+    const toIso: string | null = typeof periodBody?.to === 'string' && periodBody.to ? periodBody.to : null;
+    const bounded = Boolean(fromIso || toIso);
+    const vendorId: string | null = typeof periodBody?.vendorId === 'string' && periodBody.vendorId ? periodBody.vendorId : null;
+    const category: string | null = typeof periodBody?.category === 'string' && periodBody.category ? periodBody.category : null;
+
+    // Product ids the overview aggregation is confined to when a store and/or
+    // category filter is active (null = no confinement).
+    const scopedProductIds = async (): Promise<string[] | null> => {
+      if (!vendorId && !category) return null;
+      let q = db.from('products').select('id');
+      if (vendorId) q = q.eq('vendor_id', vendorId);
+      if (category) q = q.eq('category', category);
+      const { data } = await q.limit(100000);
+      return (data || []).map((p: any) => p.id as string);
+    };
+
+    // Paid orders inside the window — a dedicated, essentially uncapped
+    // aggregation query (thin column set) so revenue figures never depend on
+    // the row-list fetch limits below.
+    const scopedPaidOrders = async (productIds: string[] | null) => {
+      if (productIds && productIds.length === 0) return [];
+      let q = db.from('orders').select('amount,created_at,product_id').eq('status', 'paid');
+      if (fromIso) q = q.gte('created_at', fromIso);
+      if (toIso) q = q.lte('created_at', toIso);
+      if (productIds) q = q.in('product_id', productIds);
+      const { data } = await q.order('created_at', { ascending: false }).limit(100000);
+      return data || [];
+    };
+
+    const newCustomerCount = async () => {
+      let q = db.from('profiles').select('id', { count: 'exact', head: true });
+      if (fromIso) q = q.gte('created_at', fromIso);
+      if (toIso) q = q.lte('created_at', toIso);
+      const { count } = await q;
+      return count || 0;
+    };
+
+    // Bucket keys spanning the window: daily up to ~13 weeks, monthly beyond.
+    const bucketKeys = (): { keys: string[]; sliceLen: number } => {
+      const end = toIso ? new Date(toIso) : new Date();
+      const start = fromIso
+        ? new Date(fromIso)
+        : (() => { const d = new Date(end); d.setUTCDate(d.getUTCDate() - 29); return d; })();
+      const spanDays = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+      if (spanDays <= 92) {
+        const keys: string[] = [];
+        const d = new Date(start); d.setUTCHours(0, 0, 0, 0);
+        while (d <= end) { keys.push(d.toISOString().slice(0, 10)); d.setUTCDate(d.getUTCDate() + 1); }
+        return { keys, sliceLen: 10 };
+      }
+      const keys: string[] = [];
+      const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+      while (d <= end) { keys.push(d.toISOString().slice(0, 7)); d.setUTCMonth(d.getUTCMonth() + 1); }
+      return { keys: keys.slice(-36), sliceLen: 7 };
+    };
+
+    const buildPeriodMetrics = (scopedPaid: any[], products: any[], newCustomers: number) => {
+      const { keys, sliceLen } = bucketKeys();
+      const revenueByDay = keys.map((key) => ({
+        date: key,
+        revenue: scopedPaid
+          .filter((o) => String(o.created_at).slice(0, sliceLen) === key)
+          .reduce((sum, o) => sum + Number(o.amount), 0),
+      }));
+      const byProduct = new Map<string, { orders: number; revenue: number }>();
+      for (const o of scopedPaid) {
+        const cur = byProduct.get(o.product_id) || { orders: 0, revenue: 0 };
+        cur.orders += 1;
+        cur.revenue += Number(o.amount);
+        byProduct.set(o.product_id, cur);
+      }
+      const topProducts = [...byProduct.entries()]
+        .map(([id, v]) => ({ id, title: products.find((p) => p.id === id)?.title || 'Unlisted product', orders: v.orders, revenue: v.revenue }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
+      const categoryStats = Array.from(new Set(products.map((p) => p.category || 'General')))
+        .map((category) => {
+          const ids = new Set(products.filter((p) => (p.category || 'General') === category).map((p) => p.id));
+          const matching = scopedPaid.filter((o) => ids.has(o.product_id));
+          return { category, products: ids.size, revenue: matching.reduce((sum, o) => sum + Number(o.amount), 0) };
+        })
+        .sort((a, b) => b.revenue - a.revenue);
+      return {
+        from: fromIso,
+        to: toIso,
+        bounded,
+        revenue: scopedPaid.reduce((sum, o) => sum + Number(o.amount), 0),
+        paidOrders: scopedPaid.length,
+        newCustomers,
+        revenueByDay,
+        topProducts,
+        categoryStats,
+      };
+    };
+
+    const overviewProductIds = await scopedProductIds();
+    const overviewProducts = (all: any[]): any[] =>
+      overviewProductIds ? all.filter((p: any) => overviewProductIds.includes(p.id)) : all;
+
+    if (periodBody?.overviewOnly) {
+      const [scopedPaid, newCustomers, prodRes] = await Promise.all([
+        scopedPaidOrders(overviewProductIds),
+        newCustomerCount(),
+        db.from('products').select('id,title,category').limit(5000),
+      ]);
+      return json({ periodMetrics: buildPeriodMetrics(scopedPaid, overviewProducts(prodRes.data || []), newCustomers) });
+    }
+
     // Default: Fetch complete dashboard data with ALL columns for full editing
-    const [ordersResult, profilesResult, ticketsResult, productsResult, postsResult, promosResult, categoriesResult, usersResult] = await Promise.all([
-      db.from('orders').select('*, products(id, title, slug, price, currency, cover_url)').order('created_at', { ascending: false }).limit(200),
-      db.from('profiles').select('*').order('created_at', { ascending: false }).limit(200),
+    const [ordersResult, profilesResult, ticketsResult, productsResult, postsResult, promosResult, categoriesResult, usersResult, scopedPaid, newCustomers] = await Promise.all([
+      db.from('orders').select('*, products(id, title, slug, price, currency, cover_url)').order('created_at', { ascending: false }).limit(1000),
+      db.from('profiles').select('*').order('created_at', { ascending: false }).limit(500),
       db.from('tickets').select('*').order('created_at', { ascending: false }).limit(100),
-      db.from('products').select('*').order('created_at', { ascending: false }).limit(200),
+      db.from('products').select('*').order('created_at', { ascending: false }).limit(1000),
       db.from('blog_posts').select('*').order('created_at', { ascending: false }).limit(100),
       db.from('promo_codes').select('*').order('created_at', { ascending: false }).limit(100),
       db.from('categories').select('*').order('sort_order').order('name').limit(100),
       db.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+      scopedPaidOrders(overviewProductIds),
+      newCustomerCount(),
     ]);
 
     const orders = ordersResult.data || [];
@@ -133,6 +252,9 @@ Deno.serve(async (request) => {
       revenueByDay,
       topProducts,
       categoryStats,
+      // Period-scoped, uncapped aggregation for the dashboard period filter.
+      // On the initial load `from`/`to` are absent, so this is the all-time view.
+      periodMetrics: buildPeriodMetrics(scopedPaid, productsResult.data || [], newCustomers),
       orders,
       profiles: profilesResult.data || [],
       users,

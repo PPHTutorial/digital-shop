@@ -24,7 +24,7 @@
   <meta name="twitter:title" content="My Account | DigiStore">
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
-  <link rel="stylesheet" href="./css/app.css">
+  <link rel="stylesheet" href="./css/app.css?v=0930facf">
 </head>
 
 <body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
@@ -112,12 +112,59 @@
           <div class="acct-panel">
             <h2>Edit Your Details</h2>
             <form id="profile-form" class="acct-profile-form">
+              <div class="acct-avatar-field span-2">
+                <span class="acct-avatar-field__preview" id="avatar-preview">?</span>
+                <div class="acct-avatar-field__body">
+                  <label class="button" for="avatar-file">Change photo</label>
+                  <input id="avatar-file" type="file" accept="image/*" class="hidden">
+                  <input type="hidden" name="avatar_url" id="avatar-url">
+                  <p id="avatar-status" class="help">JPG or PNG, up to 3&nbsp;MB.</p>
+                </div>
+              </div>
+
+              <h3 class="acct-form-section span-2">Personal details</h3>
               <div class="form-field span-2"><label for="full_name">Full name</label><input id="full_name" class="field" name="full_name" required></div>
               <div class="form-field"><label for="phone">Phone</label><input id="phone" class="field" name="phone"></div>
               <div class="form-field"><label for="country">Country</label><input id="country" class="field" name="country"></div>
-              <div class="form-field span-2"><label for="address">Address</label><textarea id="address" class="field" name="address"></textarea></div>
+              <div class="form-field"><label for="date_of_birth">Date of birth</label><input id="date_of_birth" class="field" name="date_of_birth" type="date"></div>
               <div class="form-field"><label for="occupation">Occupation</label><input id="occupation" class="field" name="occupation"></div>
-              <div class="form-field"><label for="age">Age</label><input id="age" class="field" name="age" type="number"></div>
+              <div class="form-field span-2"><label for="address">Address</label><textarea id="address" class="field" name="address"></textarea></div>
+
+              <h3 class="acct-form-section span-2">Billing &amp; invoicing</h3>
+              <div class="form-field"><label for="company_name">Company name</label><input id="company_name" class="field" name="company_name"></div>
+              <div class="form-field"><label for="vat_number">VAT / tax number</label><input id="vat_number" class="field" name="vat_number"></div>
+              <div class="form-field span-2"><label for="billing_address">Billing address</label><textarea id="billing_address" class="field" name="billing_address"></textarea></div>
+
+              <h3 class="acct-form-section span-2">Preferences</h3>
+              <div class="form-field"><label for="preferred_currency">Preferred currency</label>
+                <select id="preferred_currency" class="field" name="preferred_currency">
+                  <option value="USD">USD — US Dollar</option>
+                  <option value="EUR">EUR — Euro</option>
+                  <option value="GBP">GBP — Pound Sterling</option>
+                  <option value="GHS">GHS — Ghana Cedi</option>
+                  <option value="NGN">NGN — Nigerian Naira</option>
+                  <option value="KES">KES — Kenyan Shilling</option>
+                  <option value="ZAR">ZAR — South African Rand</option>
+                  <option value="CAD">CAD — Canadian Dollar</option>
+                  <option value="AUD">AUD — Australian Dollar</option>
+                  <option value="INR">INR — Indian Rupee</option>
+                </select>
+              </div>
+              <div class="form-field"><label for="locale">Language</label>
+                <select id="locale" class="field" name="locale">
+                  <option value="en">English</option>
+                  <option value="fr">Français</option>
+                  <option value="es">Español</option>
+                  <option value="pt">Português</option>
+                  <option value="de">Deutsch</option>
+                </select>
+              </div>
+              <div class="form-field span-2"><label for="timezone">Timezone</label><input id="timezone" class="field" name="timezone" placeholder="e.g. Africa/Accra"></div>
+
+              <label class="acct-check-line span-2"><input type="checkbox" name="marketing_opt_in" value="1"> Product news, launches, and marketing emails</label>
+              <label class="acct-check-line span-2"><input type="checkbox" name="notify_product_news" value="1"> Updates to products I've purchased</label>
+              <label class="acct-check-line span-2"><input type="checkbox" name="notify_order_updates" value="1"> Order and receipt emails</label>
+
               <button type="submit" class="button button-primary form-submit">Save profile</button>
               <p id="profile-feedback" class="status-line span-2"></p>
             </form>

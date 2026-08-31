@@ -24,7 +24,7 @@
   <meta name="twitter:title" content="Seller Centre | DigiStore">
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
-  <link rel="stylesheet" href="./css/app.css">
+  <link rel="stylesheet" href="./css/app.css?v=0930facf">
 </head>
 <body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
   <div id="page-loader" class="page-loader">
@@ -211,11 +211,12 @@
               <h2>Sales &amp; Earnings</h2>
               <p>Every line item sold, what the platform took, and what you keep.</p>
             </div>
+            <div id="vnd-sales-period"></div>
           </div>
           <div class="vnd-stat-grid vnd-stat-grid--3">
-            <div class="vnd-stat-card"><span>Gross revenue (30d)</span><strong id="s-gross">—</strong></div>
+            <div class="vnd-stat-card"><span id="s-gross-label">Gross revenue</span><strong id="s-gross">—</strong></div>
             <div class="vnd-stat-card"><span id="s-commission-label">Commission</span><strong id="s-commission">—</strong></div>
-            <div class="vnd-stat-card"><span>Net earnings (30d)</span><strong id="s-net">—</strong></div>
+            <div class="vnd-stat-card"><span id="s-net-label">Net earnings</span><strong id="s-net">—</strong></div>
           </div>
           <div class="vnd-panel"><div id="vendor-sales-table"></div></div>
         </section>
@@ -335,6 +336,7 @@
           </div>
           <div class="vnd-panel">
             <form id="vendor-settings-form" class="vnd-form">
+              <h3 class="vnd-form-section vnd-field--span2">Storefront</h3>
               <label class="vnd-field vnd-field--span2">
                 <span class="label">Store name</span>
                 <input class="field" name="display_name" required maxlength="60">
@@ -348,8 +350,8 @@
                 <select class="field" name="country" id="settings-country"></select>
               </label>
               <label class="vnd-field">
-                <span class="label">Support email</span>
-                <input class="field" name="support_email" type="email" placeholder="you@example.com">
+                <span class="label">Website <span class="vnd-optional">(optional)</span></span>
+                <input class="field" name="website_url" type="url" placeholder="https://…">
               </label>
               <label class="vnd-field vnd-field--span2">
                 <span class="label">Store logo</span>
@@ -360,6 +362,67 @@
                 <input type="hidden" name="logo_url" id="logo-url">
                 <small id="logo-status" class="help"></small>
               </label>
+              <label class="vnd-field vnd-field--span2">
+                <span class="label">Store banner <span class="vnd-optional">(optional)</span></span>
+                <div class="flex items-center gap-4">
+                  <span id="banner-preview" class="vnd-banner-preview"></span>
+                  <input type="file" id="banner-file" accept="image/*" class="text-xs">
+                </div>
+                <input type="hidden" name="banner_url" id="banner-url">
+                <small id="banner-status" class="help"></small>
+              </label>
+
+              <h3 class="vnd-form-section vnd-field--span2">Contact</h3>
+              <label class="vnd-field">
+                <span class="label">Support email</span>
+                <input class="field" name="support_email" type="email" placeholder="you@example.com">
+              </label>
+              <label class="vnd-field">
+                <span class="label">Support phone</span>
+                <input class="field" name="support_phone" type="tel">
+              </label>
+              <label class="vnd-field vnd-field--span2">
+                <span class="label">Support hours <span class="vnd-optional">(optional)</span></span>
+                <input class="field" name="support_hours" placeholder="e.g. Mon–Fri, 9am–5pm GMT">
+              </label>
+
+              <h3 class="vnd-form-section vnd-field--span2">Legal &amp; billing</h3>
+              <label class="vnd-field">
+                <span class="label">Registered legal name</span>
+                <input class="field" name="legal_name">
+              </label>
+              <label class="vnd-field">
+                <span class="label">Tax / VAT ID</span>
+                <input class="field" name="tax_id">
+              </label>
+              <label class="vnd-field vnd-field--span2">
+                <span class="label">Business address</span>
+                <textarea class="field" name="business_address" rows="2"></textarea>
+              </label>
+
+              <h3 class="vnd-form-section vnd-field--span2">Policies</h3>
+              <label class="vnd-field vnd-field--span2">
+                <span class="label">Return / refund policy</span>
+                <textarea class="field" name="return_policy" rows="3" placeholder="Shown on your storefront and product pages."></textarea>
+              </label>
+              <label class="vnd-field vnd-field--span2">
+                <span class="label">Terms &amp; conditions</span>
+                <textarea class="field" name="terms" rows="3"></textarea>
+              </label>
+
+              <h3 class="vnd-form-section vnd-field--span2">Social links</h3>
+              <div class="vnd-field vnd-field--span2">
+                <div class="vnd-social-grid">
+                  <input class="field" name="social_twitter" type="url" placeholder="X / Twitter URL">
+                  <input class="field" name="social_instagram" type="url" placeholder="Instagram URL">
+                  <input class="field" name="social_facebook" type="url" placeholder="Facebook URL">
+                  <input class="field" name="social_linkedin" type="url" placeholder="LinkedIn URL">
+                  <input class="field" name="social_youtube" type="url" placeholder="YouTube URL">
+                  <input class="field" name="social_tiktok" type="url" placeholder="TikTok URL">
+                  <input class="field" name="social_github" type="url" placeholder="GitHub URL">
+                </div>
+              </div>
+
               <div class="vnd-field--span2 flex items-center gap-3">
                 <button class="button button-primary" type="submit">Save settings</button>
                 <p id="settings-feedback" class="status-line text-xs my-0"></p>

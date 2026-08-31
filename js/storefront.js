@@ -3,6 +3,7 @@ import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIco
 import { categoryLook } from './category-look.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
 import { paintSkeletonGrid } from './uikit.js';
+import { AD_LISTING_COLS, stripAdListings } from './ad-listing.js';
 
 let allProducts = []; // full published catalogue — powers the category-specific rails + jumbotron counts
 let managedCategories = [];
@@ -238,7 +239,7 @@ async function load() {
   try {
     const [productsResult, categoriesResult] = await Promise.all([
       supabase.from('products')
-        .select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published,is_featured,purchase_count,rating_sum,rating_count,created_at')
+        .select('id,title,slug,category,description,price,original_price,currency,cover_url,is_published,is_featured,purchase_count,rating_sum,rating_count,created_at' + AD_LISTING_COLS)
         .eq('is_published', true).order('created_at', { ascending: false }),
       supabase.from('categories').select('name,slug,description,sort_order').eq('is_active', true).order('sort_order').order('name'),
     ]);
@@ -248,7 +249,7 @@ async function load() {
     if (error) {
       console.error('Error loading products:', error);
     } else {
-      allProducts = data || [];
+      allProducts = stripAdListings(data || []);
     }
   } catch (err) {
     console.error('Fetch error:', err);

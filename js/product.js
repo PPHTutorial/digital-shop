@@ -4,6 +4,7 @@ import { initTabs, openModal } from './uikit.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
 import { openFileViewer } from './preview.js';
 import { addToCart } from './cart-actions.js';
+import { isAdListing, openLeavingInterstitial, stripAdListings } from './ad-listing.js';
 
 const params = new URLSearchParams(window.location.search);
 const slug = params.get('product') || params.get('slug') || params.get('id');
@@ -118,6 +119,8 @@ function renderGallery() {
 }
 
 function renderInfo() {
+  const adListing = isAdListing(product);
+
   document.querySelector('#pd-category').textContent = product.category || 'General';
   document.querySelector('#pd-title').textContent = product.title;
   document.querySelector('#pd-crumb-title').textContent = product.title;
@@ -150,9 +153,11 @@ function renderInfo() {
     document.querySelector('#pd-price-save').textContent = `SAVE ${pct}%`;
     document.querySelector('#pd-price-save').classList.remove('hidden');
   }
-  document.querySelector('#pd-price-note').textContent = product.delivery_note
-    ? product.delivery_note
-    : 'Instant delivery to your secure DigiStore vault after payment.';
+  document.querySelector('#pd-price-note').textContent = adListing
+    ? 'External listing — you leave DigiStore to visit the seller’s own site. DigiStore does not process this transaction or deliver files for it.'
+    : product.delivery_note
+      ? product.delivery_note
+      : 'Instant delivery to your secure DigiStore vault after payment.';
 
   const specs = [];
   specs.push({ icon: 'file-badge-2', label: 'License', value: (product.license_type || 'single-seat').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) + ' License' });
@@ -168,14 +173,29 @@ function renderInfo() {
       </span>
     </div>`).join('');
 
-  document.querySelector('#pd-buy-btn').href = `./checkout?product=${encodeURIComponent(product.slug)}`;
+  const buyBtn = document.querySelector('#pd-buy-btn');
   document.querySelector('#pd-wish-slot').innerHTML = wishlistButton(product.id, product.title).replace('class="wishbtn"', 'class="wishbtn pd-wish-btn-lg"');
-  document.querySelector('#pd-add-cart-btn')?.addEventListener('click', async (event) => {
-    const btn = event.currentTarget;
-    btn.disabled = true;
-    await addToCart(product.id, 1);
-    btn.disabled = false;
-  });
+
+  if (adListing) {
+    // External destination — the CTA is a guarded click-through, not a checkout.
+    buyBtn.innerHTML = '<i data-lucide="external-link" width="18" height="18"></i><span>Visit site</span>';
+    buyBtn.href = product.external_url;
+    buyBtn.target = '_blank';
+    buyBtn.rel = 'noopener noreferrer';
+    buyBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      openLeavingInterstitial({ url: product.external_url, title: product.title });
+    });
+    document.querySelector('#pd-add-cart-btn')?.remove();
+  } else {
+    buyBtn.href = `./checkout?product=${encodeURIComponent(product.slug)}`;
+    document.querySelector('#pd-add-cart-btn')?.addEventListener('click', async (event) => {
+      const btn = event.currentTarget;
+      btn.disabled = true;
+      await addToCart(product.id, 1);
+      btn.disabled = false;
+    });
+  }
 
   document.querySelector('#pd-description').innerHTML = product.description
     ? renderMarkdown(product.description)
@@ -344,7 +364,7 @@ async function init() {
   vendor = data.vendor;
   reviews = data.reviews || [];
   ratingBreakdown = data.rating_breakdown || {};
-  related = data.related || [];
+  related = stripAdListings(data.related || []);
 
   document.querySelector('#pd-content').classList.remove('hidden');
 

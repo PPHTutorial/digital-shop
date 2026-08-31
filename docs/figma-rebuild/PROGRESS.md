@@ -103,3 +103,10 @@ Preserved and adapted (not re-derived) the real Supabase wiring already in the o
 
 **Pre-existing gap noted, not fixed (out of scope for this phase)**: `.field` (the shared text-input/textarea/select class used site-wide) has a hardcoded `background: #fff` with no dark-mode override, so form inputs render as light boxes inside otherwise-dark admin/vendor/checkout panels. This predates Phase 4, affects every page with a form, and fixing it is a Phase-0-level token change outside this phase's file scope — flagged here for whoever picks up a future dark-mode polish pass.
 
+
+**************************************
+
+5. Remaining admin tables → row menus (Workstream 3 finish)
+Categories (Edit / Show·Hide), Promotions (Pause·Activate / Delete), Stores (Suspend / Reinstate) now use the ⋯ rowMenu/wireRowMenus. Single-action rows (transactions "Detail", tickets "Open") left as plain buttons on purpose; the moderation queue isn't a data table so it's untouched.
+
+Still open: Workstream 2C backend (deposit accounting, Edge Function enforcement, storefront click-through for is_ad). Three migrations still need supabase db push: 20260827150000, 20260827160000, 20260827170000.

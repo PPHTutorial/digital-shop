@@ -1,6 +1,7 @@
 import { supabase } from './client.js';
 import { escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
+import { AD_LISTING_COLS, stripAdListings } from './ad-listing.js';
 
 const PAGE_SIZE = 9;
 let allPosts = [];
@@ -159,15 +160,16 @@ async function renderRelatedProducts() {
 
   const { data } = await supabase
     .from('products')
-    .select('id,title,slug,short_description,price,original_price,currency,cover_url,is_featured')
+    .select('id,title,slug,short_description,price,original_price,currency,cover_url,is_featured' + AD_LISTING_COLS)
     .eq('is_published', true)
     .order('is_featured', { ascending: false })
     .order('purchase_count', { ascending: false })
-    .limit(4);
+    .limit(8);
 
-  if (!data?.length) return;
+  const products = stripAdListings(data || []).slice(0, 4);
+  if (!products.length) return;
   section.classList.remove('hidden');
-  host.innerHTML = data.map(relatedProductCardHtml).join('');
+  host.innerHTML = products.map(relatedProductCardHtml).join('');
   await loadWishlist();
   paintWishlist(host);
   wireWishlist(host);

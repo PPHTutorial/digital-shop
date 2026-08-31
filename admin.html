@@ -24,7 +24,7 @@
   <meta name="twitter:title" content="Admin Centre | DigiStore">
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
-  <link rel="stylesheet" href="./css/app.css">
+  <link rel="stylesheet" href="./css/app.css?v=0930facf">
 </head>
 <body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
   <div id="page-loader" class="page-loader">
@@ -108,7 +108,17 @@
               <h2>Everything that needs your attention</h2>
               <p>Commercial performance, demand and operational signals in one view.</p>
             </div>
-            <label class="admin-period"><span>Revenue period</span><select id="revenue-period"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select></label>
+            <div class="adm-overview-filters">
+              <div id="overview-period"></div>
+              <label class="period-filter__group">
+                <span class="label">Store</span>
+                <select id="overview-vendor" class="field"><option value="">All stores</option></select>
+              </label>
+              <label class="period-filter__group">
+                <span class="label">Category</span>
+                <select id="overview-category" class="field"><option value="">All categories</option></select>
+              </label>
+            </div>
           </div>
           <div class="adm-stat-grid">
             <div class="adm-stat-card"><span>Total revenue</span><strong id="m-revenue">—</strong><small id="m-revenue-change">Across paid orders</small></div>
@@ -189,6 +199,7 @@
                 <option value="admin">Admins only</option>
                 <option value="all">All users</option>
               </select>
+              <div id="customers-period"></div>
             </div>
             <div id="users-table" class="mt-4"></div>
           </div>
@@ -201,6 +212,13 @@
             <div id="orders-insight" class="admin-insight"></div>
           </div>
           <div class="adm-panel">
+            <div class="adm-filter-row">
+              <div id="txn-period"></div>
+              <label class="period-filter__group">
+                <span class="label">Payment provider</span>
+                <select id="txn-provider" class="field"><option value="">All providers</option></select>
+              </label>
+            </div>
             <div id="orders-status-summary" class="flex flex-wrap gap-2 text-xs"></div>
             <div id="orders-filter-tabs" class="mt-3 flex flex-wrap gap-1.5"></div>
             <div id="orders-table" class="mt-4"></div>
@@ -213,7 +231,16 @@
             <div><span class="eyebrow">CATALOG</span><h2>Products and digital editions</h2><p>Publish, price, package and merchandise every product from one workspace.</p></div>
             <button id="new-product" class="button button-primary" type="button">+ Add product</button>
           </div>
-          <div class="adm-panel"><div id="products-table"></div></div>
+          <div class="adm-panel">
+            <div class="adm-filter-row">
+              <div id="products-period"></div>
+              <label class="period-filter__group">
+                <span class="label">Category</span>
+                <select id="products-category-filter" class="field"><option value="">All categories</option></select>
+              </label>
+            </div>
+            <div id="products-table" class="mt-4"></div>
+          </div>
         </section>
 
         <!-- A05 Categories manager -->
@@ -268,11 +295,15 @@
             <div class="uk-tabs__list" role="tablist">
               <button type="button" class="uk-tabs__btn is-active" data-uk-tab="vendors">Seller applications <span id="mod-count-vendors" class="uk-badge uk-badge--neutral"></span></button>
               <button type="button" class="uk-tabs__btn" data-uk-tab="campaigns">Ad campaigns <span id="mod-count-campaigns" class="uk-badge uk-badge--neutral"></span></button>
+              <button type="button" class="uk-tabs__btn" data-uk-tab="ad-listings">External-link listings <span id="mod-count-ad_listings" class="uk-badge uk-badge--neutral"></span></button>
+              <button type="button" class="uk-tabs__btn" data-uk-tab="payout-accounts">Payout accounts <span id="mod-count-payout_accounts" class="uk-badge uk-badge--neutral"></span></button>
               <button type="button" class="uk-tabs__btn" data-uk-tab="topups">Wallet top-ups <span id="mod-count-topups" class="uk-badge uk-badge--neutral"></span></button>
               <button type="button" class="uk-tabs__btn" data-uk-tab="payouts">Payout requests <span id="mod-count-payouts" class="uk-badge uk-badge--neutral"></span></button>
             </div>
             <div class="uk-tabs__panel is-active mt-4" data-uk-tab-panel="vendors" id="mod-vendors"></div>
             <div class="uk-tabs__panel mt-4" data-uk-tab-panel="campaigns" id="mod-campaigns"></div>
+            <div class="uk-tabs__panel mt-4" data-uk-tab-panel="ad-listings" id="mod-ad-listings"></div>
+            <div class="uk-tabs__panel mt-4" data-uk-tab-panel="payout-accounts" id="mod-payout-accounts"></div>
             <div class="uk-tabs__panel mt-4" data-uk-tab-panel="topups" id="mod-topups"></div>
             <div class="uk-tabs__panel mt-4" data-uk-tab-panel="payouts" id="mod-payouts"></div>
           </div>
@@ -365,6 +396,8 @@
               <label class="adm-field"><span class="label">Default vendor commission <span class="help" style="font-weight:400">(%, applied to new stores)</span></span><input name="default_commission_rate" type="number" step=".01" min="0" max="100" class="field"></label>
               <label class="adm-field"><span class="label">Standard refund rate <span class="help" style="font-weight:400">(%, shown in the refund policy)</span></span><input name="refund_rate_percent" type="number" step=".01" min="0" max="100" class="field"></label>
               <label class="adm-field"><span class="label">Min. ad-wallet balance <span class="help" style="font-weight:400">(USD, to publish an external-link listing)</span></span><input name="ad_min_wallet_balance" type="number" step="1" min="0" class="field"></label>
+              <label class="adm-field"><span class="label">External-link listing deposit <span class="help" style="font-weight:400">(USD, refundable hold taken on approval)</span></span><input name="ad_listing_deposit" type="number" step="1" min="0" class="field"></label>
+              <label class="adm-field"><span class="label">Max product file size <span class="help" style="font-weight:400">(MB, for a published hosted file)</span></span><input name="max_product_file_mb" type="number" step="1" min="1" class="field"></label>
               <div class="adm-field--span2 flex items-center gap-3">
                 <button class="button button-primary" type="submit">Save settings</button>
                 <p id="settings-feedback" class="status-line text-xs my-0"></p>
