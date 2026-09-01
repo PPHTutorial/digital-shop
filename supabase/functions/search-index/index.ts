@@ -18,14 +18,19 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 
 const SITE_URL = (Deno.env.get('PUBLIC_SITE_URL') || 'https://digistore.codeinktechnologies.com').replace(/\/$/, '');
 
-/** Maps a queue row to the public URL a crawler should fetch. */
+/**
+ * Maps a queue row to the public URL a crawler should fetch. Posts and products
+ * are path-routed now (/blog/<slug>, /product/<slug>) and prerendered — keep
+ * these shapes in step with tools/prerender.mjs, tools/generate-sitemap.mjs and
+ * supabase/functions/sitemap.
+ */
 function publicUrlFor(entityType: string, slug: string | null, id: string): string {
   const key = slug || id;
   switch (entityType) {
     case 'product':
-      return `${SITE_URL}/product?product=${encodeURIComponent(key)}`;
+      return `${SITE_URL}/product/${encodeURIComponent(key)}`;
     case 'blog_post':
-      return `${SITE_URL}/blog?post=${encodeURIComponent(key)}`;
+      return `${SITE_URL}/blog/${encodeURIComponent(key)}`;
     default:
       return `${SITE_URL}/`;
   }

@@ -1,0 +1,5 @@
+# Per-slug pages emitted by tools/prerender.mjs from the blog.html /
+# product.html shells. Committed so GitHub Pages can serve them, but they are
+# build output — collapse them in diffs and exclude from language stats.
+blog/**   linguist-generated=true
+product/** linguist-generated=true

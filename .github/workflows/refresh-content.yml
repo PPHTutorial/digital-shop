@@ -1,0 +1,56 @@
+name: Refresh prerendered content
+
+# Re-runs the prerender + sitemap generators against live Supabase data and
+# commits any change, so a blog post or product published/edited in Supabase
+# goes live on GitHub Pages (and into sitemap.xml) without a manual
+# scripts/deploy.ps1 run.
+#
+# No secrets required: tools/prerender.mjs and tools/generate-sitemap.mjs fall
+# back to the public anon key committed in js/config.js — the same access the
+# browser already has (only published rows are anon-readable under RLS).
+#
+# GitHub Pages ("Deploy from a branch") redeploys automatically on the push
+# this job makes. Note: GitHub pauses scheduled workflows after ~60 days with
+# no repo activity — re-enable from the Actions tab if that happens.
+
+on:
+  schedule:
+    - cron: '17 * * * *'   # hourly, off the top of the hour to dodge scheduler congestion
+  workflow_dispatch: {}     # manual "Run workflow" button
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-content
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      PUBLIC_SITE_URL: https://digistore.codeinktechnologies.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Prerender blog/ and product/ from live data
+        run: node tools/prerender.mjs
+
+      - name: Regenerate sitemap.xml from live data
+        run: node tools/generate-sitemap.mjs
+
+      - name: Commit & push if anything changed
+        run: |
+          if [ -z "$(git status --porcelain -- blog product sitemap.xml)" ]; then
+            echo "No content changes — nothing to deploy."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add blog product sitemap.xml
+          git commit -m "chore: refresh prerendered content + sitemap [skip ci]"
+          git push

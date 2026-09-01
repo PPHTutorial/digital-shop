@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons } from './ui.js';
+import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, setCanonical } from './ui.js';
 import { loadServableCampaigns, attachAdTracking, promoteSponsored } from './ads.js';
 import { enhanceSelect } from './select.js';
 import { enhanceCheckboxes, enhanceRadios } from './form-controls.js';
@@ -92,7 +92,7 @@ function cardMetaHtml(p) {
 function createCardHtml(p) {
   const hasDiscount = p.original_price && Number(p.original_price) > Number(p.price);
   const discountPct = hasDiscount ? Math.round((1 - Number(p.price) / Number(p.original_price)) * 100) : 0;
-  const href = `./product?product=${encodeURIComponent(p.slug || p.id)}`;
+  const href = `./product/${encodeURIComponent(p.slug || p.id)}`;
   const blurb = p.short_description || p.description || '';
   const vendorLabel = p.vendor_id ? (p.vendor?.display_name || 'Marketplace Seller') : 'DigiStore Official';
 
@@ -558,6 +558,7 @@ async function renderVendorStore(slug) {
   bio.classList.toggle('hidden', !vendor.bio);
 
   document.title = `${vendor.display_name} | DigiStore`;
+  setCanonical(`/store?vendor=${encodeURIComponent(slug)}`);
   document.querySelector('#product-loading')?.classList.add('hidden');
 
   grid.innerHTML = products.length
@@ -577,6 +578,15 @@ async function init() {
   mountHeader();
   mountFooter();
   wirePriceSlider();
+
+  // Consolidate the many filter/sort/search/page permutations of this URL onto
+  // a small set of canonicals: a single bare category is a real landing page
+  // and owns itself; a lone ?search= is left to /store; a ?vendor= view sets
+  // its own canonical in renderVendorStore(). Everything else points to /store.
+  const onlyCategory = params.get('category') && ![...params.keys()].some((k) => k !== 'category');
+  if (!params.get('vendor')) {
+    setCanonical(onlyCategory ? `/store?category=${encodeURIComponent(params.get('category'))}` : '/store');
+  }
 
   // The catalog has no search box of its own — the header search (js/ui.js)
   // filters this page live via this event, debounced, with no navigation.

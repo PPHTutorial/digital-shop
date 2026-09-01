@@ -55,7 +55,7 @@ async function renderCrossSell(category, excludeId) {
   host.innerHTML = items.map((p) => {
     const hasDiscount = p.original_price && Number(p.original_price) > Number(p.price);
     return `
-      <a class="catalog-card is-clickable" href="./product?product=${encodeURIComponent(p.slug)}">
+      <a class="catalog-card is-clickable" href="./product/${encodeURIComponent(p.slug)}">
         <span class="catalog-card__media">
           ${p.cover_url ? `<img src="${escapeHtml(p.cover_url)}" alt="${escapeHtml(p.title)}" loading="lazy">` : `<span class="catalog-card__placeholder"><i data-lucide="file-text" width="26" height="26"></i></span>`}
         </span>

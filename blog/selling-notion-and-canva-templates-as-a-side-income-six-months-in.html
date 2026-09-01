@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="/">
+  <meta name="description" content="A real accounting of hours, sales, and lessons from six months of building a template shop after work, without the survivorship bias of most success stories.">
+  <title>Selling Notion and Canva Templates as a Side Income, Six Months In | DigiStore Journal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" type="image/png" sizes="16x16" href="/img/brand/favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/brand/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/img/brand/icon-192.png">
+  <link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#072220">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="DigiStore">
+  <meta property="og:title" content="Selling Notion and Canva Templates as a Side Income, Six Months In | DigiStore Journal">
+  <meta property="og:description" content="A real accounting of hours, sales, and lessons from six months of building a template shop after work, without the survivorship bias of most success stories.">
+  <meta property="og:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <link rel="canonical" href="https://digistore.codeinktechnologies.com/blog/selling-notion-and-canva-templates-as-a-side-income-six-months-in">
+  <meta property="og:url" content="https://digistore.codeinktechnologies.com/blog/selling-notion-and-canva-templates-as-a-side-income-six-months-in">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Selling Notion and Canva Templates as a Side Income, Six Months In | DigiStore Journal">
+  <meta name="twitter:description" content="A real accounting of hours, sales, and lessons from six months of building a template shop after work, without the survivorship bias of most success stories.">
+  <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="stylesheet" href="/css/app.css?v=2e86bd0f">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Selling Notion and Canva Templates as a Side Income, Six Months In","description":"A real accounting of hours, sales, and lessons from six months of building a template shop after work, without the survivorship bias of most success stories.","image":"https://images.unsplash.com/photo-1626785774573-4b799315345d?ixid=M3w5NTIxMzl8MHwxfHNlYXJjaHwxfHxncmFwaGljJTIwZGVzaWduJTIwdGVtcGxhdGUlMjBjb21wdXRlcnxlbnwwfDB8fHwxNzg3ODA3MTg1fDA&ixlib=rb-4.1.0&w=1200&h=675&fit=crop&q=80","datePublished":"2026-06-18T09:35:00+00:00","dateModified":"2026-08-27T05:11:07.839128+00:00","author":{"@type":"Organization","name":"DigiStore","url":"https://digistore.codeinktechnologies.com"},"publisher":{"@type":"Organization","name":"DigiStore","logo":{"@type":"ImageObject","url":"https://digistore.codeinktechnologies.com/img/brand/icon-192.png"}},"mainEntityOfPage":"https://digistore.codeinktechnologies.com/blog/selling-notion-and-canva-templates-as-a-side-income-six-months-in"}</script>
+</head>
+
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
+
+  <main class="flex-1">
+    <section id="blog-hero" class="page-hero hidden">
+      <h1 id="blog-hero-title" class="page-hero__title">DigiStore Journal</h1>
+      <p id="blog-hero-sub" class="page-hero__sub">Insights, guides, and release notes from the marketplace. Learn how to grow your digital asset toolkit.</p>
+    </section>
+
+    <section id="blog-listing" class="hidden">
+      <section class="blog-body">
+        <div id="blog-featured-wrap"></div>
+
+        <h2 class="blog-section-title">Latest Articles</h2>
+        <div id="blog-grid" class="blog-grid"></div>
+        <div id="blog-grid-loadmore" class="blog-loadmore-row hidden">
+          <button type="button" id="blog-loadmore-btn" class="button !px-6">Load more articles</button>
+          <span id="blog-grid-count" class="blog-loadmore-count"></span>
+        </div>
+      </section>
+    </section>
+
+    <section id="blog-article-wrap">
+      <div class="blog-article-body">
+       <div class="blog-article-prose">
+        <a href="/blog" class="blog-article-back">← Back to Journal</a>
+        <div id="blog-article-loading" class="legal-skel hidden">
+          <div class="uk-skel" style="height:14px;width:140px;border-radius:999px"></div>
+          <div class="uk-skel" style="height:32px;width:70%"></div>
+          <div class="uk-skel" style="height:14px;width:100%"></div>
+          <div class="uk-skel" style="height:14px;width:90%"></div>
+        </div>
+        <div id="blog-article-not-found" class="hidden soft-panel p-10 text-center">
+          <p class="font-bold" style="color:var(--text)">That article could not be found.</p>
+          <p class="mt-1 text-sm" style="color:var(--text-muted)">It may have been unpublished or the link is out of date.</p>
+          <a class="button button-primary mt-4" href="/blog">Browse the journal</a>
+        </div>
+        <article id="blog-article-content" data-prerendered="true" data-post-id="56ab48d1-5d45-4735-9a3e-031197c1168c">
+          <div class="blog-article-meta-row">
+            <span id="blog-article-date" class="legal-effective">Jun 18, 2026</span>
+            <span id="blog-article-readtime" class="blog-article-readtime">4 min read</span>
+          </div>
+          <h1 id="blog-article-title" class="legal-title">Selling Notion and Canva Templates as a Side Income, Six Months In</h1>
+          <div id="blog-article-cover-wrap" class="blog-article-cover"><img id="blog-article-cover" alt="Selling Notion and Canva Templates as a Side Income, Six Months In" src="https://images.unsplash.com/photo-1626785774573-4b799315345d?ixid=M3w5NTIxMzl8MHwxfHNlYXJjaHwxfHxncmFwaGljJTIwZGVzaWduJTIwdGVtcGxhdGUlMjBjb21wdXRlcnxlbnwwfDB8fHwxNzg3ODA3MTg1fDA&amp;ixlib=rb-4.1.0&amp;w=1200&amp;h=675&amp;fit=crop&amp;q=80"></div>
+
+          <div class="blog-article-actions" data-engagement-bar="top">
+            <button type="button" class="js-blog-like blog-action-btn" aria-pressed="false">
+              <i data-lucide="heart" width="16" height="16"></i><span class="js-blog-like-count">0</span>
+            </button>
+            <button type="button" class="js-blog-save blog-action-btn" aria-pressed="false">
+              <i data-lucide="bookmark" width="16" height="16"></i><span class="js-blog-save-label">Save</span>
+            </button>
+            <button type="button" class="js-blog-share blog-action-btn">
+              <i data-lucide="share-2" width="16" height="16"></i><span>Share</span>
+            </button>
+            <a href="/blog/selling-notion-and-canva-templates-as-a-side-income-six-months-in#blog-comments" class="blog-action-btn">
+              <i data-lucide="message-circle" width="16" height="16"></i><span class="js-blog-comment-count">0</span>
+            </a>
+          </div>
+
+          <div id="blog-article-html" class="legal-doc-body pd-markdown">
+<p>Six months of building a template shop on evenings and weekends produces a much less dramatic story than the screenshots of five figure launches that circulate online, but it is a more useful one if you are actually considering starting. Here is what the honest numbers and hours looked like.</p>
+<h2>Month one and two: mostly building, barely selling</h2>
+<p>The first eight weeks went almost entirely into building an initial catalog of twelve templates across Notion and Canva, roughly six to eight hours a week. Total revenue in this period was under $150, mostly from friends and a small existing social following rather than any real marketplace traction. This is the stage where most people quit, because the effort to revenue ratio looks discouraging with no evidence yet that it will improve.</p>
+<h3>Month three: the first real signal</h3>
+<p>A single Notion template, a freelance project tracker, started getting organic traction after being shared in a relevant online community. That one template alone brought in $310 in the third month, more than the entire catalog had earned in the two months before it. The lesson here was not obvious at the time: one specific, well targeted product can outperform a broad catalog of decent ones by a wide margin.</p>
+<h2>Months four through six: doubling down on what worked</h2>
+<p>Rather than building more variety, the next three months went into building two more templates specifically adjacent to the successful one, a client invoice tracker and a project proposal template, aimed at the same freelancer audience that responded to the first hit. Combined revenue across these three months reached roughly $1,850, with the original project tracker still accounting for close to half of total sales.</p>
+<h2>The actual time investment, honestly counted</h2>
+<ul>
+<li>Roughly 140 total hours across six months, including template building, marketing posts, and customer support.</li>
+<li>Effective hourly rate across the full period works out to under $15, which is a sobering number if framed as a job rather than a growing asset.</li>
+<li>The trend line matters more than the average: hours per dollar earned improved steadily from month one to month six as the catalog and audience compounded.</li>
+</ul>
+<h2>What would speed this up next time</h2>
+<p>Picking a narrower target audience from day one, rather than building generically useful templates and hoping to find an audience afterward, would have compressed the first three discouraging months significantly. Talking to five potential buyers before building anything, instead of after, is the single change that would have made the biggest difference in hindsight.</p>
+<h2>Is it worth it</h2>
+<p>At $1,850 over six months and roughly 140 hours, this is not a get rich story, and presenting it as one would be dishonest. But the trajectory, not the snapshot, is the actual point: revenue per hour improved every single month, the catalog is now an asset that keeps selling with far less new effort than the early templates required, and the audience built along the way makes every future product launch faster than the last one. Judged as a business being built rather than a lottery ticket, six months in looks like solid, unglamorous progress.</p>
+<h2>What the community that shared the winning template actually looked like</h2>
+<p>The community where the freelance project tracker took off was a moderately active forum for independent contractors, not a huge platform, which matters because it suggests the win came from relevance rather than sheer audience size. A smaller, highly relevant audience responded far more strongly than posting the same template to a much larger but less specifically matched general productivity community would likely have produced, a pattern that held up again with the two follow up templates aimed at the same specific freelancer audience.</p>
+<h2>What month seven and beyond looked like</h2>
+<p>The momentum from the original hit template did not simply continue on its own; sustaining it required deliberately building a small email list from template buyers specifically, which now accounts for a growing share of new template launches converting faster than the original cold community posts ever did. Six months in, the actual asset being built was not just three templates, it was a demonstrated, repeatable process for finding, validating, and marketing to one specific underserved audience, which is worth more than any single template's ongoing revenue on its own.</p>
+</div>
+
+          <div class="blog-article-actions" data-engagement-bar="bottom">
+            <button type="button" class="js-blog-like blog-action-btn" aria-pressed="false">
+              <i data-lucide="heart" width="16" height="16"></i><span class="js-blog-like-count">0</span>
+            </button>
+            <button type="button" class="js-blog-save blog-action-btn" aria-pressed="false">
+              <i data-lucide="bookmark" width="16" height="16"></i><span class="js-blog-save-label">Save</span>
+            </button>
+            <button type="button" class="js-blog-share blog-action-btn">
+              <i data-lucide="share-2" width="16" height="16"></i><span>Share</span>
+            </button>
+            <a href="/blog/selling-notion-and-canva-templates-as-a-side-income-six-months-in#blog-comments" class="blog-action-btn">
+              <i data-lucide="message-circle" width="16" height="16"></i><span class="js-blog-comment-count">0</span>
+            </a>
+          </div>
+        </article>
+
+        <section id="blog-comments" class="blog-comments">
+          <h2 id="blog-comments-title" class="blog-comments-title">Comments</h2>
+
+          <div id="blog-comment-form-wrap">
+            <form id="blog-comment-form" class="blog-comment-form">
+              <textarea id="blog-comment-input" rows="3" placeholder="Share your thoughts…" maxlength="2000" required></textarea>
+              <button type="submit" class="button button-primary !min-h-9 !px-4 text-xs font-bold">Post comment</button>
+            </form>
+          </div>
+          <a id="blog-comment-signin" href="#" class="hidden button !min-h-9 !px-4 text-xs font-bold">Sign in to comment</a>
+
+          <div id="blog-comments-list" class="blog-comments-list"></div>
+        </section>
+       </div>
+
+        <section id="blog-related" class="pd-related hidden">
+          <h2>You Might Also Like</h2>
+          <div id="blog-related-grid" class="pd-related-grid"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="newsletter-band">
+      <div class="newsletter-panel">
+        <div>
+          <h2>Subscribe to our Newsletter</h2>
+          <p>New releases, tools, and digital insights — occasionally, never spam.</p>
+        </div>
+        <form id="subscribe-form" class="newsletter-form">
+          <input name="email" required type="email" placeholder="Your email address…">
+          <button type="submit">Submit</button>
+        </form>
+      </div>
+      <p id="subscribe-status" class="status-line px-6 pb-4" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module" src="/js/blog.js"></script>
+</body>
+
+</html>

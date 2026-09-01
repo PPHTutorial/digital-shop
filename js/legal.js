@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { finishPageLoader, mountFooter, mountHeader, renderIcons } from './ui.js';
+import { finishPageLoader, mountFooter, mountHeader, renderIcons, setCanonical } from './ui.js';
 import { inlineHtmlFromMarkdown } from './rte.js';
 
 const DOC_TITLES = {
@@ -53,6 +53,9 @@ async function load() {
 
   const params = new URLSearchParams(window.location.search);
   const slug = params.get('doc') || 'terms';
+
+  // Every ?doc= view is served from legal.html — give each its own canonical.
+  setCanonical(`/legal?doc=${encodeURIComponent(slug)}`);
 
   document.querySelectorAll('[data-legal-link]').forEach((link) => {
     link.classList.toggle('is-active', link.dataset.legalLink === slug);

@@ -33,15 +33,17 @@ Deno.serve(async () => {
     `<url><loc>${base}/legal?doc=licence</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>`,
   ];
 
+  // Posts and products are path-routed and prerendered — see tools/prerender.mjs
+  // and tools/generate-sitemap.mjs; keep these URL shapes in step.
   const productUrls = (products || []).map((item) => {
     const slug = item.slug || item.id;
     const lastmod = item.updated_at ? new Date(item.updated_at).toISOString() : new Date().toISOString();
-    return `<url><loc>${base}/product?product=${encodeURIComponent(slug)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`;
+    return `<url><loc>${base}/product/${encodeURIComponent(slug)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>`;
   });
 
   const postUrls = (posts || []).map((post) => {
     const lastmod = post.updated_at ? new Date(post.updated_at).toISOString() : new Date().toISOString();
-    return `<url><loc>${base}/blog?post=${encodeURIComponent(post.slug)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`;
+    return `<url><loc>${base}/blog/${encodeURIComponent(post.slug)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`;
   });
 
   const urls = [...staticUrls, ...productUrls, ...postUrls].join('');

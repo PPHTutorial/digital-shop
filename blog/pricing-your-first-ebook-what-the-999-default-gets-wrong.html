@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="/">
+  <meta name="description" content="Most new authors copy the price they saw on someone else&#039;s cover, then wonder why sales stall at forty copies. Here&#039;s a way to actually price against what you built instead of what feels safe.">
+  <title>Pricing Your First Ebook: What the $9.99 Default Gets Wrong | DigiStore Journal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" type="image/png" sizes="16x16" href="/img/brand/favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/brand/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/img/brand/icon-192.png">
+  <link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#072220">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="DigiStore">
+  <meta property="og:title" content="Pricing Your First Ebook: What the $9.99 Default Gets Wrong | DigiStore Journal">
+  <meta property="og:description" content="Most new authors copy the price they saw on someone else&#039;s cover, then wonder why sales stall at forty copies. Here&#039;s a way to actually price against what you built instead of what feels safe.">
+  <meta property="og:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <link rel="canonical" href="https://digistore.codeinktechnologies.com/blog/pricing-your-first-ebook-what-the-999-default-gets-wrong">
+  <meta property="og:url" content="https://digistore.codeinktechnologies.com/blog/pricing-your-first-ebook-what-the-999-default-gets-wrong">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Pricing Your First Ebook: What the $9.99 Default Gets Wrong | DigiStore Journal">
+  <meta name="twitter:description" content="Most new authors copy the price they saw on someone else&#039;s cover, then wonder why sales stall at forty copies. Here&#039;s a way to actually price against what you built instead of what feels safe.">
+  <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="stylesheet" href="/css/app.css?v=2e86bd0f">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Pricing Your First Ebook: What the $9.99 Default Gets Wrong","description":"Most new authors copy the price they saw on someone else's cover, then wonder why sales stall at forty copies. Here's a way to actually price against what you built instead of what feels safe.","image":"https://images.unsplash.com/photo-1557825835-70d97c4aa567?ixid=M3w5NTIxMzl8MHwxfHNlYXJjaHwxfHxlYm9vayUyMHJlYWRpbmclMjB0YWJsZXR8ZW58MHwwfHx8MTc4NzgwNzE3MHww&ixlib=rb-4.1.0&w=1200&h=675&fit=crop&q=80","datePublished":"2026-05-29T08:15:00+00:00","dateModified":"2026-08-27T05:11:07.839128+00:00","author":{"@type":"Organization","name":"DigiStore","url":"https://digistore.codeinktechnologies.com"},"publisher":{"@type":"Organization","name":"DigiStore","logo":{"@type":"ImageObject","url":"https://digistore.codeinktechnologies.com/img/brand/icon-192.png"}},"mainEntityOfPage":"https://digistore.codeinktechnologies.com/blog/pricing-your-first-ebook-what-the-999-default-gets-wrong"}</script>
+</head>
+
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
+
+  <main class="flex-1">
+    <section id="blog-hero" class="page-hero hidden">
+      <h1 id="blog-hero-title" class="page-hero__title">DigiStore Journal</h1>
+      <p id="blog-hero-sub" class="page-hero__sub">Insights, guides, and release notes from the marketplace. Learn how to grow your digital asset toolkit.</p>
+    </section>
+
+    <section id="blog-listing" class="hidden">
+      <section class="blog-body">
+        <div id="blog-featured-wrap"></div>
+
+        <h2 class="blog-section-title">Latest Articles</h2>
+        <div id="blog-grid" class="blog-grid"></div>
+        <div id="blog-grid-loadmore" class="blog-loadmore-row hidden">
+          <button type="button" id="blog-loadmore-btn" class="button !px-6">Load more articles</button>
+          <span id="blog-grid-count" class="blog-loadmore-count"></span>
+        </div>
+      </section>
+    </section>
+
+    <section id="blog-article-wrap">
+      <div class="blog-article-body">
+       <div class="blog-article-prose">
+        <a href="/blog" class="blog-article-back">← Back to Journal</a>
+        <div id="blog-article-loading" class="legal-skel hidden">
+          <div class="uk-skel" style="height:14px;width:140px;border-radius:999px"></div>
+          <div class="uk-skel" style="height:32px;width:70%"></div>
+          <div class="uk-skel" style="height:14px;width:100%"></div>
+          <div class="uk-skel" style="height:14px;width:90%"></div>
+        </div>
+        <div id="blog-article-not-found" class="hidden soft-panel p-10 text-center">
+          <p class="font-bold" style="color:var(--text)">That article could not be found.</p>
+          <p class="mt-1 text-sm" style="color:var(--text-muted)">It may have been unpublished or the link is out of date.</p>
+          <a class="button button-primary mt-4" href="/blog">Browse the journal</a>
+        </div>
+        <article id="blog-article-content" data-prerendered="true" data-post-id="54797702-c5c5-464a-b218-fb3cc4bc14bd">
+          <div class="blog-article-meta-row">
+            <span id="blog-article-date" class="legal-effective">May 29, 2026</span>
+            <span id="blog-article-readtime" class="blog-article-readtime">5 min read</span>
+          </div>
+          <h1 id="blog-article-title" class="legal-title">Pricing Your First Ebook: What the $9.99 Default Gets Wrong</h1>
+          <div id="blog-article-cover-wrap" class="blog-article-cover"><img id="blog-article-cover" alt="Pricing Your First Ebook: What the $9.99 Default Gets Wrong" src="https://images.unsplash.com/photo-1557825835-70d97c4aa567?ixid=M3w5NTIxMzl8MHwxfHNlYXJjaHwxfHxlYm9vayUyMHJlYWRpbmclMjB0YWJsZXR8ZW58MHwwfHx8MTc4NzgwNzE3MHww&amp;ixlib=rb-4.1.0&amp;w=1200&amp;h=675&amp;fit=crop&amp;q=80"></div>
+
+          <div class="blog-article-actions" data-engagement-bar="top">
+            <button type="button" class="js-blog-like blog-action-btn" aria-pressed="false">
+              <i data-lucide="heart" width="16" height="16"></i><span class="js-blog-like-count">0</span>
+            </button>
+            <button type="button" class="js-blog-save blog-action-btn" aria-pressed="false">
+              <i data-lucide="bookmark" width="16" height="16"></i><span class="js-blog-save-label">Save</span>
+            </button>
+            <button type="button" class="js-blog-share blog-action-btn">
+              <i data-lucide="share-2" width="16" height="16"></i><span>Share</span>
+            </button>
+            <a href="/blog/pricing-your-first-ebook-what-the-999-default-gets-wrong#blog-comments" class="blog-action-btn">
+              <i data-lucide="message-circle" width="16" height="16"></i><span class="js-blog-comment-count">0</span>
+            </a>
+          </div>
+
+          <div id="blog-article-html" class="legal-doc-body pd-markdown">
+<p>Open ten ebooks in any niche and you will find eight of them priced at $9.99. Ask the authors why, and most will admit they copied a number they saw somewhere else. It feels safe. It also leaves money on the table for some products and scares off the wrong buyers for others, because $9.99 is not really a price, it is a placeholder people reach for when they have not done the math.</p>
+<h2>Start with what the ebook replaces</h2>
+<p>Before picking a number, ask what your reader would otherwise pay to solve the same problem. A 40 page guide that saves someone three hours of trial and error against a $60 an hour freelancer is worth more than a 40 page guide that repeats free blog content with nicer formatting. Price against the alternative, not against the page count. A short, sharp guide that fixes one specific problem can outsell a 200 page book that wanders.</p>
+<h3>The three price bands that actually work</h3>
+<p>In practice, digital guides tend to cluster into three honest bands. Under $15 works for narrow, single-outcome guides aimed at people who have not bought from you before. $19 to $39 fits a more complete resource with templates, checklists, or worksheets bundled in. Above $49 requires either a proven brand, a large scope, or direct access to you in some form, like a bonus call or a private community.</p>
+<p>Trying to sell a thin 25 page PDF for $47 because it took months to write ignores that buyers do not pay for your time, they pay for their outcome. Underpricing a genuinely comprehensive resource trains your list to expect bargain pricing forever, which makes every future launch harder.</p>
+<h2>Test with a real audience, not a guess</h2>
+<p>If you have even 200 email subscribers, you can run a rough price test before your full launch. Send half a soft-launch email with one price, the other half with a price $10 higher, and track click-through to the checkout page rather than just sales, since a small list will not give you statistically clean revenue numbers. What you are looking for is whether the higher price meaningfully kills interest or barely moves it. If it barely moves it, you priced too low.</p>
+<h2>Bundles change the math</h2>
+<p>Once you have more than one product, a bundle discount usually outperforms discounting any single item. Selling three $19 guides together for $39 instead of $57 feels generous to the buyer while still lifting your average order value above what a single sale would bring. This works because buyers weigh a bundle against buying nothing more than against buying one item, so the anchor is different.</p>
+<h2>Watch what happens after the price change</h2>
+<p>Track refund rate alongside conversion rate whenever you adjust price. A price increase that holds conversion steady but doubles refunds usually means the product does not match the new price's implied promise yet, and the fix is often to add a testimonial, a clearer table of contents, or a short sample chapter rather than to roll the price back immediately.</p>
+<ul>
+<li>List three specific outcomes the buyer gets, and price against what each outcome would cost to solve another way.</li>
+<li>Avoid re-pricing more than once a quarter; frequent changes erode trust with repeat buyers who feel punished for buying early.</li>
+<li>If you are unsure between two prices, pick the higher one and add one more concrete asset to justify it.</li>
+</ul>
+<h2>The number that actually matters</h2>
+<p>Revenue per visitor, not units sold, is the metric that tells you whether a price is working. A guide selling 200 copies at $9 brings in $1,800. The same guide at $24 selling 90 copies brings in $2,160, with less support burden and fewer refund requests to process. Chasing unit volume feels good on a dashboard, but it is not what pays your bills. Once you start tracking revenue per visitor across a few price points, the right number for your specific audience becomes obvious fairly quickly, and it is rarely the number you copied from someone else's cover.</p>
+<h2>Currency and regional buying power complicate a single global price</h2>
+<p>A $24 guide feels completely different to a buyer in a country with a strong currency than it does to a buyer where the same amount represents a much larger share of monthly income. Sellers who ignore this entirely sometimes cap their addressable market without realizing it, since a flat global price implicitly optimizes for whichever region's buying power the seller happened to have in mind when picking the number. Some platforms support regional pricing adjustments automatically, and even a rough manual adjustment, a slightly lower price shown to visitors from regions with historically lower conversion, can recover sales that a single rigid price point was quietly losing.</p>
+<h2>What happens when you stop guessing and start asking</h2>
+<p>A short, one question survey sent to existing customers, "what almost stopped you from buying at this price," produces more useful pricing information than any amount of internal speculation. Buyers are often more willing to be honest about price hesitation after the fact, once they have already committed, than they would be during the purchase decision itself. Running this survey after every price change, even briefly, builds a running record of how your specific audience actually reasons about the specific numbers you charge, which becomes a genuinely valuable asset over several launches, far more reliable than copying a competitor's price out of convenience.</p>
+</div>
+
+          <div class="blog-article-actions" data-engagement-bar="bottom">
+            <button type="button" class="js-blog-like blog-action-btn" aria-pressed="false">
+              <i data-lucide="heart" width="16" height="16"></i><span class="js-blog-like-count">0</span>
+            </button>
+            <button type="button" class="js-blog-save blog-action-btn" aria-pressed="false">
+              <i data-lucide="bookmark" width="16" height="16"></i><span class="js-blog-save-label">Save</span>
+            </button>
+            <button type="button" class="js-blog-share blog-action-btn">
+              <i data-lucide="share-2" width="16" height="16"></i><span>Share</span>
+            </button>
+            <a href="/blog/pricing-your-first-ebook-what-the-999-default-gets-wrong#blog-comments" class="blog-action-btn">
+              <i data-lucide="message-circle" width="16" height="16"></i><span class="js-blog-comment-count">0</span>
+            </a>
+          </div>
+        </article>
+
+        <section id="blog-comments" class="blog-comments">
+          <h2 id="blog-comments-title" class="blog-comments-title">Comments</h2>
+
+          <div id="blog-comment-form-wrap">
+            <form id="blog-comment-form" class="blog-comment-form">
+              <textarea id="blog-comment-input" rows="3" placeholder="Share your thoughts…" maxlength="2000" required></textarea>
+              <button type="submit" class="button button-primary !min-h-9 !px-4 text-xs font-bold">Post comment</button>
+            </form>
+          </div>
+          <a id="blog-comment-signin" href="#" class="hidden button !min-h-9 !px-4 text-xs font-bold">Sign in to comment</a>
+
+          <div id="blog-comments-list" class="blog-comments-list"></div>
+        </section>
+       </div>
+
+        <section id="blog-related" class="pd-related hidden">
+          <h2>You Might Also Like</h2>
+          <div id="blog-related-grid" class="pd-related-grid"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="newsletter-band">
+      <div class="newsletter-panel">
+        <div>
+          <h2>Subscribe to our Newsletter</h2>
+          <p>New releases, tools, and digital insights — occasionally, never spam.</p>
+        </div>
+        <form id="subscribe-form" class="newsletter-form">
+          <input name="email" required type="email" placeholder="Your email address…">
+          <button type="submit">Submit</button>
+        </form>
+      </div>
+      <p id="subscribe-status" class="status-line px-6 pb-4" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module" src="/js/blog.js"></script>
+</body>
+
+</html>

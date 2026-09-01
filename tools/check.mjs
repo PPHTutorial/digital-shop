@@ -34,7 +34,9 @@ function fail(file, message, line) {
    File discovery
    ========================================================================== */
 
-const IGNORED_DIRS = new Set(['node_modules', '.git', '.vscode', 'supabase/.temp', 'tests/.artifacts']);
+// `blog/` and `product/` hold per-slug pages emitted by tools/prerender.mjs
+// from the blog.html / product.html shells — generated output, not sources.
+const IGNORED_DIRS = new Set(['node_modules', '.git', '.vscode', 'supabase/.temp', 'tests/.artifacts', 'blog', 'product']);
 
 async function walk(dir, filter, found = []) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {

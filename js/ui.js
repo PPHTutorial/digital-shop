@@ -104,6 +104,46 @@ export function setButtonLoading(b,loading,label='Please wait…'){if(!b)return;
 export async function getAccount(){const{data:{user}}=await supabase.auth.getUser();if(!user)return{user:null,profile:null};const{data:profile}=await supabase.from('profiles').select('full_name,role,phone,address,country,occupation,age,created_at,admin_tier,account_status,account_status_reason').eq('id',user.id).maybeSingle();return{user,profile}}
 export const icon = (name, size = 18) => `<i data-lucide="${name}" width="${size}" height="${size}"></i>`;
 
+export const SITE_ORIGIN = 'https://digistore.codeinktechnologies.com';
+
+/**
+ * Point rel=canonical (and og:url) at one specific URL. Blog posts and
+ * products have their own path (/blog/<slug>, /product/<slug>); the remaining
+ * param views (?doc=, ?category=, ?vendor=) still share a shell, so without an
+ * explicit canonical Google clusters the variants and drops all but one. Call
+ * this once per view with the URL that view should own. Pass a path
+ * ("/blog/slug"); an absolute URL is used as-is. Creates the <link> if the
+ * page's HTML lacks one.
+ */
+export function setCanonical(pathOrUrl) {
+  const href = /^https?:\/\//i.test(pathOrUrl)
+    ? pathOrUrl
+    : SITE_ORIGIN + (String(pathOrUrl).startsWith('/') ? pathOrUrl : `/${pathOrUrl}`);
+  let link = document.head.querySelector('link[rel="canonical"]');
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'canonical';
+    document.head.appendChild(link);
+  }
+  link.href = href;
+  document.head.querySelector('meta[property="og:url"]')?.setAttribute('content', href);
+}
+
+/**
+ * Inject (or replace) a single JSON-LD <script> for structured data. `id`
+ * keeps repeat calls idempotent when a view re-renders.
+ */
+export function setJsonLd(data, id = 'page-jsonld') {
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('script');
+    el.type = 'application/ld+json';
+    el.id = id;
+    document.head.appendChild(el);
+  }
+  el.textContent = JSON.stringify(data);
+}
+
 // Social handles stored in site_settings.social (jsonb). Edited on the admin
 // Settings screen, rendered in the footer. `icon` is a lucide name — brand
 // glyphs that lucide lacks fall back to a close-enough generic.
@@ -352,16 +392,19 @@ export async function mountHeader() {
     }
 
     // URLs are extensionless now, but a direct /index.html hit must still read
-    // as home, so both spellings are accepted below.
-    const path = window.location.pathname.toLowerCase().split('/').pop() || '';
+    // as home, so both spellings are accepted below. The first path segment is
+    // the section — /blog/<slug> and /product/<slug> keep the nav highlighted.
+    const segments = window.location.pathname.toLowerCase().split('/').filter(Boolean);
+    const path = segments[segments.length - 1] || '';
+    const section = segments[0] || '';
     const hash = window.location.hash.toLowerCase();
 
-    const isHome = (path === '' || path === 'index' || path === 'index.html');
-    const isStore = path.includes('store');
-    const isBlog = path.includes('blog');
-    const isAbout = path.includes('about');
-    const isContact = path.includes('contact');
-    const isSupport = path.includes('support');
+    const isHome = (segments.length === 0 || path === 'index' || path === 'index.html');
+    const isStore = section === 'store' || section === 'product';
+    const isBlog = section === 'blog';
+    const isAbout = section === 'about';
+    const isContact = section === 'contact';
+    const isSupport = section === 'support';
 
     // The Figma nav was 4 plain-text links (Home/All Products/About/Contact)
     // with no icons; Blog is back in the visible nav per the project owner,
@@ -733,7 +776,7 @@ export function mountFooter() {
             </div>
           </div>
           <p class="text-xs leading-relaxed max-w-sm" style="color:var(--text-muted)">
-            Empowering professionals, creators, and developers worldwide with verified, high-value digital products, comprehensive ebooks, tools, and software templates.
+            DigiStore is a global marketplace for premium digital products — ebooks, software, templates, online courses and design assets — from verified independent creators. Human-reviewed listings, instant secure delivery, and buyer protection on every order.
           </p>
           <div class="pt-2 flex flex-wrap gap-2 items-center text-[11px]" style="color:var(--text-muted)">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-medium" style="background:var(--surface-sunken)">
@@ -802,7 +845,7 @@ export function mountFooter() {
       <div class="pt-8 flex flex-wrap items-center justify-between gap-6 text-xs" style="border-top:1px solid var(--border);color:var(--text-soft)">
         <div>
           <p>© ${year} <strong style="color:var(--text-muted)">Codeink Technologies</strong>. All rights reserved.</p>
-          <p class="text-[11px] mt-0.5">DigiStore is a registered digital merchandise platform by Codeink Technologies.</p>
+          <p class="text-[11px] mt-0.5">DigiStore is a registered digital-commerce platform operated by Codeink Technologies.</p>
           <div id="footer-social" class="footer-social"></div>
         </div>
         <div class="flex flex-wrap items-center gap-5 sm:gap-6">

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="The page you were looking for could not be found on DigiStore.">
+  <title>Page not found | DigiStore</title>
+  <meta name="robots" content="noindex">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" type="image/png" sizes="16x16" href="/img/brand/favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/brand/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/img/brand/icon-192.png">
+  <link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#072220">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="DigiStore">
+  <meta property="og:title" content="Page not found | DigiStore">
+  <meta property="og:description" content="The page you were looking for could not be found on DigiStore.">
+  <meta property="og:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="stylesheet" href="./css/app.css?v=2e86bd0f">
+</head>
+
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
+    </div>
+  </div>
+
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
+
+  <main class="flex-1 grid place-items-center px-6 py-24">
+    <div class="soft-panel max-w-lg p-10 text-center">
+      <p class="text-5xl font-bold" style="color:var(--text)">404</p>
+      <h1 class="mt-3 text-xl font-bold" style="color:var(--text)">We couldn't find that page</h1>
+      <p class="mt-2 text-sm" style="color:var(--text-muted)">
+        The link may be out of date, or the page may have moved. Try the catalog or the journal.
+      </p>
+      <div class="mt-6 flex flex-wrap justify-center gap-3">
+        <a class="button button-primary" href="./store">Browse products</a>
+        <a class="button" href="./blog">Read the journal</a>
+        <a class="button" href="./">Go home</a>
+      </div>
+    </div>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script type="module" src="./js/notfound.js"></script>
+</body>
+
+</html>

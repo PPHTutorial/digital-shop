@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
+import { escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader, renderIcons, setButtonLoading, setCanonical, setJsonLd, SITE_ORIGIN, toast } from './ui.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
 import { AD_LISTING_COLS, stripAdListings } from './ad-listing.js';
 
@@ -34,7 +34,7 @@ function readTimeFor(html) {
 }
 
 function blogCardHtml(post) {
-  const href = `./blog?post=${encodeURIComponent(post.slug)}`;
+  const href = `./blog/${encodeURIComponent(post.slug)}`;
   return `
     <article class="blog-card is-clickable">
       <span class="blog-card__cover">
@@ -56,7 +56,7 @@ function renderFeatured(post) {
   if (!host) return;
   if (!post) { host.innerHTML = ''; return; }
 
-  const href = `./blog?post=${encodeURIComponent(post.slug)}`;
+  const href = `./blog/${encodeURIComponent(post.slug)}`;
   host.innerHTML = `
     <article class="blog-featured is-clickable">
       <span class="blog-featured__cover">
@@ -128,7 +128,7 @@ function wireSubscribeForm() {
    ========================================================================== */
 function relatedProductCardHtml(p) {
   const hasDiscount = p.original_price && Number(p.original_price) > Number(p.price);
-  const href = `./product?product=${encodeURIComponent(p.slug || p.id)}`;
+  const href = `./product/${encodeURIComponent(p.slug || p.id)}`;
   return `
     <article class="catalog-card is-clickable" data-product-id="${p.id}">
       <span class="catalog-card__media">
@@ -274,7 +274,7 @@ function paintEngagement() {
 }
 
 function signInRedirectUrl() {
-  const next = `blog${window.location.search}`;
+  const next = window.location.pathname.replace(/^\/+/, '') + window.location.search;
   return `./auth?mode=signin&next=${encodeURIComponent(next)}`;
 }
 
@@ -429,6 +429,13 @@ async function loadArticle(slug) {
   document.querySelector('#blog-listing')?.classList.add('hidden');
   document.querySelector('#blog-article-wrap')?.classList.remove('hidden');
 
+  // tools/prerender.mjs bakes the article into blog/<slug>.html. When that
+  // markup is present we hydrate over it: the fetch still runs (for the post
+  // id, engagement, and a live refresh), but a network failure leaves the
+  // prerendered copy in place instead of flashing "not found".
+  const article = document.querySelector('#blog-article-content');
+  const prerendered = article?.dataset.prerendered === 'true';
+
   const { data, error } = await supabase
     .from('blog_posts')
     .select('id,title,excerpt,content,cover_url,published_at')
@@ -439,6 +446,18 @@ async function loadArticle(slug) {
   document.querySelector('#blog-article-loading')?.classList.add('hidden');
 
   if (error || !data) {
+    if (prerendered) {
+      currentPostId = article.dataset.postId || null;
+      if (currentPostId) {
+        const { user } = await getAccount();
+        currentUser = user;
+        wireEngagementActions();
+        wireComments();
+        await loadEngagement(currentPostId);
+      }
+      finishPageLoader();
+      return;
+    }
     document.querySelector('#blog-article-not-found')?.classList.remove('hidden');
     finishPageLoader();
     return;
@@ -453,6 +472,28 @@ async function loadArticle(slug) {
   document.querySelector('meta[property="og:description"]')?.setAttribute('content', data.excerpt || '');
   document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', `${data.title} | DigiStore`);
   document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', data.excerpt || '');
+
+  // Articles live at /blog/<slug>; claim that as the canonical (otherwise
+  // Google folds every article into /blog) and describe it with BlogPosting
+  // structured data. prerender.mjs writes the same tags into the static file.
+  const articleUrl = `${SITE_ORIGIN}/blog/${encodeURIComponent(slug)}`;
+  setCanonical(articleUrl);
+  setJsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: data.title,
+    description: data.excerpt || '',
+    image: data.cover_url || `${SITE_ORIGIN}/img/brand/og-image.png`,
+    datePublished: data.published_at,
+    dateModified: data.published_at,
+    author: { '@type': 'Organization', name: 'DigiStore', url: SITE_ORIGIN },
+    publisher: {
+      '@type': 'Organization',
+      name: 'DigiStore',
+      logo: { '@type': 'ImageObject', url: `${SITE_ORIGIN}/img/brand/icon-192.png` },
+    },
+    mainEntityOfPage: articleUrl,
+  });
 
   document.querySelector('#blog-article-date').textContent = formatDate(data.published_at);
   document.querySelector('#blog-article-readtime').textContent = readTimeFor(data.content);
@@ -481,6 +522,7 @@ async function loadArticle(slug) {
 }
 
 async function loadListing() {
+  setCanonical('/blog');
   const { data, error } = await supabase
     .from('blog_posts')
     .select('title,slug,excerpt,cover_url,published_at')
@@ -512,8 +554,17 @@ async function init() {
   wireSubscribeForm();
   wireLoadMore();
 
+  // Articles live at /blog/<slug>. Legacy ?post=<slug> links (old index,
+  // shared URLs) still resolve — render in place and quietly rewrite the bar
+  // to the clean path rather than bouncing through a redirect.
   const params = new URLSearchParams(window.location.search);
-  const slug = params.get('post');
+  const legacySlug = params.get('post');
+  const pathSlug = window.location.pathname.match(/^\/blog\/([^/]+)\/?$/)?.[1];
+  const slug = pathSlug ? decodeURIComponent(pathSlug) : legacySlug;
+
+  if (slug && legacySlug && !pathSlug) {
+    window.history.replaceState(null, '', `/blog/${encodeURIComponent(slug)}`);
+  }
 
   if (slug) {
     await loadArticle(slug);

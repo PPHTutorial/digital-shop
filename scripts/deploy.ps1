@@ -67,6 +67,15 @@ $publicNoJwtFunctions = @('flutterwave-callback', 'nowpayments-ipn', 'sitemap', 
 }
 
 if (-not $SkipGitHub) {
+  $env:SUPABASE_URL = "https://$ProjectRef.supabase.co"
+  $env:PUBLIC_SITE_URL = $SiteUrl
+
+  Write-Host 'Pre-rendering blog/ and product/ pages from live data…' -ForegroundColor Cyan
+  node tools/prerender.mjs
+
+  Write-Host 'Regenerating sitemap.xml from live data…' -ForegroundColor Cyan
+  node tools/generate-sitemap.mjs
+
   git add --all
   $changes = git status --porcelain
   if ($changes) { git commit -m 'Deploy DigiStore' }

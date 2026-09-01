@@ -79,7 +79,7 @@ function createProductCardHtml(p, context) {
         <span class="catalog-card__go" aria-hidden="true">${icon('arrow-right', 15)}</span>
       </span>
 
-      <a class="catalog-card__link" href="./product?product=${encodeURIComponent(canonicalSlug)}">
+      <a class="catalog-card__link" href="./product/${encodeURIComponent(canonicalSlug)}">
         <span class="sr-only">${escapeHtml(p.title)}</span>
       </a>
     </article>`;

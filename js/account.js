@@ -103,7 +103,7 @@ async function loadWishlistTab() {
             <strong>${p.currency} ${Number(p.price).toFixed(2)}</strong>
           </span>
         </span>
-        <a class="catalog-card__link" href="./product?product=${encodeURIComponent(p.slug)}"><span class="sr-only">${escapeHtml(p.title)}</span></a>
+        <a class="catalog-card__link" href="./product/${encodeURIComponent(p.slug)}"><span class="sr-only">${escapeHtml(p.title)}</span></a>
       </article>`;
   }).join('');
 

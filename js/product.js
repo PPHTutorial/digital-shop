@@ -1,13 +1,17 @@
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader, renderIcons, renderMarkdown, toast } from './ui.js';
+import { escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader, renderIcons, renderMarkdown, setCanonical, setJsonLd, SITE_ORIGIN, toast } from './ui.js';
 import { initTabs, openModal } from './uikit.js';
 import { wishlistButton, loadWishlist, paintWishlist, wireWishlist } from './wishlist.js';
 import { openFileViewer } from './preview.js';
 import { addToCart } from './cart-actions.js';
 import { isAdListing, openLeavingInterstitial, stripAdListings } from './ad-listing.js';
 
+// Products live at /product/<slug>. Legacy ?product=/?slug=/?id= links still
+// resolve; init() rewrites the address bar to the clean path once loaded.
 const params = new URLSearchParams(window.location.search);
-const slug = params.get('product') || params.get('slug') || params.get('id');
+const pathSlug = window.location.pathname.match(/^\/product\/([^/]+)\/?$/)?.[1];
+const legacySlug = params.get('product') || params.get('slug') || params.get('id');
+const slug = pathSlug ? decodeURIComponent(pathSlug) : legacySlug;
 
 let product = null;
 let vendor = null;
@@ -50,7 +54,7 @@ function timeAgo(iso) {
    ========================================================================== */
 function relatedCardHtml(p) {
   const hasDiscount = p.original_price && Number(p.original_price) > Number(p.price);
-  const href = `./product?product=${encodeURIComponent(p.slug)}`;
+  const href = `./product/${encodeURIComponent(p.slug)}`;
   return `
     <article class="catalog-card is-clickable" data-product-id="${p.id}">
       <span class="catalog-card__media">
@@ -127,6 +131,41 @@ function renderInfo() {
   document.querySelector('#pd-crumb-category').textContent = product.category || 'Shop';
   document.querySelector('#pd-crumb-category').href = `./store?category=${encodeURIComponent(product.category || '')}`;
   document.title = `${product.title} | DigiStore`;
+
+  // Products live at /product/<slug> — pin the canonical there (otherwise
+  // Google folds every product into /product) and expose Product/Offer
+  // structured data. prerender.mjs writes the same tags into the static file.
+  const productUrl = `${SITE_ORIGIN}/product/${encodeURIComponent(product.slug || product.id)}`;
+  setCanonical(productUrl);
+  const descMeta = document.querySelector('meta[name="description"]');
+  if (descMeta && product.short_description) descMeta.setAttribute('content', product.short_description);
+  document.querySelector('meta[property="og:title"]')?.setAttribute('content', `${product.title} | DigiStore`);
+  document.querySelector('meta[property="og:description"]')?.setAttribute('content', product.short_description || '');
+  document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', `${product.title} | DigiStore`);
+  document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', product.short_description || '');
+  setJsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.title,
+    description: product.short_description || '',
+    image: product.cover_url || `${SITE_ORIGIN}/img/brand/og-image.png`,
+    category: product.category || undefined,
+    brand: { '@type': 'Brand', name: (vendor && vendor.display_name) || 'DigiStore' },
+    offers: {
+      '@type': 'Offer',
+      price: Number(product.price).toFixed(2),
+      priceCurrency: product.currency,
+      availability: 'https://schema.org/InStock',
+      url: productUrl,
+    },
+    ...(Number(product.rating_count) > 0 ? {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: Number(product.rating_average).toFixed(1),
+        reviewCount: product.rating_count,
+      },
+    } : {}),
+  });
 
   const vendorLink = document.querySelector('#pd-vendor-link');
   if (product.vendor_id && vendor) {
@@ -261,7 +300,7 @@ function renderRelated() {
 async function openReviewModal() {
   const { user } = await getAccount();
   if (!user) {
-    const next = `product${window.location.search}`;
+    const next = window.location.pathname.replace(/^\/+/, '') + window.location.search;
     window.location.href = `./auth?mode=signin&next=${encodeURIComponent(next)}`;
     return;
   }
@@ -350,11 +389,17 @@ async function init() {
     return;
   }
 
+  // tools/prerender.mjs bakes the listing into product/<slug>.html. If that
+  // markup is present, a failed fetch keeps it visible rather than flashing
+  // "not found"; otherwise this behaves as a normal client render.
+  const prerendered = document.querySelector('#pd-content')?.dataset.prerendered === 'true';
+
   const { data, error } = await supabase.rpc('product_detail', { p_slug: slug });
 
   document.querySelector('#pd-loading').classList.add('hidden');
 
   if (error || !data?.product) {
+    if (prerendered) { finishPageLoader(); return; }
     document.querySelector('#pd-not-found').classList.remove('hidden');
     finishPageLoader();
     return;
@@ -365,6 +410,11 @@ async function init() {
   reviews = data.reviews || [];
   ratingBreakdown = data.rating_breakdown || {};
   related = stripAdListings(data.related || []);
+
+  // Clean a legacy ?product=/?id= URL up to /product/<slug> now that we know it.
+  if (legacySlug && !pathSlug && product.slug) {
+    window.history.replaceState(null, '', `/product/${encodeURIComponent(product.slug)}`);
+  }
 
   document.querySelector('#pd-content').classList.remove('hidden');
 

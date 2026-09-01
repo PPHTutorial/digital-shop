@@ -5,4 +5,3 @@ Disallow: /account.html
 Disallow: /checkout.html
 
 Sitemap: https://digistore.codeinktechnologies.com/sitemap.xml
-Sitemap: https://synnepvvxpluoydkmphb.functions.supabase.co/sitemap
