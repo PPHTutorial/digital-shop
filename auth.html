@@ -25,7 +25,7 @@
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
   <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
-  <link rel="stylesheet" href="./css/app.css?v=2e86bd0f">
+  <link rel="stylesheet" href="./css/app.css?v=a593b43c">
 </head>
 
 <body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
@@ -63,6 +63,10 @@
             </div>
             <input id="auth-password" name="password" type="password" minlength="8" autocomplete="current-password" placeholder="••••••••••••" required>
           </div>
+          <label class="form-field hidden" id="auth-terms-wrap" style="flex-direction:row;align-items:flex-start;gap:8px;font-size:.82rem">
+            <input type="checkbox" id="auth-accept" name="accept_terms" style="margin-top:3px">
+            <span>I agree to the <a href="./legal?doc=terms" target="_blank" rel="noopener">Terms of Service</a>, <a href="./legal?doc=privacy" target="_blank" rel="noopener">Privacy Policy</a> and <a href="./legal?doc=refunds" target="_blank" rel="noopener">Refund Policy</a>.</span>
+          </label>
           <p id="auth-notice" class="status-line" aria-live="polite"></p>
           <button id="auth-submit" type="submit" class="auth-submit">Sign In to Account</button>
         </form>

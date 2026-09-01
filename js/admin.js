@@ -104,7 +104,7 @@ const SCREEN_TITLES = {
   overview: 'Overview', customers: 'Customers', transactions: 'Transactions', products: 'Products',
   categories: 'Categories', promotions: 'Promotions', content: 'CMS & Journal', stores: 'Stores',
   moderation: 'Moderation', tickets: 'Tickets', notifications: 'Notifications', admins: 'Admins',
-  affiliates: 'Affiliates', settings: 'Site settings', audit: 'Audit log',
+  affiliates: 'Affiliates', recognition: 'Recognition', settings: 'Site settings', audit: 'Audit log',
 };
 
 const SCREEN_LOADERS = {};
@@ -2181,13 +2181,15 @@ document.addEventListener('click', async (event) => {
     result = await supabase.rpc('settle_ad_topup', { p_request_id: d.rejectTopup, p_approve: false });
   } else if (d.payPayout) {
     const reference = window.prompt('Transfer reference (optional):') ?? null;
-    result = await supabase.from('payouts').update({ status: 'paid', processed_at: new Date().toISOString(), reference }).eq('id', d.payPayout);
-    if (!result.error) await supabase.from('vendor_earnings').update({ status: 'paid' }).eq('payout_id', d.payPayout);
+    result = await supabase.rpc('admin_settle_payout', {
+      p_payout_id: d.payPayout, p_reference: reference, p_succeeded: true,
+    });
   } else if (d.failPayout) {
     const reason = window.prompt('Why did this payout fail?');
     if (reason === null) return;
-    result = await supabase.from('payouts').update({ status: 'failed', failure_reason: reason, processed_at: new Date().toISOString() }).eq('id', d.failPayout);
-    if (!result.error) await supabase.from('vendor_earnings').update({ payout_id: null }).eq('payout_id', d.failPayout);
+    result = await supabase.rpc('admin_settle_payout', {
+      p_payout_id: d.failPayout, p_reference: null, p_succeeded: false, p_failure_reason: reason,
+    });
   }
 
   if (result?.error) { toast(result.error.message, 'error'); return; }
@@ -3078,6 +3080,101 @@ document.querySelector('#audit-search')?.addEventListener('input', () => { audit
 document.querySelector('#audit-entity-filter')?.addEventListener('change', () => { auditPage = 1; paintAudit(); });
 document.querySelector('#refresh-audit')?.addEventListener('click', () => loadAudit(true));
 
+/* ==========================================================================
+   Recognition & rewards — badge catalogue, month close, plaque queue
+   ========================================================================== */
+
+const REWARD_KIND_LABEL = {
+  commission_discount: 'Commission discount', store_credit: 'Store credit',
+  featured_placement: 'Homepage spotlight', affiliate_bonus: 'Affiliate bonus', plaque: 'Physical plaque',
+};
+let recognitionWired = false;
+
+async function loadRecognition() {
+  const queueHost = document.querySelector('#rec-plaque-queue');
+  const rewardsHost = document.querySelector('#rec-rewards');
+  const defsHost = document.querySelector('#rec-defs');
+  queueHost.innerHTML = '<p class="text-xs" style="color:var(--text-muted)">Loading…</p>';
+
+  const { data, error } = await supabase.rpc('admin_recognition_overview');
+  if (error) {
+    queueHost.innerHTML = `<p style="color:var(--danger)">${escapeHtml(error.message)}</p>`;
+    return;
+  }
+
+  const queue = data.plaque_queue || [];
+  queueHost.innerHTML = queue.length ? queue.map((r) => `
+    <div class="reward-card" data-reward="${escapeHtml(r.id)}">
+      <div class="reward-card__body">
+        <div class="reward-card__title">${escapeHtml(r.name || 'DigiStore member')} — ${escapeHtml(r.source)}</div>
+        <div class="reward-card__meta">${escapeHtml([r.ship_to_name, r.ship_to_address, r.ship_to_country].filter(Boolean).join(', ') || 'Awaiting address from recipient')} · ${escapeHtml(r.status)}</div>
+      </div>
+      ${r.status === 'active'
+        ? `<button type="button" class="button button-primary" data-rec-ship="${escapeHtml(r.id)}">Mark shipped</button>`
+        : '<span class="uk-badge uk-badge--neutral">Awaiting address</span>'}
+    </div>`).join('') : '<p class="text-xs" style="color:var(--text-muted)">No plaques in the queue.</p>';
+
+  const rewards = data.recent_rewards || [];
+  rewardsHost.innerHTML = rewards.length ? `
+    <table class="uk-table"><thead><tr><th>Recipient</th><th>Reward</th><th>Status</th><th>Source</th><th>When</th></tr></thead><tbody>
+    ${rewards.map((r) => `<tr>
+      <td>${escapeHtml(r.name || '—')}</td>
+      <td>${escapeHtml(REWARD_KIND_LABEL[r.kind] || r.kind)}${r.value ? ` (${escapeHtml(String(r.value))})` : ''}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td style="font-size:.72rem;color:var(--text-soft)">${escapeHtml(r.source)}</td>
+      <td>${dateTime(r.created_at)}</td>
+    </tr>`).join('')}
+    </tbody></table>` : '<p class="text-xs" style="color:var(--text-muted)">No rewards granted yet.</p>';
+
+  const defs = data.defs || [];
+  const byAudience = {};
+  defs.forEach((d) => { (byAudience[d.audience] ||= []).push(d); });
+  defsHost.innerHTML = Object.entries(byAudience).map(([aud, list]) => `
+    <h4 style="text-transform:capitalize;margin:12px 0 6px;color:var(--text)">${escapeHtml(aud)}</h4>
+    <div class="badge-row">${list.map((d) => `
+      <span class="badge-chip badge-chip--${escapeHtml(d.tier || 'bronze')}" title="${escapeHtml(d.description || '')}">
+        ${icon(d.icon || 'award', 13)}<span>${escapeHtml(d.title)}${d.metric !== 'monthly_winner' ? ` · ${escapeHtml(String(d.threshold))}` : ''}${d.reward_kind ? ` · ${escapeHtml(REWARD_KIND_LABEL[d.reward_kind] || d.reward_kind)}` : ''}</span>
+      </span>`).join('')}</div>`).join('');
+
+  renderIcons();
+  wireRecognition();
+}
+
+function wireRecognition() {
+  if (recognitionWired) return;
+  recognitionWired = true;
+
+  document.querySelector('#rec-refresh')?.addEventListener('click', () => loadRecognition());
+
+  document.querySelector('#rec-close-month')?.addEventListener('click', async () => {
+    const period = window.prompt('Close which month? Leave blank for the month that just ended. Format YYYY-MM.', '');
+    if (period === null) return;
+    const trimmed = period.trim();
+    if (trimmed && !/^\d{4}-\d{2}$/.test(trimmed)) { toast('Use YYYY-MM.', 'error'); return; }
+    const force = window.confirm('Rebuild if this month was already closed? OK = force rebuild, Cancel = skip if already closed.');
+    const { data, error } = await supabase.rpc('admin_run_month_close', {
+      p_period: trimmed || null, p_force: force,
+    });
+    if (error) { toast(error.message, 'error'); return; }
+    toast(`Month close: ${data?.status || 'done'} (${data?.snapshot_rows ?? 0} rows).`);
+    loadRecognition();
+  });
+
+  document.querySelector('#rec-plaque-queue')?.addEventListener('click', async (event) => {
+    const btn = event.target.closest('[data-rec-ship]');
+    if (!btn) return;
+    const tracking = window.prompt('Tracking reference (optional):', '');
+    if (tracking === null) return;
+    const { error } = await supabase.rpc('admin_fulfil_reward', {
+      p_reward_id: btn.dataset.recShip, p_tracking_ref: tracking.trim() || null,
+    });
+    if (error) { toast(error.message, 'error'); return; }
+    toast('Marked shipped.');
+    loadRecognition();
+  });
+}
+
+SCREEN_LOADERS.recognition = loadRecognition;
 SCREEN_LOADERS.moderation = loadModeration;
 SCREEN_LOADERS.affiliates = loadAffiliates;
 SCREEN_LOADERS.content = () => loadCms();

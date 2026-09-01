@@ -33,6 +33,7 @@ const STATIC_PATHS = [
   { loc: '/', priority: '1.0', changefreq: 'daily' },
   { loc: '/store', priority: '0.9', changefreq: 'daily' },
   { loc: '/blog', priority: '0.8', changefreq: 'daily' },
+  { loc: '/leaderboard', priority: '0.6', changefreq: 'daily' },
   { loc: '/categories', priority: '0.6', changefreq: 'weekly' },
   { loc: '/about', priority: '0.7', changefreq: 'monthly' },
   { loc: '/contact', priority: '0.7', changefreq: 'monthly' },

@@ -25,7 +25,7 @@
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
   <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
-  <link rel="stylesheet" href="./css/app.css?v=2e86bd0f">
+  <link rel="stylesheet" href="./css/app.css?v=a593b43c">
 </head>
 
 <body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
@@ -51,6 +51,7 @@
           <button type="button" class="is-active" data-acct-tab="overview"><i data-lucide="layout-grid" width="18" height="18"></i><span>Overview</span></button>
           <button type="button" data-acct-tab="orders"><i data-lucide="shopping-bag" width="18" height="18"></i><span>My Orders</span></button>
           <button type="button" data-acct-tab="wishlist"><i data-lucide="heart" width="18" height="18"></i><span>Wishlist</span></button>
+          <button type="button" data-acct-tab="rewards"><i data-lucide="award" width="18" height="18"></i><span>Badges &amp; Rewards</span></button>
           <button type="button" data-acct-tab="profile"><i data-lucide="user" width="18" height="18"></i><span>Profile Settings</span></button>
         </nav>
 
@@ -114,6 +115,27 @@
           </div>
         </div>
 
+        <!-- Badges & Rewards -->
+        <div class="acct-tab-panel" data-acct-panel="rewards">
+          <div class="acct-panel">
+            <h2>This month's rank</h2>
+            <div id="acct-ranks" class="flex flex-wrap gap-3"></div>
+          </div>
+          <div class="acct-panel">
+            <h2>Rewards</h2>
+            <div id="acct-rewards-list" class="flex flex-col gap-3"></div>
+          </div>
+          <div class="acct-panel">
+            <h2>Your badges</h2>
+            <div id="acct-badges-grid" class="badge-grid"></div>
+          </div>
+          <div class="acct-panel">
+            <h2>Almost there</h2>
+            <p class="text-xs -mt-3 mb-3" style="color:var(--text-muted)">The next badge in reach for each milestone.</p>
+            <div id="acct-next-badges" class="badge-grid"></div>
+          </div>
+        </div>
+
         <!-- Profile -->
         <div class="acct-tab-panel" data-acct-panel="profile">
           <div class="acct-panel">
@@ -171,6 +193,7 @@
               <label class="acct-check-line span-2"><input type="checkbox" name="marketing_opt_in" value="1"> Product news, launches, and marketing emails</label>
               <label class="acct-check-line span-2"><input type="checkbox" name="notify_product_news" value="1"> Updates to products I've purchased</label>
               <label class="acct-check-line span-2"><input type="checkbox" name="notify_order_updates" value="1"> Order and receipt emails</label>
+              <label class="acct-check-line span-2"><input type="checkbox" name="show_on_leaderboards" value="1"> Show my full name on public leaderboards (otherwise shown as “First L.”)</label>
 
               <div class="form-field span-2">
                 <label>Appearance</label>

@@ -405,6 +405,7 @@ export async function mountHeader() {
     const isAbout = section === 'about';
     const isContact = section === 'contact';
     const isSupport = section === 'support';
+    const isLeaderboard = section === 'leaderboard';
 
     // The Figma nav was 4 plain-text links (Home/All Products/About/Contact)
     // with no icons; Blog is back in the visible nav per the project owner,
@@ -415,6 +416,7 @@ export async function mountHeader() {
       <a href="./" class="${isHome ? 'active' : ''}">Home</a>
       <a href="./store" class="${isStore ? 'active' : ''}">All Products</a>
       <a href="./blog" class="${isBlog ? 'active' : ''}">Blog</a>
+      <a href="./leaderboard" class="${isLeaderboard ? 'active' : ''}">Leaderboard</a>
       <a href="./about" class="${isAbout ? 'active' : ''}">About</a>
       <a href="./contact" class="${isContact ? 'active' : ''}">Contact</a>
     `;
@@ -427,6 +429,7 @@ export async function mountHeader() {
       <a href="./" class="${isHome ? 'active' : ''}">${icon('house')}<span>Home</span></a>
       <a href="./store" class="${isStore ? 'active' : ''}">${icon('shopping-bag')}<span>All Products</span></a>
       <a href="./blog" class="${isBlog ? 'active' : ''}">${icon('newspaper')}<span>Blog</span></a>
+      <a href="./leaderboard" class="${isLeaderboard ? 'active' : ''}">${icon('trophy')}<span>Leaderboard</span></a>
       <a href="./about" class="${isAbout ? 'active' : ''}">${icon('info')}<span>About</span></a>
       <a href="./contact" class="${isContact ? 'active' : ''}">${icon('mail')}<span>Contact</span></a>
       <a href="./support" class="${isSupport ? 'active' : ''}">${icon('circle-help')}<span>Support</span></a>
@@ -809,6 +812,7 @@ export function mountFooter() {
             <li><a href="./account#orders-list">Order History</a></li>
             <li><a href="./support">Customer Helpdesk</a></li>
             <li><a href="./support">Submit Support Ticket</a></li>
+            <li><a href="./leaderboard">Leaderboards &amp; Badges</a></li>
             <li><a href="./blog">Articles &amp; Updates</a></li>
             <li><a href="./about">About Codeink</a></li>
           </ul>

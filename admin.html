@@ -25,7 +25,7 @@
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
   <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
-  <link rel="stylesheet" href="./css/app.css?v=2e86bd0f">
+  <link rel="stylesheet" href="./css/app.css?v=a593b43c">
 </head>
 <body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
   <div id="page-loader" class="page-loader">
@@ -81,6 +81,7 @@
           <span class="adm-nav-group">Marketplace</span>
           <a href="#stores" data-adm-link="stores"><i data-lucide="store" width="16" height="16"></i><span>Stores</span></a>
           <a href="#affiliates" data-adm-link="affiliates"><i data-lucide="link" width="16" height="16"></i><span class="flex-1">Affiliates</span><span id="aff-badge" class="adm-nav-badge hidden"></span></a>
+          <a href="#recognition" data-adm-link="recognition"><i data-lucide="award" width="16" height="16"></i><span>Recognition</span></a>
           <a href="#moderation" data-adm-link="moderation"><i data-lucide="shield-check" width="16" height="16"></i><span class="flex-1">Moderation</span><span id="mod-badge" class="adm-nav-badge hidden"></span></a>
 
           <span class="adm-nav-group">Support</span>
@@ -306,6 +307,20 @@
             <div class="uk-tabs__panel mt-4" data-uk-tab-panel="commissions" id="aff-adm-commissions"></div>
             <div class="uk-tabs__panel mt-4" data-uk-tab-panel="payouts" id="aff-adm-payouts"></div>
           </div>
+        </section>
+
+        <!-- Recognition & rewards -->
+        <section class="adm-tab-panel" data-adm-panel="recognition">
+          <div class="adm-panel-head">
+            <div><span class="eyebrow">MARKETPLACE</span><h2>Recognition &amp; rewards</h2><p>Badge catalogue, monthly leaderboard close, and the physical-plaque fulfilment queue.</p></div>
+            <div class="flex gap-2">
+              <button id="rec-refresh" class="button" type="button">Refresh</button>
+              <button id="rec-close-month" class="button button-primary" type="button">Run month close…</button>
+            </div>
+          </div>
+          <div class="adm-panel"><h3>Plaque fulfilment queue</h3><div id="rec-plaque-queue"></div></div>
+          <div class="adm-panel"><h3>Recent rewards</h3><div id="rec-rewards"></div></div>
+          <div class="adm-panel"><h3>Badge catalogue</h3><div id="rec-defs"></div></div>
         </section>
 
         <!-- A08 Moderation queue -->

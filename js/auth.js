@@ -23,6 +23,9 @@ function setMode(nextMode) {
   submit.textContent = mode === 'signup' ? 'Create Account' : 'Sign In to Account';
   document.querySelector('#full-name-wrap').classList.toggle('hidden', mode !== 'signup');
   document.querySelector('[name="full_name"]').required = mode === 'signup';
+  const termsWrap = document.querySelector('#auth-terms-wrap');
+  termsWrap.classList.toggle('hidden', mode !== 'signup');
+  document.querySelector('#auth-accept').required = mode === 'signup';
   document.querySelector('#auth-password').required = true;
   document.querySelector('#auth-password').closest('.form-field').classList.remove('hidden');
   notice.textContent = '';
@@ -96,6 +99,26 @@ form.addEventListener('submit', async (event) => {
     toast(result.error.message, 'error');
     return;
   }
+  // Record legal acceptance (audit only, never blocks). Needs a session, so
+  // when email confirmation defers it we stash a flag and record on first sign-in.
+  const LEGAL_PENDING = 'digistore-legal-pending';
+  const recordAcceptance = (slugs, ctx) => supabase.rpc('record_legal_acceptance', {
+    p_slugs: slugs, p_context: ctx, p_user_agent: navigator.userAgent,
+  }).catch(() => {});
+  if (mode === 'signup') {
+    if (result.data.session) recordAcceptance(['terms', 'privacy', 'refunds'], 'signup');
+    else { try { localStorage.setItem(LEGAL_PENDING, 'terms,privacy,refunds|signup'); } catch { /* ignore */ } }
+  } else if (result.data.session) {
+    try {
+      const pending = localStorage.getItem(LEGAL_PENDING);
+      if (pending) {
+        const [slugs, ctx] = pending.split('|');
+        recordAcceptance(slugs.split(','), ctx || 'signup');
+        localStorage.removeItem(LEGAL_PENDING);
+      }
+    } catch { /* ignore */ }
+  }
+
   if (mode === 'signup' && !result.data.session) {
     notice.textContent = 'Check your email to confirm your DigiStore account, then sign in.';
     notice.className = 'status-line success';

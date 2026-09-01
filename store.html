@@ -27,7 +27,7 @@
   <meta name="twitter:description" content="Explore the complete DigiStore catalog — digital ebooks, software tools, UI templates, online courses, and media assets.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
   <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
-  <link rel="stylesheet" href="./css/app.css?v=2e86bd0f">
+  <link rel="stylesheet" href="./css/app.css?v=a593b43c">
 </head>
 
 <body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
@@ -54,9 +54,13 @@
             <p id="vendor-meta" class="text-xs font-bold" style="color:var(--text-muted)"></p>
           </div>
         </div>
-        <a class="button shrink-0" href="./store">← All products</a>
+        <div class="flex shrink-0 items-center gap-2">
+          <button id="vendor-follow" type="button" class="button hidden" aria-pressed="false"></button>
+          <a class="button" href="./store">← All products</a>
+        </div>
       </div>
       <p id="vendor-bio" class="px-6 pb-6 text-sm leading-relaxed" style="color:var(--text-muted)"></p>
+      <div id="vendor-badges" class="badge-row px-6 pb-6"></div>
     </section>
 
     <!-- Breadcrumb + heading -->

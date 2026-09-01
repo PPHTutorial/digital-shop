@@ -25,6 +25,7 @@ Deno.serve(async () => {
     `<url><loc>${base}/contact</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
     `<url><loc>${base}/support</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>`,
     `<url><loc>${base}/blog</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`,
+    `<url><loc>${base}/leaderboard</loc><changefreq>daily</changefreq><priority>0.6</priority></url>`,
     `<url><loc>${base}/store</loc><changefreq>daily</changefreq><priority>0.9</priority></url>`,
     `<url><loc>${base}/categories</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>`,
     `<url><loc>${base}/legal?doc=terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>`,

@@ -24,7 +24,7 @@
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
   <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
-  <link rel="stylesheet" href="./css/app.css?v=2e86bd0f">
+  <link rel="stylesheet" href="./css/app.css?v=a593b43c">
 </head>
 <body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)]" style="background:var(--bg);color:var(--text)">
   <div id="page-loader" class="page-loader">
@@ -186,6 +186,10 @@
         </div>
 
         <form id="checkout-form"></form>
+        <label class="flex items-start gap-2 text-xs my-3" style="color:var(--text-muted)">
+          <input type="checkbox" id="checkout-accept" form="checkout-form" required style="margin-top:2px">
+          <span>I agree to the <a href="./legal?doc=terms" target="_blank" rel="noopener">Terms of Service</a> and <a href="./legal?doc=refunds" target="_blank" rel="noopener">Refund Policy</a>.</span>
+        </label>
         <button id="pay-submit-btn" type="submit" form="checkout-form" class="button button-primary w-full !py-3 !text-sm flex items-center justify-center gap-2">
           <span id="pay-btn-label">Complete Secure Purchase</span>
         </button>

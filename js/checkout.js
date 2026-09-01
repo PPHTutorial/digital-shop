@@ -388,7 +388,9 @@ document.querySelector('#checkout-form').addEventListener('submit', async (event
   const nameEl = document.querySelector('#billing-name');
   const emailEl = document.querySelector('#billing-email');
   const countryEl = document.querySelector('#billing-country');
+  const acceptEl = document.querySelector('#checkout-accept');
   if (!nameEl.reportValidity() || !emailEl.reportValidity() || !countryEl.reportValidity()) return;
+  if (acceptEl && !acceptEl.reportValidity()) return;
 
   setButtonLoading(submitBtn, true, 'Preparing payment…');
   feedback.textContent = 'Securing transaction session…';
@@ -416,6 +418,11 @@ document.querySelector('#checkout-form').addEventListener('submit', async (event
     feedback.className = 'status-line error mt-3 text-xs';
     return;
   }
+
+  // Audit-only record that this buyer agreed to the terms for this order.
+  supabase.rpc('record_legal_acceptance', {
+    p_slugs: ['terms', 'refunds'], p_context: 'checkout', p_user_agent: navigator.userAgent,
+  }).catch(() => {});
 
   // The order is now committed server-side — clear the matching cart rows so
   // a customer mid-payment doesn't see (and risk re-buying) the same items.

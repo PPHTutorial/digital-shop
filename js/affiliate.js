@@ -85,6 +85,9 @@ function wireApplyForm() {
       toast(error.message, 'error');
       return;
     }
+    supabase.rpc('record_legal_acceptance', {
+      p_slugs: ['terms', 'vendor-agreement'], p_context: 'affiliate_signup', p_user_agent: navigator.userAgent,
+    }).catch(() => {});
     toast('Application submitted — we’ll be in touch by email.', 'success');
     void data;
     await route();

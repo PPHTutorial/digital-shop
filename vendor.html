@@ -25,7 +25,7 @@
   <meta name="twitter:description" content="Premium digital ebooks, software, tools, templates, and courses with instant secure downloads.">
   <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
   <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
-  <link rel="stylesheet" href="./css/app.css?v=2e86bd0f">
+  <link rel="stylesheet" href="./css/app.css?v=a593b43c">
 </head>
 <body class="dash-wide selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
   <div id="page-loader" class="page-loader">
@@ -92,6 +92,11 @@
             each sale &mdash; you keep the rest. Earnings mature after a short holding period that covers refunds,
             then become available to withdraw to your payout account.
           </div>
+
+          <label class="vnd-field--span2 flex items-start gap-2 text-xs" style="color:var(--text-muted)">
+            <input type="checkbox" name="accept_terms" id="apply-accept" required style="margin-top:2px">
+            <span>I agree to the <a href="./legal?doc=vendor-agreement" target="_blank" rel="noopener">Vendor Agreement</a>, <a href="./legal?doc=store-policy" target="_blank" rel="noopener">Store &amp; Listing Policy</a> and <a href="./legal?doc=payouts" target="_blank" rel="noopener">Payout &amp; Settlement Policy</a>.</span>
+          </label>
 
           <div class="vnd-field--span2 flex flex-wrap items-center gap-3">
             <button class="button button-primary" type="submit">Submit application</button>
@@ -166,6 +171,7 @@
           <div class="vnd-stat-grid">
             <div class="vnd-stat-card"><span>Net revenue (lifetime)</span><strong id="m-lifetime">—</strong><small id="m-commission">After commission</small></div>
             <div class="vnd-stat-card"><span>Total sales</span><strong id="m-sales-count">—</strong><small>All-time orders</small></div>
+            <div class="vnd-stat-card"><span>Followers</span><strong id="m-followers">—</strong><small id="m-sales-rank">Store followers</small></div>
             <div class="vnd-stat-card"><span>Products listed</span><strong id="m-products">—</strong><small>Live on the storefront</small></div>
             <div class="vnd-stat-card"><span>Average rating</span><strong id="m-rating">—</strong><small id="m-rating-note">Across all products</small></div>
           </div>
@@ -188,6 +194,13 @@
             <span class="eyebrow">RECENT ACTIVITY</span>
             <h3>Latest sales</h3>
             <div id="recent-sales" class="vnd-activity-list"></div>
+          </div>
+
+          <div class="vnd-panel">
+            <span class="eyebrow">RECOGNITION</span>
+            <h3>Store achievements &amp; rewards</h3>
+            <div id="vnd-achievements" class="badge-row" style="margin-bottom:12px"></div>
+            <div id="vnd-rewards" class="flex flex-col gap-2"></div>
           </div>
         </section>
 
@@ -247,6 +260,20 @@
               <p id="payout-balance-note"></p>
             </div>
             <button id="request-payout-btn" class="button button-primary" type="button">Request payout</button>
+          </div>
+
+          <div class="vnd-panel">
+            <span class="eyebrow">SCHEDULE</span>
+            <h3>How you get paid</h3>
+            <p class="vnd-panel-note">An automatic schedule pays your available balance to your verified default account. Only settled funds are paid out — card payments can take a few business days to settle.</p>
+            <div class="flex flex-wrap items-center gap-3" style="margin-top:10px">
+              <select id="payout-cadence" class="field !mt-0" style="max-width:300px">
+                <option value="manual">Manual — I withdraw myself</option>
+                <option value="weekly">Weekly — every Friday</option>
+                <option value="monthly">Monthly — first business day</option>
+              </select>
+              <span id="payout-next" class="vnd-panel-note" style="margin:0"></span>
+            </div>
           </div>
 
           <div class="vnd-panel">

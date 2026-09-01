@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Leaderboards | DigiStore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" type="image/png" sizes="16x16" href="/img/brand/favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/brand/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/img/brand/icon-192.png">
+  <link rel="apple-touch-icon" href="/img/brand/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#072220">
+  <meta name="description" content="DigiStore leaderboards — top sellers, most-followed creators, top buyers, top affiliates and the most active community members each month, with badges and rewards.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="DigiStore">
+  <meta property="og:title" content="Leaderboards | DigiStore">
+  <meta property="og:description" content="Top sellers, creators, buyers, affiliates and community members each month — with badges and rewards.">
+  <meta property="og:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <link rel="canonical" href="https://digistore.codeinktechnologies.com/leaderboard">
+  <meta property="og:url" content="https://digistore.codeinktechnologies.com/leaderboard">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Leaderboards | DigiStore">
+  <meta name="twitter:description" content="Top sellers, creators, buyers, affiliates and community members each month.">
+  <meta name="twitter:image" content="https://digistore.codeinktechnologies.com/img/brand/og-image.png">
+  <script>try{var t=localStorage.getItem("digistore-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="stylesheet" href="./css/app.css?v=a593b43c">
+</head>
+<body class="selection:bg-[color:var(--accent)] selection:text-[color:var(--accent-ink)] flex flex-col min-h-screen" style="background:var(--bg);color:var(--text)">
+  <div id="page-loader" class="page-loader">
+    <div class="loader-card">
+      <div class="shimmer logo"></div>
+      <div class="shimmer hero"></div>
+      <div class="shimmer short"></div>
+    </div>
+  </div>
+
+  <header id="site-header" class="sticky top-0 z-40 backdrop-blur shadow-sm"></header>
+
+  <main class="shell py-8 lg:py-10 flex-1">
+    <section class="lb-hero">
+      <span class="eyebrow">Recognition</span>
+      <h1 class="lb-hero__title">DigiStore Leaderboards</h1>
+      <p class="lb-hero__sub">Every month we celebrate the sellers, creators, buyers, affiliates and
+        community members who move the marketplace. Rank up, earn badges, and win real rewards —
+        a commission cut, store credit, a homepage spotlight, or a plaque on your wall.</p>
+    </section>
+
+    <div class="lb-controls">
+      <div id="lb-tabs" class="lb-tabs" role="tablist" aria-label="Leaderboard">
+        <button type="button" class="lb-tab is-active" data-board="top_sellers" role="tab" aria-selected="true">Top Sellers</button>
+        <button type="button" class="lb-tab" data-board="most_followed_creators" role="tab" aria-selected="false">Most Followed</button>
+        <button type="button" class="lb-tab" data-board="top_buyers" role="tab" aria-selected="false">Top Buyers</button>
+        <button type="button" class="lb-tab" data-board="top_affiliates" role="tab" aria-selected="false">Top Affiliates</button>
+        <button type="button" class="lb-tab" data-board="top_engagers" role="tab" aria-selected="false">Top Engagers</button>
+        <button type="button" class="lb-tab" data-board="top_community" role="tab" aria-selected="false">Community</button>
+      </div>
+      <label class="lb-period">
+        <span class="sr-only">Period</span>
+        <select id="lb-period" data-no-enhance>
+          <option value="current">This month</option>
+          <option value="all_time">All time</option>
+        </select>
+      </label>
+    </div>
+
+    <p id="lb-caption" class="lb-caption"></p>
+    <div id="lb-rows" class="lb-rows" aria-live="polite"></div>
+  </main>
+
+  <footer id="site-footer"></footer>
+  <script type="module" src="./js/leaderboard.js"></script>
+</body>
+</html>

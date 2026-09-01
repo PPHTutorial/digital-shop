@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, setCanonical } from './ui.js';
+import { escapeHtml, finishPageLoader, icon, mountFooter, mountHeader, renderIcons, setCanonical, toast } from './ui.js';
 import { loadServableCampaigns, attachAdTracking, promoteSponsored } from './ads.js';
 import { enhanceSelect } from './select.js';
 import { enhanceCheckboxes, enhanceRadios } from './form-controls.js';
@@ -505,6 +505,80 @@ function wirePriceSlider() {
   });
 }
 
+/* ==========================================================================
+   Follow a creator + earned-badge row on the public storefront. Mirrors the
+   blog like toggle (js/blog.js): optimistic class flip, direct insert/delete
+   on public.vendor_follows, sign-in redirect, revert-on-error.
+   ========================================================================== */
+let vendorFollow = { vendorId: null, following: false, count: 0, userId: null, busy: false };
+
+function paintVendorFollow() {
+  const btn = document.querySelector('#vendor-follow');
+  if (!btn) return;
+  btn.classList.remove('hidden');
+  btn.classList.toggle('button-primary', !vendorFollow.following);
+  btn.setAttribute('aria-pressed', String(vendorFollow.following));
+  const label = vendorFollow.following ? 'Following' : 'Follow';
+  btn.innerHTML = `${icon(vendorFollow.following ? 'user-check' : 'user-plus', 15)}<span>${label}</span>`
+    + (vendorFollow.count ? `<span class="button-count">${vendorFollow.count}</span>` : '');
+  renderIcons();
+}
+
+async function wireVendorFollow(vendor) {
+  const btn = document.querySelector('#vendor-follow');
+  if (!btn) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  vendorFollow = {
+    vendorId: vendor.id,
+    following: Boolean(vendor.viewer_following),
+    count: Number(vendor.follower_count || 0),
+    userId: user?.id || null,
+    busy: false,
+  };
+  paintVendorFollow();
+
+  btn.addEventListener('click', async () => {
+    if (!vendorFollow.userId) {
+      const next = window.location.pathname.replace(/^\/+/, '') + window.location.search;
+      window.location.href = `./auth?mode=signin&next=${encodeURIComponent(next)}`;
+      return;
+    }
+    if (vendorFollow.busy) return;
+    vendorFollow.busy = true;
+    const wasFollowing = vendorFollow.following;
+    vendorFollow.following = !wasFollowing;
+    vendorFollow.count = Math.max(0, vendorFollow.count + (wasFollowing ? -1 : 1));
+    paintVendorFollow();
+    try {
+      const { error } = wasFollowing
+        ? await supabase.from('vendor_follows').delete()
+            .eq('vendor_id', vendorFollow.vendorId).eq('user_id', vendorFollow.userId)
+        : await supabase.from('vendor_follows')
+            .insert({ vendor_id: vendorFollow.vendorId, user_id: vendorFollow.userId });
+      if (error) throw error;
+    } catch (err) {
+      vendorFollow.following = wasFollowing;
+      vendorFollow.count = Math.max(0, vendorFollow.count + (wasFollowing ? 1 : -1));
+      paintVendorFollow();
+      toast(err.message || 'Could not update follow. Please try again.', 'error');
+    } finally {
+      vendorFollow.busy = false;
+    }
+  });
+}
+
+function renderVendorBadges(vendor) {
+  const host = document.querySelector('#vendor-badges');
+  if (!host) return;
+  const badges = Array.isArray(vendor.badges) ? vendor.badges : [];
+  host.classList.toggle('hidden', !badges.length);
+  host.innerHTML = badges.map((b) => `
+    <span class="badge-chip badge-chip--${escapeHtml(b.tier || 'bronze')}" title="${escapeHtml(b.title || '')}">
+      ${icon(b.icon || 'award', 13)}<span>${escapeHtml(b.title || '')}</span>
+    </span>`).join('');
+  renderIcons();
+}
+
 /**
  * Renders one seller's public store. Returns false when the slug does not
  * resolve, so the caller can fall back to the normal catalog.
@@ -547,15 +621,21 @@ async function renderVendorStore(slug) {
   const since = vendor.approved_at
     ? new Date(vendor.approved_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
     : null;
+  const followerCount = Number(vendor.follower_count || 0);
   document.querySelector('#vendor-meta').textContent = [
     `${products.length} product${products.length === 1 ? '' : 's'}`,
     vendor.total_sales_count ? `${vendor.total_sales_count} sold` : null,
+    followerCount ? `${followerCount} follower${followerCount === 1 ? '' : 's'}` : null,
+    vendor.monthly_wins ? `${vendor.monthly_wins}× monthly winner` : null,
     since ? `Selling since ${since}` : null,
   ].filter(Boolean).join(' · ');
 
   const bio = document.querySelector('#vendor-bio');
   bio.textContent = vendor.bio || '';
   bio.classList.toggle('hidden', !vendor.bio);
+
+  renderVendorBadges(vendor);
+  wireVendorFollow(vendor);
 
   document.title = `${vendor.display_name} | DigiStore`;
   setCanonical(`/store?vendor=${encodeURIComponent(slug)}`);

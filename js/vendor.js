@@ -177,6 +177,29 @@ function renderOverview() {
   renderChart(dashboard.daily_net || []);
   renderChecklist();
   renderRecentSales(dashboard.recent_sales || [], currency);
+  renderRecognition(dashboard.recognition || {});
+}
+
+function renderRecognition(rec) {
+  document.querySelector('#m-followers').textContent = compactNumber(rec.follower_count ?? 0);
+  document.querySelector('#m-sales-rank').textContent = rec.sales_rank_current
+    ? `#${rec.sales_rank_current} this month`
+    : 'Store followers';
+
+  const badges = Array.isArray(rec.badges) ? rec.badges : [];
+  document.querySelector('#vnd-achievements').innerHTML = badges.length
+    ? badges.map((b) => `<span class="badge-chip badge-chip--${escapeHtml(b.tier || 'bronze')}" title="${escapeHtml(b.description || '')}">${icon(b.icon || 'award', 13)}<span>${escapeHtml(b.title)}</span></span>`).join('')
+    : '<p class="vnd-panel-note" style="margin:0">No badges yet — your first sale earns one.</p>';
+
+  const rewards = Array.isArray(rec.active_rewards) ? rec.active_rewards : [];
+  const KIND = {
+    commission_discount: 'Commission discount', store_credit: 'Store credit',
+    featured_placement: 'Homepage spotlight', affiliate_bonus: 'Affiliate bonus', plaque: 'Physical plaque',
+  };
+  document.querySelector('#vnd-rewards').innerHTML = rewards.length
+    ? rewards.map((r) => `<div class="reward-card"><div class="reward-card__body"><div class="reward-card__title">${escapeHtml(KIND[r.kind] || r.kind)}</div><div class="reward-card__meta">${escapeHtml(r.status)}${r.ends_at ? ` · until ${new Date(r.ends_at).toLocaleDateString()}` : ''}</div></div></div>`).join('')
+    : '';
+  renderIcons();
 }
 
 /** Minimal inline bar chart — no dependency. */
@@ -444,14 +467,17 @@ async function loadPayouts() {
       ? `${money(balance.pending, currency)} still clearing the refund window.`
       : 'Earnings become available after the refund window closes.';
 
-  const [accountsResult, historyResult] = await Promise.all([
+  const [accountsResult, historyResult, cadenceResult] = await Promise.all([
     supabase.from('payout_accounts')
-      .select('id,method,country,currency,account_name,account_last4,bank_name,momo_provider,paypal_email,crypto_asset,is_default,is_verified,created_at')
+      .select('id,method,country,currency,account_name,account_last4,bank_name,momo_provider,paypal_email,crypto_asset,is_default,is_verified,verification_status,created_at')
       .eq('vendor_id', vendor.id).order('created_at', { ascending: false }),
     supabase.from('payouts')
-      .select('id,amount,currency,status,reference,requested_at,processed_at,failure_reason')
+      .select('id,amount,currency,status,source,reference,requested_at,processed_at,failure_reason,payout_transfers(status,flw_status,failure_reason,stale_flagged_at)')
       .eq('vendor_id', vendor.id).order('requested_at', { ascending: false }).limit(50),
+    supabase.from('vendors').select('payout_cadence,next_payout_at').eq('id', vendor.id).maybeSingle(),
   ]);
+
+  renderPayoutCadence(cadenceResult.data || {});
 
   payoutAccounts = accountsResult.data || [];
   const accountsHost = document.querySelector('#payout-accounts-list');
@@ -487,9 +513,17 @@ async function loadPayouts() {
       { key: 'reference', label: 'Reference', render: (p) => p.reference ? `<span style="font-family:var(--font-mono);font-size:.78rem">${escapeHtml(p.reference)}</span>` : '—' },
       { key: 'requested_at', label: 'Requested', render: (p) => shortDate(p.requested_at) },
       {
-        key: 'status', label: 'Status', render: (p) => `
-          ${statusBadge(p.status)}
-          ${p.failure_reason ? `<div style="font-size:.66rem;color:var(--danger);margin-top:2px">${escapeHtml(p.failure_reason)}</div>` : ''}`,
+        key: 'status', label: 'Status', render: (p) => {
+          const t = Array.isArray(p.payout_transfers) ? p.payout_transfers[0] : p.payout_transfers;
+          const transferLine = t
+            ? `<div style="font-size:.66rem;color:var(--text-soft);margin-top:2px">transfer: ${escapeHtml(t.status)}${t.stale_flagged_at ? ' · needs review' : ''}</div>`
+            : '';
+          const reason = p.failure_reason || t?.failure_reason;
+          return `
+            ${statusBadge(p.status)}
+            ${transferLine}
+            ${reason ? `<div style="font-size:.66rem;color:var(--danger);margin-top:2px">${escapeHtml(reason)}</div>` : ''}`;
+        },
       },
     ],
     rows: payoutHistory,
@@ -500,6 +534,37 @@ async function loadPayouts() {
   });
 
   return payoutAccounts;
+}
+
+let payoutCadenceWired = false;
+
+function renderPayoutCadence(row) {
+  const select = document.querySelector('#payout-cadence');
+  const next = document.querySelector('#payout-next');
+  if (!select) return;
+  select.value = row.payout_cadence || 'manual';
+  next.textContent = (row.payout_cadence && row.payout_cadence !== 'manual' && row.next_payout_at)
+    ? `Next automatic payout: ${shortDate(row.next_payout_at)}`
+    : '';
+
+  if (payoutCadenceWired) return;
+  payoutCadenceWired = true;
+  select.addEventListener('change', async () => {
+    const choice = select.value;
+    select.disabled = true;
+    const { data, error } = await supabase.rpc('set_payout_cadence', { p_cadence: choice });
+    select.disabled = false;
+    if (error) {
+      toast(error.message, 'error');
+      select.value = 'manual';
+      next.textContent = '';
+      return;
+    }
+    toast(choice === 'manual' ? 'Automatic payouts turned off.' : 'Payout schedule saved.');
+    next.textContent = (choice !== 'manual' && data?.next_payout_at)
+      ? `Next automatic payout: ${shortDate(data.next_payout_at)}`
+      : '';
+  });
 }
 
 /* --- Ad wallet --------------------------------------------------------------- */
@@ -1567,6 +1632,10 @@ document.querySelector('#apply-form')?.addEventListener('submit', async (event) 
     feedback.className = 'status-line error text-xs';
     return;
   }
+  supabase.rpc('record_legal_acceptance', {
+    p_slugs: ['vendor-agreement', 'store-policy', 'payouts'],
+    p_context: 'seller_onboarding', p_user_agent: navigator.userAgent,
+  }).catch(() => {});
   toast('Application submitted.');
   await boot();
 });

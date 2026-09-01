@@ -42,6 +42,8 @@ if (-not $SkipSecrets) {
     FLW_SECRET_KEY = (Read-PlainSecret 'FLW_SECRET_KEY')
     NOWPAYMENTS_API_KEY = (Read-PlainSecret 'NOWPAYMENTS_API_KEY')
     NOWPAYMENTS_IPN_SECRET = (Read-PlainSecret 'NOWPAYMENTS_IPN_SECRET')
+    CRON_SECRET = (Read-PlainSecret 'CRON_SECRET')
+    FLW_SECRET_HASH = (Read-PlainSecret 'FLW_SECRET_HASH')
     PUBLIC_SITE_URL = $SiteUrl
     SUPABASE_FUNCTIONS_URL = "https://$ProjectRef.supabase.co/functions/v1"
     STORE_NAME = 'DigiStore'
@@ -55,9 +57,9 @@ $answer = Read-Host 'Apply the migration to the linked project? Type DEPLOY to c
 if ($answer -ne 'DEPLOY') { throw 'Deployment cancelled before database changes.' }
 supabase db push
 
-$publicNoJwtFunctions = @('flutterwave-callback', 'nowpayments-ipn', 'sitemap', 'search-index', 'daily-content', 'download-book')
+$publicNoJwtFunctions = @('flutterwave-callback', 'nowpayments-ipn', 'sitemap', 'search-index', 'daily-content', 'download-book', 'reconcile-settlements', 'run-payouts', 'flutterwave-transfer-webhook')
 
-@('create-flutterwave-payment','flutterwave-callback','create-nowpayments-payment','nowpayments-ipn','download-book','sitemap','search-index','daily-content','admin-dashboard') | ForEach-Object {
+@('create-flutterwave-payment','flutterwave-callback','create-nowpayments-payment','nowpayments-ipn','download-book','sitemap','search-index','daily-content','admin-dashboard','reconcile-settlements','run-payouts','flutterwave-transfer-webhook') | ForEach-Object {
   Write-Host "Deploying Edge Function: $_" -ForegroundColor Cyan
   if ($publicNoJwtFunctions -contains $_) {
     supabase functions deploy $_ --no-verify-jwt --project-ref $ProjectRef

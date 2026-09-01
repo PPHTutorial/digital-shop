@@ -1,5 +1,5 @@
 import { supabase } from './client.js';
-import { escapeHtml, finishPageLoader, getAccount, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
+import { escapeHtml, finishPageLoader, getAccount, icon, mountFooter, mountHeader, renderIcons, setButtonLoading, toast } from './ui.js';
 import { wishlistButton, paintWishlist, wireWishlist } from './wishlist.js';
 
 let account;
@@ -216,7 +216,8 @@ async function load() {
   ].forEach((k) => {
     if (form.elements[k]) form.elements[k].value = profile?.[k] ?? '';
   });
-  [['marketing_opt_in', false], ['notify_product_news', true], ['notify_order_updates', true]].forEach(([k, def]) => {
+  [['marketing_opt_in', false], ['notify_product_news', true], ['notify_order_updates', true],
+    ['show_on_leaderboards', false]].forEach(([k, def]) => {
     if (form.elements[k]) form.elements[k].checked = profile?.[k] ?? def;
   });
 
@@ -264,8 +265,119 @@ document.querySelectorAll('[data-acct-tab]').forEach((btn) => {
     document.querySelectorAll('[data-acct-tab]').forEach((b) => b.classList.toggle('is-active', b === btn));
     document.querySelectorAll('[data-acct-panel]').forEach((p) => p.classList.toggle('is-active', p.dataset.acctPanel === key));
     setDashSidebarOpen(false);
+    if (key === 'rewards') loadRewardsTab();
   });
 });
+
+/* ==========================================================================
+   Badges & Rewards tab — one call to my_recognition(). Lazy-loaded on first
+   open, re-fetched each open so a freshly earned badge shows up.
+   ========================================================================== */
+const TIER_ICON = { bronze: 'medal', silver: 'medal', gold: 'award', platinum: 'crown', diamond: 'gem' };
+const money = (v, c) => `${c && c !== 'USD' ? `${c} ` : '$'}${Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+let plaqueWired = false;
+
+async function loadRewardsTab() {
+  const ranksHost = document.querySelector('#acct-ranks');
+  const rewardsHost = document.querySelector('#acct-rewards-list');
+  const badgesHost = document.querySelector('#acct-badges-grid');
+  const nextHost = document.querySelector('#acct-next-badges');
+  rewardsHost.innerHTML = '<p class="text-xs" style="color:var(--text-muted)">Loading…</p>';
+
+  const { data, error } = await supabase.rpc('my_recognition');
+  if (error || !data?.authenticated) {
+    rewardsHost.innerHTML = `<p style="color:var(--danger)">${escapeHtml(error?.message || 'Could not load your rewards.')}</p>`;
+    return;
+  }
+
+  const rankLabel = { top_buyers: 'Top Buyers', top_engagers: 'Top Engagers' };
+  ranksHost.innerHTML = Object.entries(data.ranks || {}).map(([board, r]) => `
+    <span class="rank-pill">${escapeHtml(rankLabel[board] || board)}
+      ${r?.rank ? `#<b>${r.rank}</b>` : '<b>—</b>'}</span>`).join('')
+    || '<p class="text-xs" style="color:var(--text-muted)">No ranking activity yet this month.</p>';
+
+  const rewards = data.rewards || [];
+  rewardsHost.innerHTML = rewards.length ? rewards.map(rewardCardHtml).join('')
+    : '<p class="text-xs" style="color:var(--text-muted)">No rewards yet — climb a leaderboard or hit a milestone.</p>';
+
+  const badges = data.badges || [];
+  badgesHost.innerHTML = badges.length ? badges.map((b) => `
+    <div class="badge-tile">
+      <span class="badge-tile__icon">${icon(b.icon || TIER_ICON[b.tier] || 'award', 20)}</span>
+      <span class="badge-tile__title">${escapeHtml(b.title)}</span>
+      <span class="badge-tile__desc">${escapeHtml(b.description || '')}</span>
+    </div>`).join('')
+    : '<p class="text-xs" style="color:var(--text-muted)">No badges yet.</p>';
+
+  const next = data.next_badges || [];
+  nextHost.innerHTML = next.length ? next.map((b) => {
+    const pct = Math.round(Number(b.progress || 0) * 100);
+    return `
+      <div class="badge-tile is-locked">
+        <span class="badge-tile__icon">${icon(b.icon || 'award', 20)}</span>
+        <span class="badge-tile__title">${escapeHtml(b.title)}</span>
+        <span class="badge-tile__desc">${escapeHtml(String(Math.floor(Number(b.current_value || 0))))} / ${escapeHtml(String(b.threshold))}</span>
+        <span class="badge-tile__bar"><span style="width:${pct}%"></span></span>
+      </div>`;
+  }).join('') : '<p class="text-xs" style="color:var(--text-muted)">Every milestone badge earned.</p>';
+
+  renderIcons();
+  wirePlaqueForms();
+}
+
+function rewardCardHtml(r) {
+  const KIND = {
+    commission_discount: 'Commission discount',
+    store_credit: 'Store credit',
+    featured_placement: 'Homepage spotlight',
+    affiliate_bonus: 'Affiliate bonus',
+    plaque: 'Physical plaque',
+  };
+  const detail = r.kind === 'store_credit' && r.metadata?.promo_code
+    ? `Code <strong>${escapeHtml(r.metadata.promo_code)}</strong> · ${money(r.value, r.currency)}`
+    : r.kind === 'commission_discount' ? `${escapeHtml(String(r.value))} points off until ${r.ends_at ? new Date(r.ends_at).toLocaleDateString() : 'next month'}`
+      : r.kind === 'affiliate_bonus' ? `+${escapeHtml(String(r.value))}% — applied by an admin`
+        : r.value ? money(r.value, r.currency) : '';
+  const needsAddress = r.kind === 'plaque' && r.status === 'pending' && !r.ship_to_address;
+  const form = needsAddress ? `
+    <form class="plaque-form" data-plaque="${escapeHtml(r.id)}">
+      <input class="field" name="name" placeholder="Full name" required>
+      <input class="field" name="address" placeholder="Postal address" required>
+      <input class="field" name="country" placeholder="Country">
+      <button type="submit" class="button button-primary">Send plaque</button>
+    </form>` : '';
+  return `
+    <div class="reward-card">
+      <div class="reward-card__body">
+        <div class="reward-card__title">${escapeHtml(KIND[r.kind] || r.kind)}</div>
+        <div class="reward-card__meta">${detail || ''}${detail ? ' · ' : ''}${escapeHtml(r.status)}${r.tracking_ref ? ` · tracking ${escapeHtml(r.tracking_ref)}` : ''}</div>
+      </div>
+      ${form}
+    </div>`;
+}
+
+function wirePlaqueForms() {
+  if (plaqueWired) return;
+  plaqueWired = true;
+  document.querySelector('#acct-rewards-list').addEventListener('submit', async (e) => {
+    const form = e.target.closest('[data-plaque]');
+    if (!form) return;
+    e.preventDefault();
+    const btn = form.querySelector('button[type="submit"]');
+    const fd = new FormData(form);
+    setButtonLoading(btn, true, 'Sending…');
+    const { error } = await supabase.rpc('submit_plaque_shipping', {
+      p_reward_id: form.dataset.plaque,
+      p_name: fd.get('name'),
+      p_address: fd.get('address'),
+      p_country: fd.get('country') || null,
+    });
+    setButtonLoading(btn, false);
+    if (error) { toast(error.message, 'error'); return; }
+    toast('Shipping details saved — your plaque is on the way.');
+    loadRewardsTab();
+  });
+}
 
 // Mobile off-canvas drawer — same `#dash-sidebar`/`#dash-menu-button`/
 // `#dash-scrim` pattern as the admin/vendor consoles (js/admin.js,
@@ -314,6 +426,7 @@ document.querySelector('#profile-form').onsubmit = async (e) => {
     marketing_opt_in: fd.has('marketing_opt_in'),
     notify_product_news: fd.has('notify_product_news'),
     notify_order_updates: fd.has('notify_order_updates'),
+    show_on_leaderboards: fd.has('show_on_leaderboards'),
     updated_at: new Date().toISOString(),
   };
   // Keep the legacy `age` column in step with the new date of birth.
